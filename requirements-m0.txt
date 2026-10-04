@@ -1,0 +1,47 @@
+# cyberWife V1 M0 阶段 Python 依赖
+# 锁版本于 2026-09-23；WSL2 Python 3.12.3 + pip 26.1.1
+# 安装命令：pip install --break-system-packages -r requirements-m0.txt
+# 配套：pip install -r requirements-m0.txt --index-url https://download.pytorch.org/whl/cu128
+#   （M0 实际 GPU 验证阶段；本文件锁的 torch/torchaudio 默认 CPU，仅用于 M0 smoke test）
+#
+# 字段说明见 docs/model-manifest.md §2 + implementation-contracts.md §17
+
+# 推理运行时
+torch==2.9.1
+torchaudio==2.9.1
+onnxruntime==1.28.0
+
+# 文本 LLM（ggml 后端）
+llama_cpp_python==0.3.35
+
+# ASR
+faster-whisper==1.2.1
+
+# TTS（transformers + qwen-tts）
+transformers==5.17.0
+tokenizers==0.23.1
+safetensors==0.8.0
+
+# Embedding
+sentence-transformers==6.1.0
+
+# VAD
+silero-vad==6.2.2
+
+# 通用
+numpy==2.4.4
+PyYAML==6.0.1
+huggingface_hub==1.28.0
+requests==2.31.0
+tqdm==4.67.3
+
+# 测试
+pytest==8.4.2
+pytest-asyncio==0.23.8
+
+# 类型与配置（pyproject.toml 与 settings 解析需要）
+pydantic==2.13.4
+pydantic-settings==2.14.2
+anyio==4.13.0
+h11==0.16.0
+av==18.1.0

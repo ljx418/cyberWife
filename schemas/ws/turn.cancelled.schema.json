@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/turn.cancelled.schema.json",
+  "title": "WS turn.cancelled（FR-09）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["cancelled_turn_id", "next_state"],
+  "properties": {
+    "cancelled_turn_id": {"type": "integer", "minimum": 0},
+    "next_state": {"type": "string", "enum": ["listening", "idle"]},
+    "reason": {"type": "string", "enum": ["barge_in", "session_stop", "timeout", "component_failure"]},
+    "cancelled_generation": {"type": "integer", "minimum": 0},
+    "current_generation": {"type": "integer", "minimum": 0},
+    "component_errors": {"type": "array", "items": {"type": "string"}}
+  }
+}

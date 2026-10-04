@@ -1,0 +1,185 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "cyberWife V1｜B3—B5 目标架构与验收",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1390, 760],
+    "views": [
+      {
+        "id": "realtime",
+        "label": "B3 实时打断",
+        "focus": ["browser", "gateway", "session_runtime", "turn_pipeline", "speech_avatar"],
+        "note": "持续接收、单活动轮次、有界发送队列与 generation fence 共同保证旧轮彻底失效。"
+      },
+      {
+        "id": "memory_privacy",
+        "label": "B4 记忆与隐私",
+        "focus": ["turn_pipeline", "memory_service", "sqlite_state"],
+        "note": "真实 B3 会话进入 FTS5 + sqlite-vec；编辑、删除和 no-record 都由单一事务边界保证。"
+      },
+      {
+        "id": "release",
+        "label": "B5 发布恢复",
+        "focus": ["browser", "launcher_health", "gateway", "evidence"],
+        "note": "先过 B5-AC00 完整性门，再执行断网、故障恢复、生命周期和 AC/OX 全集。"
+      },
+      {
+        "id": "runtime_budget",
+        "label": "硬件与模型",
+        "focus": ["llm_runtime", "speech_avatar", "launcher_health"],
+        "note": "CosyVoice 默认、Qwen TTS 回退；项目 RAM≤14GB、VRAM≤22GB，宿主与 WSL 可用内存各≥2GB。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "browser",
+      "type": "frontend",
+      "label": "Windows Chrome",
+      "sublabel": "浏览器端",
+      "tag": "B5 需切默认入口",
+      "pos": [55, 270],
+      "size": [190, 78]
+    },
+    {
+      "id": "gateway",
+      "type": "security",
+      "label": "ApiGateway :7860",
+      "sublabel": "REST / 全双工 WebSocket",
+      "tag": "B3 需修改",
+      "pos": [315, 270],
+      "size": [190, 78]
+    },
+    {
+      "id": "session_runtime",
+      "type": "messagebus",
+      "label": "SessionRuntime",
+      "sublabel": "接收 · 单轮 · 有界发送",
+      "tag": "B3 待新增",
+      "pos": [575, 270],
+      "size": [220, 78]
+    },
+    {
+      "id": "turn_pipeline",
+      "type": "backend",
+      "label": "TurnPipeline",
+      "sublabel": "ASR → LLM → TTS → Avatar",
+      "tag": "B3 需修改",
+      "pos": [865, 270],
+      "size": [195, 78]
+    },
+    {
+      "id": "interruption",
+      "type": "security",
+      "label": "InterruptionController",
+      "sublabel": "CancellationToken · generation fence",
+      "tag": "B3 待新增",
+      "pos": [575, 92],
+      "size": [220, 76]
+    },
+    {
+      "id": "llm_runtime",
+      "type": "external",
+      "label": "Windows llama.cpp",
+      "sublabel": "Qwen3-14B Q4_K_M · :8090",
+      "tag": "B1/B2.5 已验收",
+      "pos": [1130, 92],
+      "size": [210, 76]
+    },
+    {
+      "id": "speech_avatar",
+      "type": "backend",
+      "label": "Speech + Avatar Workers",
+      "sublabel": "Whisper · CosyVoice · LiveTalking",
+      "tag": "B2/B2.5 已验收；B3补取消",
+      "pos": [1130, 270],
+      "size": [220, 78]
+    },
+    {
+      "id": "memory_service",
+      "type": "backend",
+      "label": "MemoryService + RetentionService",
+      "sublabel": "候选 · 融合召回 · 删除 · no-record",
+      "tag": "B4 待新增",
+      "pos": [865, 465],
+      "size": [235, 82]
+    },
+    {
+      "id": "sqlite_state",
+      "type": "database",
+      "label": "SQLite 状态层",
+      "sublabel": "WAL · FTS5 · sqlite-vec 512d",
+      "tag": "基础已有；B4需原子化",
+      "pos": [1160, 465],
+      "size": [195, 82]
+    },
+    {
+      "id": "launcher_health",
+      "type": "cloud",
+      "label": "RuntimeLauncher + HealthAggregator",
+      "sublabel": "start · status · recover · stop · probes",
+      "tag": "B0 已验收；B5扩展",
+      "pos": [315, 465],
+      "size": [240, 82]
+    },
+    {
+      "id": "evidence",
+      "type": "database",
+      "label": "验收证据与门禁",
+      "sublabel": "B3/B4 runner · B5-AC00 · AC/OX",
+      "tag": "当前 NOT EXECUTED",
+      "pos": [55, 465],
+      "size": [200, 82]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "Windows 宿主",
+      "wraps": ["browser", "llm_runtime"],
+      "pad": 20
+    },
+    {
+      "kind": "security-group",
+      "label": "WSL2 本机应用边界",
+      "wraps": ["gateway", "session_runtime", "turn_pipeline", "interruption", "speech_avatar", "memory_service", "sqlite_state", "launcher_health"],
+      "pad": 22
+    },
+    {
+      "kind": "region",
+      "label": "真实证据边界",
+      "wraps": ["evidence"],
+      "pad": 16
+    }
+  ],
+  "connections": [
+    {"from": "browser", "to": "gateway", "label": "双向 loopback", "variant": "security", "labelAt": [280, 255]},
+    {"from": "gateway", "to": "session_runtime", "label": "receiver 入队", "variant": "emphasis", "labelAt": [540, 255]},
+    {"from": "session_runtime", "to": "turn_pipeline", "label": "单活动轮次", "variant": "emphasis", "labelAt": [830, 255]},
+    {"from": "interruption", "to": "session_runtime", "label": "取消令牌 + generation", "variant": "security", "fromSide": "bottom", "toSide": "top", "labelAt": [685, 216]},
+    {"from": "turn_pipeline", "to": "llm_runtime", "label": "HTTP 流 / 取消", "variant": "dashed", "fromSide": "top", "toSide": "left"},
+    {"from": "turn_pipeline", "to": "speech_avatar", "label": "PCM / H.264", "variant": "emphasis", "labelAt": [1095, 365]},
+    {"from": "turn_pipeline", "to": "memory_service", "label": "已验收 turn", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelAt": [982, 410]},
+    {"from": "memory_service", "to": "sqlite_state", "label": "单事务 CRUD / 清理", "variant": "security", "labelAt": [1130, 570]},
+    {"from": "launcher_health", "to": "gateway", "label": "生命周期 + probe", "variant": "dashed", "fromSide": "top", "toSide": "bottom", "labelAt": [435, 407]}
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "已经真实验收",
+      "items": ["B0 一键生命周期与六组件 probe", "B1 真实 PCM→ASR→LLM 20/20", "B2 Avatar 25fps 与原页恢复", "B2.5 CosyVoice 普通链 P95=6.392s"]
+    },
+    {
+      "dot": "amber",
+      "title": "B3—B5 实施主线",
+      "items": ["当前阶段门 4/7；B3—B5 尚未执行", "B3 全双工与旧 generation 零泄漏", "B4 记忆、原子删除与 no-record", "B5 先过完整性门，再做发布组合回归"]
+    },
+    {
+      "dot": "rose",
+      "title": "不可降低的硬门",
+      "items": ["打断静音 P95≤400ms；普通首响 P95≤7s", "项目 RAM≤14GB；VRAM≤22GB；双侧可用≥2GB", "删除四层零召回；no-record 业务持久化零增量"]
+    }
+  ]
+}

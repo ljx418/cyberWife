@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/component.schema.json",
+  "title": "WS component.degraded / component.recovered",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["component", "status"],
+  "properties": {
+    "component": {"type": "string", "enum": ["vad", "asr", "llm", "tts", "avatar", "embedding"]},
+    "status": {"type": "string", "enum": ["degraded", "recovered", "loading", "error"]},
+    "reason": {"type": "string"},
+    "fallback_active": {"type": "boolean"}
+  }
+}

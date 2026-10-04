@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/consent.schema.json",
+  "title": "授权授予与撤销（FR-02）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "policy_version", "granted"],
+  "properties": {
+    "scope": {"type": "string", "enum": ["portrait", "voice", "all"]},
+    "policy_version": {"type": "string"},
+    "granted": {"type": "boolean"},
+    "granted_at": {"type": "string", "format": "date-time"},
+    "revoked_at": {"type": ["string", "null"], "format": "date-time"}
+  }
+}

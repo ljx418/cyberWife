@@ -1,0 +1,298 @@
+// Browser PCM playback and first-non-silent render confirmation (B2.5-O1).
+
+type PlaybackEnvelope = {
+  type: string;
+  session_id: string;
+  turn_id: number | null;
+  payload: Record<string, unknown>;
+};
+
+type Marker = {
+  key: string;
+  sessionId: string;
+  turnId: number;
+  traceId: string;
+  generation: number;
+  asrFinalWallMs: number;
+  serverElapsedMs: number;
+  browserReceivedPerfMs: number;
+};
+
+const WORKLET_SOURCE = `
+class CyberWifeFirstSoundMeter extends AudioWorkletProcessor {
+  constructor() {
+    super();
+    this.armed = false;
+    this.key = '';
+    this.port.onmessage = (event) => {
+      if (event.data && event.data.type === 'arm') {
+        this.armed = true;
+        this.key = event.data.key;
+      }
+    };
+  }
+  process(inputs, outputs) {
+    const input = inputs[0] || [];
+    const output = outputs[0] || [];
+    for (let channel = 0; channel < output.length; channel += 1) {
+      const source = input[channel] || input[0];
+      if (source) output[channel].set(source);
+    }
+    if (this.armed && input.some(channel => channel.some(sample => Math.abs(sample) >= 0.002))) {
+      this.armed = false;
+      this.port.postMessage({ type: 'first-non-silent', key: this.key });
+    }
+    return true;
+  }
+}
+registerProcessor('cyberwife-first-sound-meter', CyberWifeFirstSoundMeter);
+`;
+
+let context: AudioContext | null = null;
+let meter: AudioWorkletNode | null = null;
+let outputPromise: Promise<AudioContext> | null = null;
+let nextStartAt = 0;
+let armedKey = "";
+let activeSocket: WebSocket | null = null;
+const markers = new Map<string, Marker>();
+const confirmed = new Set<string>();
+const activeSources = new Map<string, Set<AudioBufferSourceNode>>();
+const cancelledGenerations = new Set<string>();
+const latestGenerations = new Map<string, number>();
+const playbackComplete = new Set<string>();
+const playbackEndedSent = new Set<string>();
+
+function generationKey(sessionId: string, generation: number): string {
+  return `${sessionId}:${generation}`;
+}
+
+function confirmRendered(key: string): void {
+  const marker = markers.get(key);
+  if (!marker || confirmed.has(marker.key)) return;
+  confirmed.add(marker.key);
+  const browserWallMs = Date.now();
+  const ws = activeSocket;
+  if (ws?.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: "audio.playback.started",
+      session_id: marker.sessionId,
+      turn_id: marker.turnId,
+      trace_id: marker.traceId,
+      generation: marker.generation,
+      asr_to_playback_ms: marker.serverElapsedMs + Math.max(
+        0,
+        performance.now() - marker.browserReceivedPerfMs,
+      ),
+      browser_first_non_silent_wall_ms: browserWallMs,
+    }));
+  }
+}
+
+function confirmEnded(key: string): void {
+  if (!playbackComplete.has(key) || playbackEndedSent.has(key)) return;
+  const marker = markers.get(key);
+  if (!marker || cancelledGenerations.has(generationKey(marker.sessionId, marker.generation))) return;
+  const sources = activeSources.get(generationKey(marker.sessionId, marker.generation));
+  if (sources && sources.size > 0) return;
+  const ws = activeSocket;
+  if (ws?.readyState !== WebSocket.OPEN) return;
+  playbackEndedSent.add(key);
+  ws.send(JSON.stringify({
+    type: "audio.playback.ended",
+    session_id: marker.sessionId,
+    turn_id: marker.turnId,
+    trace_id: marker.traceId,
+    generation: marker.generation,
+    browser_playback_ended_wall_ms: Date.now(),
+  }));
+}
+
+async function ensureOutput(): Promise<AudioContext> {
+  if (outputPromise) return outputPromise;
+  if (context && context.state !== "closed") {
+    if (context.state === "suspended") await context.resume();
+    return context;
+  }
+  outputPromise = (async () => {
+    const created = new AudioContext({ latencyHint: "interactive", sampleRate: 16000 });
+    context = created;
+    const moduleUrl = URL.createObjectURL(new Blob([WORKLET_SOURCE], { type: "text/javascript" }));
+    try {
+      await created.audioWorklet.addModule(moduleUrl);
+    } finally {
+      URL.revokeObjectURL(moduleUrl);
+    }
+    meter = new AudioWorkletNode(created, "cyberwife-first-sound-meter", {
+      numberOfInputs: 1,
+      numberOfOutputs: 1,
+      outputChannelCount: [1],
+    });
+    meter.connect(created.destination);
+    meter.port.onmessage = (event: MessageEvent<{ type: string; key: string }>) => {
+      if (event.data?.type === "first-non-silent") confirmRendered(event.data.key);
+    };
+    nextStartAt = created.currentTime;
+    return created;
+  })();
+  try {
+    return await outputPromise;
+  } catch (error) {
+    outputPromise = null;
+    context = null;
+    meter = null;
+    throw error;
+  }
+}
+
+function decodePcm16(base64: string): Int16Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Int16Array(bytes.buffer);
+}
+
+export const MediaSession = {
+  async start(): Promise<void> {
+    await ensureOutput();
+  },
+
+  async handleServerEvent(env: PlaybackEnvelope, ws: WebSocket): Promise<boolean> {
+    if (env.type === "barge_in.detected") {
+      this.cancelGeneration(undefined, env.session_id);
+      return true;
+    }
+    if (env.type === "turn.cancelled") {
+      const cancelled = Number(env.payload.cancelled_generation);
+      this.cancelGeneration(Number.isFinite(cancelled) ? cancelled : undefined, env.session_id);
+      return true;
+    }
+    if (env.type === "reply.audio.complete" && env.turn_id !== null) {
+      const traceId = env.payload.trace_id;
+      const generation = env.payload.generation;
+      if (typeof traceId !== "string" || typeof generation !== "number") return false;
+      const key = `${env.session_id}:${env.turn_id}:${generation}:${traceId}`;
+      playbackComplete.add(key);
+      confirmEnded(key);
+      return true;
+    }
+    if (env.type !== "reply.audio.chunk" || env.turn_id === null) return false;
+    const payload = env.payload;
+    const base64 = payload.audio_chunk_b64;
+    const traceId = payload.trace_id;
+    const generation = payload.generation;
+    const asrFinalWallMs = payload.asr_final_wall_ms;
+    const serverElapsedMs = payload.server_elapsed_ms;
+    if (
+      typeof base64 !== "string" || typeof traceId !== "string" ||
+      typeof generation !== "number" || typeof asrFinalWallMs !== "number" ||
+      typeof serverElapsedMs !== "number"
+    ) return false;
+    const generationId = generationKey(env.session_id, generation);
+    const latestGeneration = latestGenerations.get(env.session_id) ?? 0;
+    if (cancelledGenerations.has(generationId) || generation < latestGeneration) return false;
+    latestGenerations.set(env.session_id, Math.max(latestGeneration, generation));
+
+    const audioContext = await ensureOutput();
+    if (!meter) return false;
+    activeSocket = ws;
+    const key = `${env.session_id}:${env.turn_id}:${generation}:${traceId}`;
+    if (armedKey !== key) {
+      armedKey = key;
+      markers.set(key, {
+        key,
+        sessionId: env.session_id,
+        turnId: env.turn_id,
+        traceId,
+        generation,
+        asrFinalWallMs,
+        serverElapsedMs,
+        browserReceivedPerfMs: performance.now(),
+      });
+      meter.port.postMessage({ type: "arm", key });
+    }
+
+    const pcm = decodePcm16(base64);
+    const buffer = audioContext.createBuffer(1, pcm.length, Number(payload.sample_rate) || 16000);
+    const channel = buffer.getChannelData(0);
+    for (let i = 0; i < pcm.length; i += 1) channel[i] = pcm[i] / 32768;
+    const source = audioContext.createBufferSource();
+    source.buffer = buffer;
+    source.connect(meter);
+    const hasNonSilent = pcm.some((sample) => Math.abs(sample) >= 66);
+    const sources = activeSources.get(generationId) ?? new Set<AudioBufferSourceNode>();
+    sources.add(source);
+    activeSources.set(generationId, sources);
+    source.onended = () => {
+      sources.delete(source);
+      if (sources.size === 0) activeSources.delete(generationId);
+      if (hasNonSilent && !cancelledGenerations.has(generationId)) confirmRendered(key);
+      confirmEnded(key);
+    };
+    const scheduledAt = Math.max(audioContext.currentTime + 0.005, nextStartAt);
+    source.start(scheduledAt);
+    nextStartAt = scheduledAt + buffer.duration;
+    return true;
+  },
+
+  cancelGeneration(generation?: number, sessionId?: string): number {
+    const targets = [...activeSources.keys()].filter((key) => {
+      const separator = key.lastIndexOf(":");
+      const keySession = key.slice(0, separator);
+      const keyGeneration = Number(key.slice(separator + 1));
+      return (sessionId === undefined || keySession === sessionId) &&
+        (generation === undefined || keyGeneration === generation);
+    });
+    let stopped = 0;
+    for (const target of targets) {
+      cancelledGenerations.add(target);
+      const sources = activeSources.get(target);
+      if (!sources) continue;
+      for (const source of sources) {
+        try {
+          source.stop();
+          stopped += 1;
+        } catch {
+          // Already-ended WebAudio sources are harmless and still removed.
+        }
+        source.disconnect();
+      }
+      activeSources.delete(target);
+      for (const [key, marker] of markers) {
+        if (generationKey(marker.sessionId, marker.generation) === target) markers.delete(key);
+        playbackComplete.delete(key);
+        playbackEndedSent.delete(key);
+      }
+    }
+    if (context) nextStartAt = context.currentTime;
+    armedKey = "";
+    return stopped;
+  },
+
+  snapshot() {
+    return {
+      contextState: context?.state ?? "closed",
+      activeSources: [...activeSources.values()].reduce((sum, sources) => sum + sources.size, 0),
+      latestGeneration: Math.max(0, ...latestGenerations.values()),
+      cancelledGenerationKeys: [...cancelledGenerations],
+      latestGenerationBySession: Object.fromEntries(latestGenerations),
+    };
+  },
+
+  async stop(): Promise<void> {
+    const current = context;
+    context = null;
+    meter = null;
+    outputPromise = null;
+    nextStartAt = 0;
+    armedKey = "";
+    activeSocket = null;
+    markers.clear();
+    confirmed.clear();
+    playbackComplete.clear();
+    playbackEndedSent.clear();
+    activeSources.clear();
+    cancelledGenerations.clear();
+    latestGenerations.clear();
+    if (current && current.state !== "closed") await current.close();
+  },
+};

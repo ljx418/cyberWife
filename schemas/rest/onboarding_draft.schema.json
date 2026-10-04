@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/onboarding_draft.schema.json",
+  "title": "Onboarding 五步草稿（FR-01）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "consent_granted", "step_completed", "updated_at"],
+  "properties": {
+    "id": {"const": 1},
+    "consent_granted": {"type": "boolean"},
+    "step_completed": {"type": "integer", "minimum": 0, "maximum": 4},
+    "asset_consent_at": {"type": ["string", "null"], "format": "date-time"},
+    "profile_draft_json": {"type": "object"},
+    "settings_json": {"type": "object"},
+    "device_snapshot_json": {"type": "object"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

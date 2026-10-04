@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/state.changed.schema.json",
+  "title": "WS state.changed（FR-07）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["previous", "current", "reason"],
+  "properties": {
+    "previous": {"type": "string", "enum": ["idle", "listening", "thinking", "speaking", "interrupted", "error"]},
+    "current": {"type": "string", "enum": ["idle", "listening", "thinking", "speaking", "interrupted", "error"]},
+    "reason": {"type": "string"},
+    "trace_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
+    "generation": {"type": "integer", "minimum": 0}
+  }
+}

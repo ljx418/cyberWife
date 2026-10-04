@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/reply.schema.json",
+  "title": "WS reply.text.delta / reply.text.final / reply.audio.chunk / reply.audio.started",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["stream_kind"],
+  "properties": {
+    "stream_kind": {"type": "string", "enum": ["text_delta", "text_final", "audio_chunk", "audio_started"]},
+    "text_delta": {"type": "string"},
+    "text_final": {"type": "string"},
+    "audio_chunk_b64": {"type": "string", "contentEncoding": "base64"},
+    "audio_sample_rate": {"type": "integer"},
+    "audio_channels": {"type": "integer"},
+    "audio_seq": {"type": "integer", "minimum": 0},
+    "audio_total_chunks": {"type": "integer", "minimum": 0},
+    "trace_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
+    "generation": {"type": "integer", "minimum": 0},
+    "asr_final_wall_ms": {"type": "number", "minimum": 0},
+    "server_elapsed_ms": {"type": "number", "minimum": 0},
+    "sample_rate": {"type": "integer", "minimum": 1},
+    "clock_ms": {"type": "integer", "minimum": 0}
+  }
+}

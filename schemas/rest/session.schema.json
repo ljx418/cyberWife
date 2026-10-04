@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/session.schema.json",
+  "title": "会话资源（FR-08/13）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "recording_policy", "created_at"],
+  "properties": {
+    "id": {"type": "integer"},
+    "recording_policy": {"type": "string", "enum": ["standard", "none"]},
+    "started_at": {"type": "string", "format": "date-time"},
+    "ended_at": {"type": ["string", "null"], "format": "date-time"},
+    "expires_at": {"type": ["string", "null"], "format": "date-time"},
+    "turn_count": {"type": "integer", "minimum": 0},
+    "created_at": {"type": "string", "format": "date-time"}
+  }
+}

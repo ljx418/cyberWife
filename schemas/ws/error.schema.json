@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/error.schema.json",
+  "title": "WS error 事件（§16 错误码）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": [
+        "auth.consent_required",
+        "consent.revoked",
+        "session.recording_policy_invalid",
+        "health.component_unavailable",
+        "frame.size_limit",
+        "turn.cancelled",
+        "turn.late_event",
+        "internal.error"
+      ]
+    },
+    "message": {"type": "string"},
+    "user_action": {"type": "string"},
+    "trace_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"}
+  }
+}

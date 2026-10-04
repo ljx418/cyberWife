@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/profile.schema.json",
+  "title": "Profile 资源",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "user_nickname", "version", "updated_at"],
+  "properties": {
+    "id": {"type": "integer"},
+    "name": {"type": "string", "minLength": 1, "maxLength": 100},
+    "user_nickname": {"type": "string", "minLength": 1, "maxLength": 100},
+    "persona": {"type": "string", "maxLength": 600},
+    "relationship_context": {"type": "string", "maxLength": 600},
+    "example_dialogue": {"type": "string", "maxLength": 2000},
+    "version": {"type": "integer", "minimum": 0},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

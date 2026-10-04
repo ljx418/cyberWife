@@ -1,0 +1,32 @@
+# cyberWife V1 M1 后端依赖
+# 安装：pip install --break-system-packages -r backend/requirements-m1.txt
+# 字段说明见 docs/implementation-contracts.md §17
+
+# Web 框架（FastAPI + uvicorn）
+fastapi==0.118.0
+uvicorn[standard]==0.34.0
+websockets==14.0
+
+# 数据验证与配置
+pydantic==2.13.4
+pydantic-settings==2.14.2
+
+# JSON Schema 校验
+jsonschema==4.23.0
+
+# SQLite + 向量
+# 注意：sqlite-vec 在 Windows 上需预编译 wheel；如不可用则改为纯 sqlite + 内存向量
+# 当前实现走 sqlite-vec，运行时缺失时回退 FTS5 only
+sqlite-vec==0.1.6
+
+# HTTP 客户端（探测 model 进程）
+httpx==0.28.1
+
+# 运行时 / 日志
+PyYAML==6.0.1
+numpy==2.4.4
+python-multipart==0.0.20
+
+# 测试
+pytest==8.4.2
+pytest-asyncio==0.23.8

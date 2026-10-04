@@ -1,0 +1,53 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "cyberWife V1 当前实现架构与验收边界",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1280, 660],
+    "views": [
+      {"id": "conversation", "label": "实时对话主链", "focus": ["browser", "gateway", "orchestrator", "speech", "llm", "tts", "avatar"], "note": "从浏览器PCM输入到文本、声音与H.264口型输出。"},
+      {"id": "local-data", "label": "本机数据与隐私", "focus": ["gateway", "orchestrator", "persistence", "models"], "note": "用户数据留在本机；模型按logical_id解析，不进入仓库。"},
+      {"id": "operations", "label": "启动与验收", "focus": ["launcher", "gateway", "speech", "llm", "avatar", "evidence"], "note": "Windows启动器管理受管进程，验收器采集真实模型证据。"}
+    ]
+  },
+  "components": [
+    {"id": "user", "type": "external", "label": "单一成人用户", "sublabel": "本机个人/研究用途", "pos": [40, 260], "size": [150, 72]},
+    {"id": "browser", "type": "frontend", "label": "Chrome 产品界面", "sublabel": "React · WebAudio · WebCodecs", "pos": [245, 260], "size": [190, 72]},
+    {"id": "gateway", "type": "backend", "label": "FastAPI Gateway", "sublabel": "127.0.0.1:7860 · REST/WS/静态UI", "pos": [500, 260], "size": [200, 72]},
+    {"id": "orchestrator", "type": "backend", "label": "ConversationOrchestrator", "sublabel": "有界队列 · generation取消", "pos": [765, 260], "size": [205, 72]},
+    {"id": "speech", "type": "backend", "label": "Speech Worker", "sublabel": "Silero VAD · Faster-Whisper", "pos": [500, 80], "size": [200, 72]},
+    {"id": "llm", "type": "external", "label": "llama.cpp Server", "sublabel": "Qwen3-14B · 127.0.0.1:8090", "pos": [765, 80], "size": [205, 72]},
+    {"id": "tts", "type": "backend", "label": "TTS Adapters", "sublabel": "CosyVoice2默认 · Qwen回退", "pos": [1035, 80], "size": [205, 72]},
+    {"id": "avatar", "type": "backend", "label": "LiveTalking Avatar", "sublabel": "Wav2Lip · H.264 WS :8010", "pos": [1035, 260], "size": [205, 72]},
+    {"id": "persistence", "type": "database", "label": "本机持久化", "sublabel": "SQLite WAL · FTS5 · sqlite-vec", "pos": [765, 430], "size": [205, 72]},
+    {"id": "models", "type": "database", "label": "本机模型与授权资产", "sublabel": "7个ACTIVE logical_id", "pos": [1035, 430], "size": [205, 72]},
+    {"id": "launcher", "type": "security", "label": "Windows RuntimeLauncher", "sublabel": "start/status/recover/stop", "pos": [245, 80], "size": [190, 72]},
+    {"id": "evidence", "type": "security", "label": "发布与验收证据", "sublabel": "AC/OX · 资源 · 哈希冻结", "pos": [500, 550], "size": [200, 72]}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "Windows 11 / 用户交互与生命周期", "wraps": ["user", "browser", "launcher", "llm"]},
+    {"kind": "region", "label": "WSL2 / 本机推理与数据", "wraps": ["gateway", "orchestrator", "speech", "tts", "avatar", "persistence", "models", "evidence"]},
+    {"kind": "security-group", "label": "仅loopback，无默认公网执行面", "wraps": ["browser", "gateway", "orchestrator", "speech", "llm", "tts", "avatar", "persistence"]}
+  ],
+  "connections": [
+    {"id": "user-ui", "from": "user", "to": "browser", "label": "授权、说话与设置", "variant": "emphasis", "labelAt": [218, 346]},
+    {"id": "browser-gateway", "from": "browser", "to": "gateway", "label": "REST + 会话WS + PCM", "variant": "emphasis", "labelAt": [468, 346]},
+    {"id": "gateway-orchestration", "from": "gateway", "to": "orchestrator", "label": "session / turn / generation", "variant": "emphasis", "labelAt": [733, 346]},
+    {"id": "speech-input", "from": "gateway", "to": "speech", "label": "16kHz PCM / transcript"},
+    {"id": "llm-stream", "from": "orchestrator", "to": "llm", "label": "流式completion / cancel"},
+    {"id": "tts-stream", "from": "orchestrator", "to": "tts", "label": "分句→16kHz PCM"},
+    {"id": "avatar-stream", "from": "tts", "to": "avatar", "label": "PCM驱动口型", "labelAt": [1138, 166]},
+    {"id": "avatar-browser", "from": "avatar", "to": "browser", "label": "loopback H.264 WebSocket", "variant": "emphasis", "via": [[1260, 296], [1260, 30], [210, 30], [210, 296]], "labelAt": [1260, 166]},
+    {"id": "memory-transaction", "from": "orchestrator", "to": "persistence", "label": "事务记忆与保留", "labelAt": [868, 346]},
+    {"id": "model-resolution", "from": "models", "to": "orchestrator", "label": "logical_id / 授权资产"},
+    {"id": "launcher-runtime", "from": "launcher", "to": "gateway", "label": "受管PID + 功能探针", "variant": "security"},
+    {"id": "acceptance-evidence", "from": "evidence", "to": "gateway", "label": "真实E2E与资源采样", "variant": "security"}
+  ],
+  "cards": [
+    {"dot": "emerald", "title": "已实现主链", "items": ["一次点击持续监听，支持多轮与打断", "CosyVoice2默认，Qwen3-TTS单向回退", "Wav2Lip口型通过H.264/WebCodecs回传"]},
+    {"dot": "cyan", "title": "硬件与隐私边界", "items": ["项目RAM≤14GiB，VRAM≤22GiB", "Windows与WSL运行余量均≥2GiB", "用户数据与模型仅本机，服务仅loopback"]},
+    {"dot": "amber", "title": "本轮审计重点", "items": ["目标图必须与代码实体逐一对应", "真实用户场景与Headless合同分层举证", "未自动化或未实测项保持黄/红，不假签全绿"]}
+  ]
+}

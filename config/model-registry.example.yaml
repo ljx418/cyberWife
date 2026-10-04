@@ -1,0 +1,129 @@
+# cyberWife V1 模型注册（示例） — 仓库内可提交
+# 本文件是 schema 示例 + 默认 logical_id；绝对路径在 model-registry.local.yaml（Git ignore）。
+# 实际配置 = 本文件 + model-registry.local.yaml 合并。
+
+version: 1
+generated_at: "2026-09-23"
+schema_doc: ../docs/implementation-contracts.md#10
+
+models:
+
+  # ── 文本 LLM ────────────────────────────────────────────────────────────
+  - logical_id: qwen3-14b-instruct-q4_k_m
+    component: llm
+    filename_or_revision: "Qwen3-14B-Instruct Q4_K_M GGUF, 8K context"
+    size_bytes: 0  # M0 实测填充
+    sha256: null   # M0 实测填充
+    source_url: "https://huggingface.co/Qwen/Qwen3-14B-GGUF/blob/main/Qwen3-14B-Q4_K_M.gguf"
+    license_id: "Apache-2.0"
+    license_review: approved
+    runtime: "llama-server / llama-cpp-python"
+    functional_probe: "tests/m0/verify_llm.py"
+    verified_at: null
+    status: discovered
+
+  # ── 语音识别 ────────────────────────────────────────────────────────────
+  - logical_id: faster-whisper-large-v3-turbo
+    component: asr
+    filename_or_revision: "Faster-Whisper large-v3-turbo (CTranslate2)"
+    size_bytes: 0
+    sha256: null
+    source_url: "https://huggingface.co/dropbox-dash/faster-whisper-large-v3-turbo/tree/main"
+    license_id: "MIT"
+    license_review: approved
+    runtime: "faster-whisper"
+    functional_probe: "tests/m0/verify_asr.py"
+    verified_at: null
+    status: discovered
+
+  - logical_id: faster-whisper-large-v3
+    component: asr
+    filename_or_revision: "Faster-Whisper large-v3 (fallback / 已下载)"
+    size_bytes: 0
+    sha256: null
+    source_url: "https://huggingface.co/Systran/faster-whisper-large-v3/tree/main"
+    license_id: "MIT"
+    license_review: approved
+    runtime: "faster-whisper"
+    functional_probe: "tests/m0/verify_asr.py"
+    verified_at: null
+    status: discovered
+    note: "fallback 备份，已归档到 _archive_faster-whisper-large-v3/；主路径使用 Turbo"
+
+  # ── 声音克隆 ────────────────────────────────────────────────────────────
+  - logical_id: qwen3-tts-12hz-1.7b-base
+    component: tts
+    filename_or_revision: "Qwen3-TTS-12Hz-1.7B-Base (HF directory, voice clone, Base)"
+    size_bytes: 0
+    sha256: null
+    sha256_speech_tokenizer: null
+    source_url: "https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-Base/tree/main"
+    license_id: "Apache-2.0"
+    license_review: pending  # M0 重审（Apache-2.0 可商用，但 voice clone 法律风险需声明）
+    runtime: "transformers + qwen-tts"
+    functional_probe: "tests/m0/verify_tts.py"
+    verified_at: null
+    status: discovered
+
+  - logical_id: cosyvoice2-0.5b
+    component: tts_candidate
+    filename_or_revision: "FunAudioLLM/CosyVoice2-0.5B"
+    size_bytes: 0
+    sha256: null
+    source_url: "https://huggingface.co/FunAudioLLM/CosyVoice2-0.5B"
+    license_id: "Apache-2.0"
+    license_review: approved
+    runtime: "CosyVoice source + PyTorch + ONNX Runtime"
+    functional_probe: "tests/m3/benchmark_cosyvoice.py"
+    verified_at: null
+    status: discovered
+    note: "候选模型；通过内容准确率和首包门槛前不得设为默认 tts。"
+
+  # ── 数字人 ──────────────────────────────────────────────────────────────
+  - logical_id: livetalking-wav2lip256
+    component: avatar
+    filename_or_revision: "LiveTalking + Wav2Lip256 checkpoint (renamed wav2lip.pth)"
+    size_bytes: 0
+    sha256: null
+    source_url: "https://github.com/lipku/LiveTalking + https://github.com/Rudrabha/Wav2Lip/blob/master/LICENSE"
+    license_id: "Wav2Lip-ResearchOnly"
+    license_review: approved
+    runtime: "LiveTalking server (host candidates only)"
+    functional_probe: "tests/m0/verify_avatar.py"
+    verified_at: null
+    status: discovered
+
+  # ── VAD ─────────────────────────────────────────────────────────────────
+  - logical_id: silero-vad-v5
+    component: vad
+    filename_or_revision: "Silero VAD v5 (torch JIT, 16kHz streaming)"
+    size_bytes: 0
+    sha256: null
+    source_url: "https://github.com/snakers4/silero-vad"
+    license_id: "MIT"
+    license_review: approved
+    runtime: "torch.hub"
+    functional_probe: "tests/m0/verify_vad.py"
+    verified_at: null
+    status: discovered
+
+  # ── 中文向量 ─────────────────────────────────────────────────────────────
+  - logical_id: bge-small-zh-v1.5
+    component: embedding
+    filename_or_revision: "BAAI/bge-small-zh-v1.5 (HF directory, 512-dim)"
+    size_bytes: 0
+    sha256: null
+    source_url: "https://huggingface.co/BAAI/bge-small-zh-v1.5/tree/main"
+    license_id: "MIT"
+    license_review: approved
+    runtime: "sentence-transformers"
+    functional_probe: "tests/m0/verify_embedding.py"
+    verified_at: null
+    status: discovered
+    embedding_dim: 512  # 维度固化写入 memory_vectors vec_f32(512)
+
+# 维一化值映射规则：
+# 1. 业务模块只引用 logical_id，禁止硬编码文件名或路径
+# 2. ModelRegistry 在启动时通过 logical_id 解析到 model-registry.local.yaml 的 absolute_path
+# 3. 失败时回退 fallback（见 implementation-contracts.md §10）
+# 4. OOM/模型加载失败时回退按 logical_id 顺序尝试

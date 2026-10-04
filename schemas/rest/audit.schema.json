@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/audit.schema.json",
+  "title": "审计事件查询响应（G3 复核）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["events"],
+  "properties": {
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "action", "entity_type", "entity_id_hash", "result", "created_at"],
+        "properties": {
+          "id": {"type": "integer"},
+          "action": {
+            "type": "string",
+            "enum": [
+              "consent.granted", "consent.revoked",
+              "asset.uploaded", "asset.previewed", "asset.activated", "asset.rollback",
+              "profile.updated",
+              "memory.committed", "memory.updated", "memory.deleted", "memory.purge_all",
+              "session.created", "session.ended", "session.no_record",
+              "retention.expired", "retention.failed",
+              "health.degraded", "health.recovered"
+            ]
+          },
+          "entity_type": {"type": "string", "enum": ["consent", "profile", "asset", "memory", "session", "retention", "health"]},
+          "entity_id_hash": {"type": "string", "pattern": "^[0-9a-f]{16}$"},
+          "result": {"type": "string", "enum": ["success", "failure", "rollback"]},
+          "deleted_row_count": {"type": ["integer", "null"]},
+          "fts_count_before": {"type": ["integer", "null"]},
+          "fts_count_after": {"type": ["integer", "null"]},
+          "vector_count_before": {"type": ["integer", "null"]},
+          "vector_count_after": {"type": ["integer", "null"]},
+          "error_code": {"type": ["string", "null"]},
+          "trace_id": {"type": ["string", "null"], "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
+          "created_at": {"type": "string", "format": "date-time"}
+        }
+      }
+    }
+  }
+}

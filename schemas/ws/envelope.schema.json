@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/envelope.schema.json",
+  "title": "WS 公共信封 6 字段",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "session_id", "turn_id", "event_seq", "occurred_at", "payload"],
+  "properties": {
+    "type": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "pattern": "^[0-9]+$"},
+    "turn_id": {"type": ["integer", "null"], "minimum": 0},
+    "event_seq": {"type": "integer", "minimum": 0},
+    "occurred_at": {"type": "string", "format": "date-time"},
+    "payload": {"type": "object"}
+  }
+}

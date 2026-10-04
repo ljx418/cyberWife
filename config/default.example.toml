@@ -1,0 +1,85 @@
+# cyberWife V1 default.example.toml
+# 仓库内可提交示例；本机绝对路径写在 model-registry.local.yaml（Git ignore）。
+# 字段说明见 docs/implementation-contracts.md §17
+
+[server]
+bind = "127.0.0.1"
+gateway_port = 7860
+speech_port   = 8091
+avatar_port   = 8010
+llama_host    = "127.0.0.1"           # 由 ResolveWindowsHost.ps1 覆盖
+llama_port    = 8090
+shutdown_grace_seconds = 10
+
+[paths]
+workspace      = "C:\\workSpace\\cyberWife"
+data_root     = "/mnt/cw-data"        # WSL2 ext4，禁 Windows 挂载盘
+assets_root   = "/mnt/cw-data/assets"
+logs_root     = "/mnt/cw-data/logs"
+migrations_dir = "migrations"
+salt_file     = "config/.salt"        # 启动时生成，仅本机
+
+[db]
+path          = "/mnt/cw-data/cyberwife.db"
+wal           = true
+cache_size_kb = 2048
+synchronous   = "NORMAL"
+
+[models]
+vad           = "silero-vad-v5"
+asr           = "faster-whisper-large-v3-turbo"
+llm           = "qwen3-14b-instruct-q4_k_m"
+tts           = "cosyvoice2-0.5b"
+avatar        = "livetalking-wav2lip256"
+embedding     = "bge-small-zh-v1.5"
+
+[device]
+asr_device         = "cuda"
+asr_compute_type   = "float16"
+tts_compute_type   = "float16"
+llm_gpu_layers     = 40
+llm_context_tokens = 4096
+avatar_resolution  = 256
+avatar_fps         = 25
+avatar_batch_size  = 8
+
+[prompt]
+max_context_tokens   = 4096
+profile_max_tokens   = 600
+short_term_count     = 3
+short_term_max_tokens= 300
+vector_top_k         = 4
+vector_score_min     = 0.55
+fts_top_k            = 6
+memory_budget_tokens = 800
+
+[cancel]
+audio_silence_p95_ms     = 400
+audio_silence_max_ms     = 1000
+llm_cancel_deadline_ms   = 1000
+tts_cancel_deadline_ms   = 1000
+avatar_drain_deadline_ms = 1000
+
+[retention]
+session_ttl_days = 30
+scan_startup     = true
+scan_cron_local  = "03:00"
+retry_initial_s  = 60
+retry_max_n      = 6
+inject_env       = "RETENTION_NOW"
+
+[logging]
+level            = "INFO"
+redact_sensitive = true
+fields_blacklist = ["audio_bytes", "raw_text", "raw_prompt", "voiceprint", "absolute_path"]
+
+[browser]
+audio_sample_rate    = 16000
+audio_channels       = 1
+audio_frame_ms       = 20
+ws_binary_max_bytes  = 4096
+webrtc_ice_servers   = []
+
+[streaming]
+# B2.5-O2 可逆A/B；4..18，未完成真实确认前保持10。
+first_playable_min_chars = 10

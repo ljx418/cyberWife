@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "cyberWife V1 后端实时架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1380, 820],
+    "views": [
+      {"id": "turn", "label": "实时对话主链", "focus": ["gateway", "turn", "speech", "llm", "avatar"], "note": "每个音频、文本和画面产物必须绑定同一 session_id / turn_id。"},
+      {"id": "cancel", "label": "打断与取消", "focus": ["gateway", "turn", "speech", "llm", "avatar"], "note": "新语音触发取消令牌，旧轮结果不得继续播放或写入记忆。"},
+      {"id": "data", "label": "记忆与隐私", "focus": ["turn", "memory", "store", "observability"], "note": "不记录模式不写入，删除事务同步覆盖源记录、FTS 与向量。"},
+      {"id": "ops", "label": "启动与恢复", "focus": ["launcher", "gateway", "speech", "llm", "avatar", "observability"], "note": "ready 必须来自功能探针，不能只检查 PID 或端口。"}
+    ]
+  },
+  "components": [
+    {"id": "browser", "type": "frontend", "label": "V1 已验收前端", "sublabel": "REST / WS / WebRTC", "tag": "范围冻结", "pos": [25, 322], "size": [175, 78]},
+    {"id": "launcher", "type": "external", "label": "RuntimeLauncher.ps1", "sublabel": "start / stop / status / recover", "tag": "待实现", "pos": [250, 70], "size": [220, 82]},
+    {"id": "gateway", "type": "backend", "label": "ApiGateway", "sublabel": "REST / WS composition root", "tag": "已有骨架·需贯通", "pos": [260, 320], "size": [200, 82]},
+    {"id": "turn", "type": "backend", "label": "TurnPipeline", "sublabel": "state / queue / cancellation", "tag": "核心待新增", "pos": [540, 320], "size": [210, 82]},
+    {"id": "speech", "type": "backend", "label": "SpeechRuntime", "sublabel": "VAD / ASR / Qwen TTS", "tag": "适配器已有·服务待建", "pos": [830, 100], "size": [230, 88]},
+    {"id": "llm", "type": "backend", "label": "LlamaCppAdapter", "sublabel": "Qwen3-14B stream / cancel", "tag": "mock 通过·真机待通", "pos": [830, 320], "size": [230, 88]},
+    {"id": "avatar", "type": "backend", "label": "AvatarAdapter", "sublabel": "LiveTalking / Wav2Lip / WebRTC", "tag": "上游在·适配未完成", "pos": [830, 540], "size": [230, 88]},
+    {"id": "memory", "type": "backend", "label": "MemoryService", "sublabel": "candidate / CRUD / retention", "tag": "待新增", "pos": [540, 560], "size": [210, 88]},
+    {"id": "store", "type": "database", "label": "SQLite + VectorIndex", "sublabel": "session / FTS / vector / audit", "tag": "仓储已有·事务待补", "pos": [260, 560], "size": [200, 88]},
+    {"id": "observability", "type": "security", "label": "Health + Telemetry", "sublabel": "probe / trace / metrics", "tag": "部分已有", "pos": [1130, 320], "size": [220, 88]}
+  ],
+  "boundaries": [
+    {"kind": "region", "label": "WSL2 本地运行时 · 仅 loopback", "wraps": ["gateway", "turn", "speech", "avatar", "memory", "store", "observability"], "pad": 24},
+    {"kind": "security-group", "label": "隐私数据边界", "wraps": ["memory", "store"], "pad": 16}
+  ],
+  "connections": [
+    {"id": "browser-gateway", "from": "browser", "to": "gateway", "label": "REST + WS", "variant": "emphasis", "fromSide": "right", "toSide": "left", "route": "straight", "labelAt": [230, 310]},
+    {"id": "launcher-observability", "from": "launcher", "to": "observability", "label": "生命周期 + 功能探针", "variant": "security", "fromSide": "top", "toSide": "top", "via": [[360, 35], [1240, 35]], "labelAt": [800, 28]},
+    {"id": "gateway-turn", "from": "gateway", "to": "turn", "label": "session / audio / command", "variant": "emphasis", "labelAt": [500, 415]},
+    {"id": "turn-speech", "from": "turn", "to": "speech", "label": "VAD / ASR / TTS + cancel", "variant": "emphasis", "fromSide": "top", "toSide": "left", "labelAt": [795, 208]},
+    {"id": "turn-llm", "from": "turn", "to": "llm", "label": "token stream + cancel", "variant": "emphasis", "labelAt": [740, 445]},
+    {"id": "turn-avatar", "from": "turn", "to": "avatar", "label": "audio clock / queue / cancel", "variant": "emphasis", "fromSide": "bottom", "toSide": "left", "labelAt": [800, 520]},
+    {"id": "avatar-browser", "from": "avatar", "to": "browser", "label": "host-only WebRTC", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "via": [[945, 715], [112.5, 715]], "labelAt": [500, 708]},
+    {"id": "turn-memory", "from": "turn", "to": "memory", "label": "异步候选记忆", "fromSide": "bottom", "toSide": "top", "labelAt": [645, 480]},
+    {"id": "memory-store", "from": "memory", "to": "store", "label": "事务 CRUD / FTS / vector", "labelAt": [500, 675]},
+    {"id": "gateway-store", "from": "gateway", "to": "store", "label": "profile / consent / session", "fromSide": "bottom", "toSide": "top", "labelAt": [360, 485]},
+    {"id": "turn-observability", "from": "turn", "to": "observability", "label": "脱敏 trace + latency + queue", "fromSide": "bottom", "toSide": "bottom", "via": [[645, 455], [1240, 455]], "labelAt": [1080, 448]}
+  ],
+  "cards": [
+    {"dot": "emerald", "title": "保留并复用", "items": ["领域模型、仓储、状态机与模型适配器已有测试基础", "前端 V1 体验已批准，不再纳入重构主线"]},
+    {"dot": "amber", "title": "后端关键路径", "items": ["先建立真实 SpeechRuntime 与 TurnPipeline，再接 Avatar、记忆和启动器", "统一取消令牌和有界队列是首响、打断与稳定性的共同前提"]},
+    {"dot": "rose", "title": "当前阻断", "items": ["CosyVoice2 CER 76.92%、首包 10.043s，不可设为默认", "llama-server 现有文件为 stub，真实全链与一小时稳态均未证明"]}
+  ]
+}

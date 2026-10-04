@@ -1,0 +1,79 @@
+# cyberWife V1 .gitignore
+# 文档基线已完成；本规则覆盖 prototype 脚手架、私有资产、模型权重、本机路径与日志。
+
+# ── prototype 脚手架产物 ─────────────────────────────────
+prototype/node_modules/
+prototype/dist/
+prototype/*.tsbuildinfo
+prototype/test-results/
+prototype/playwright-report/
+
+# ── 系统与编辑器 ─────────────────────────────────────────
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# ── 日志与构建产物 ──────────────────────────────────────
+*.log
+logs/
+
+# ── 运行时数据（WSL2 ext4 私有）──────────────────────────
+data/
+runtime/
+assets/private/
+
+# ── 模型权重与衍生缓存 ───────────────────────────────────
+*.gguf
+*.ggml
+*.pth
+*.onnx
+*.bin
+*.safetensors
+models/
+
+# ── 媒体素材（用户授权照片/声音）────────────────────────
+*.wav
+*.mp3
+*.mp4
+*.jpg
+*.jpeg
+*.png
+
+# ── 本机路径与隐私文件（model-manifest §2 明确禁止 Git）──
+# 私有绝对路径、本机密码、HSM 盐值
+config/model-registry.local.yaml
+config/runtime.local.toml
+config/.salt
+config/.salt.bak
+
+# ── M0 smoke test 报告（含本机 SHA256 与模型路径）────
+tests/m0/m0_report.json
+tests/m0/m0_report.md
+
+# ── Python 虚拟环境 ──────────────────────────────────────
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# ── 备份 ────────────────────────────────────────────────
+*.bak
+*.swp
+*.tmp
+
+# ── 真人素材授权（仅本机私有人脸/声纹记录，不入 Git）──
+docs/human-consent.md
+audit/
+.consent.json
+~/.cyberWife/
+config/.salt
+config/runtime.local.toml
+
+# ── ADR-006 修订后写真与声音（2026-09-23）─────────────────
+# 写真与项目源码同根，必须严格排除
+assets/
+audit/
+.consent-backup/

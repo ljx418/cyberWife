@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/retention.schema.json",
+  "title": "保留任务当前状态（FR-14）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["now", "next_scan_at", "ttl_days"],
+  "properties": {
+    "now": {"type": "string", "format": "date-time"},
+    "next_scan_at": {"type": "string", "format": "date-time"},
+    "ttl_days": {"type": "integer", "minimum": 1},
+    "scan_cron_local": {"type": "string", "pattern": "^[0-2][0-9]:[0-5][0-9]$"},
+    "expired_sessions_last_run": {"type": ["integer", "null"]}
+  }
+}

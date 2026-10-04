@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "cyberWife V1 · B2.5 本机实时体验优化架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1200, 900],
+    "views": [
+      {
+        "id": "normal-path",
+        "label": "普通未命中主路径",
+        "focus": ["browser", "gateway", "turn-pipeline", "llm-runtime", "tts-runtime", "avatar-runtime"],
+        "note": "普通请求独立承担首响、质量和资源硬门，缓存不得替代这条证据。"
+      },
+      {
+        "id": "warm-path",
+        "label": "严格问候预热路径",
+        "focus": ["gateway", "warm-cache", "tts-runtime", "browser"],
+        "note": "仅完整句白名单和完整版本键一致时命中；天气、记忆和附加语义强制走正常链。"
+      },
+      {
+        "id": "interrupt-path",
+        "label": "打断与旧轮隔离",
+        "focus": ["browser", "gateway", "interrupt", "turn-pipeline", "tts-runtime", "avatar-runtime"],
+        "note": "generation 统一传播到 LLM、TTS、Avatar 和浏览器播放缓冲。"
+      }
+    ]
+  },
+  "components": [
+    {"id": "user", "type": "external", "label": "用户", "sublabel": "自然说话 / 随时打断", "pos": [30, 315], "size": [120, 76], "tag": "V1 用户体验"},
+    {"id": "browser", "type": "frontend", "label": "既有陪伴主舞台", "sublabel": "VoiceDock / 状态 / 字幕", "pos": [180, 292], "size": [180, 122], "tag": "已批准 · 局部反馈"},
+    {"id": "gateway", "type": "backend", "label": "ApiGateway", "sublabel": "WS 音频与事件组合根", "pos": [405, 305], "size": [150, 96], "tag": "已开发 · 需扩展"},
+    {"id": "turn-pipeline", "type": "backend", "label": "TurnPipeline", "sublabel": "ASR → LLM → TTS → Avatar", "pos": [600, 305], "size": [170, 96], "tag": "已开发 · 需修改"},
+    {"id": "llm-runtime", "type": "backend", "label": "LlmRuntimePort", "sublabel": "llama.cpp / TRT-LLM 候选", "pos": [820, 110], "size": [180, 96], "tag": "基线已开发 · 待验证"},
+    {"id": "tts-runtime", "type": "backend", "label": "TtsRuntimePort", "sublabel": "Qwen / CosyVoice TensorRT", "pos": [820, 298], "size": [180, 110], "tag": "全链 5.08s · 阻断"},
+    {"id": "avatar-runtime", "type": "backend", "label": "LiveTalkingAdapter", "sublabel": "Wav2Lip · 音频主时钟", "pos": [820, 515], "size": [180, 96], "tag": "25.006 FPS · 已验证"},
+    {"id": "interrupt", "type": "security", "label": "InterruptionController", "sublabel": "CancellationToken + generation", "pos": [600, 535], "size": [170, 96], "tag": "B3未开发 · 预留合同"},
+    {"id": "warm-cache", "type": "database", "label": "WarmResponseCache", "sublabel": "RAM PCM · ≤6项 · 不落盘", "pos": [600, 95], "size": [170, 110], "tag": "B2.5 待新增"},
+    {"id": "metrics", "type": "database", "label": "RuntimeMetrics", "sublabel": "分桶 · RAM/VRAM · 首响", "pos": [1030, 298], "size": [150, 110], "tag": "需修改 · 防伪验收"}
+  ],
+  "connections": [
+    {"id": "user-ui", "from": "user", "to": "browser", "label": "说话 / 可闻回应", "variant": "emphasis", "labelAt": [165, 430]},
+    {"id": "ui-gateway", "from": "browser", "to": "gateway", "label": "WS PCM + generation", "variant": "emphasis", "labelAt": [382, 430]},
+    {"id": "gateway-pipeline", "from": "gateway", "to": "turn-pipeline", "label": "ASR final / turn", "variant": "emphasis", "labelAt": [480, 270]},
+    {"id": "pipeline-llm", "from": "turn-pipeline", "to": "llm-runtime", "label": "普通未命中流式推理", "fromSide": "top", "toSide": "left", "via": [[685, 245], [785, 245], [785, 158]], "labelAt": [760, 220]},
+    {"id": "pipeline-tts", "from": "turn-pipeline", "to": "tts-runtime", "label": "可播短句", "labelAt": [795, 430]},
+    {"id": "tts-avatar", "from": "tts-runtime", "to": "avatar-runtime", "label": "20ms PCM + 时间戳", "labelAt": [910, 465]},
+    {"id": "cache-check", "from": "gateway", "to": "warm-cache", "label": "完整句 + 版本键", "variant": "dashed"},
+    {"id": "cache-play", "from": "warm-cache", "to": "turn-pipeline", "label": "命中返回文本 + PCM", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "labelAt": [630, 220]},
+    {"id": "interrupt-cancel", "from": "gateway", "to": "interrupt", "label": "barge_in.detected", "variant": "security"},
+    {"id": "cancel-pipeline", "from": "interrupt", "to": "turn-pipeline", "label": "取消旧 generation", "variant": "security"},
+    {"id": "runtime-metrics", "from": "tts-runtime", "to": "metrics", "label": "首响 / RTF / 资源", "labelAt": [1015, 285]},
+    {"id": "avatar-metrics", "from": "avatar-runtime", "to": "metrics", "label": "inferfps / finalfps", "variant": "dashed"}
+  ],
+  "cards": [
+    {"dot": "rose", "title": "当前阻断", "items": ["真实预热全链首响 5.08 秒，B2 未出门", "B3、B4、B5 尚未开始，不能宣称 V1 完成"]},
+    {"dot": "amber", "title": "B2.5 受控改动", "items": ["验证 CosyVoice TensorRT 与 LLM 推理加速", "增加严格问候预热；命中成绩与普通路径分桶"]},
+    {"dot": "emerald", "title": "不可降低的出门门", "items": ["普通未命中 P50≤2.0s、P95≤3.5s", "项目 RAM≤14GB、VRAM≤22GB、体验无回退"]}
+  ]
+}

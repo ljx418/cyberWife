@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/events/domain_events.schema.json",
+  "title": "14 领域事件 payload 集合（§19 归属矩阵）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["event", "publisher", "payload"],
+  "properties": {
+    "event": {
+      "type": "string",
+      "enum": [
+        "ConsentGranted",
+        "AssetActivated",
+        "SessionStarted",
+        "UtteranceFinalized",
+        "TurnStarted",
+        "ReplyChunkReady",
+        "PlaybackStarted",
+        "BargeInDetected",
+        "TurnCancelled",
+        "SessionEnded",
+        "MemoryCommitted",
+        "MemoryDeleted",
+        "RetentionExpired",
+        "ComponentDegraded"
+      ]
+    },
+    "publisher": {
+      "type": "string",
+      "enum": ["AssetService", "ConversationOrchestrator", "TurnPipeline", "MemoryService", "RetentionService", "HealthAggregator"]
+    },
+    "subscribers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": ["AssetService", "ConversationOrchestrator", "TurnPipeline", "MemoryService", "RetentionService", "HealthAggregator"]
+      }
+    },
+    "payload": {"type": "object"},
+    "trace_id": {"type": "string", "pattern": "^[0-9A-HJKMNP-TV-Z]{26}$"},
+    "occurred_at": {"type": "string", "format": "date-time"}
+  }
+}

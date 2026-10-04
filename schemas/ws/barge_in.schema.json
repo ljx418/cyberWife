@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/ws/barge_in.schema.json",
+  "title": "WS barge_in.detected（FR-09）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["active_turn_id", "cancelled_components"],
+  "properties": {
+    "active_turn_id": {"type": "integer", "minimum": 0},
+    "audio_silence_ms": {"type": "integer", "minimum": 0},
+    "cancelled_components": {
+      "type": "array",
+      "items": {"type": "string", "enum": ["llm", "tts", "playback", "avatar"]}
+    }
+  }
+}

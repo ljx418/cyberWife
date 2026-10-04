@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>cyberWife V1 阶段性自动化验收报告</title>
+  <style>
+    :root{color-scheme:dark;--bg:#07100f;--panel:#0d1917;--panel2:#11231f;--line:#26433b;--text:#f2f7f5;--muted:#a8bcb6;--green:#72d5ad;--amber:#ffc86b;--red:#ff8c87;--cyan:#70d5e8;--purple:#c5a6ff;--shadow:0 18px 52px #0007}
+    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:radial-gradient(circle at 82% 8%,#3a1818 0,transparent 28rem),linear-gradient(145deg,#050a09,#081411 46%,#07100f);color:var(--text);font:15px/1.65 system-ui,-apple-system,"Segoe UI","Microsoft YaHei",sans-serif}.wrap{width:min(1240px,calc(100% - 32px));margin:auto}.hero{min-height:72vh;display:grid;grid-template-columns:1.16fr .84fr;gap:38px;align-items:center;padding:64px 0 44px}.eyebrow,.tag{font:700 12px/1.2 ui-monospace,SFMono-Regular,Consolas,monospace;letter-spacing:.1em;text-transform:uppercase}.eyebrow{color:var(--red)}h1{font-size:clamp(40px,7vw,82px);line-height:.96;letter-spacing:-.055em;margin:18px 0 24px;max-width:780px}.lede{font-size:clamp(18px,2vw,23px);color:#cadbd5;max-width:760px}.verdict{background:linear-gradient(145deg,#351c1ccc,#0b1715f2);border:1px solid #70403d;border-radius:28px;padding:28px;box-shadow:var(--shadow);position:relative;overflow:hidden}.verdict:before{content:"";position:absolute;inset:-70% 45% auto -15%;height:300px;background:#ff706022;filter:blur(30px);transform:rotate(-12deg)}.verdict>*{position:relative}.verdict .big{font-size:44px;font-weight:850;line-height:1;margin:12px 0;color:var(--red)}.meter{height:9px;background:#0a1211;border-radius:99px;overflow:hidden;margin:20px 0}.meter span{display:block;width:50%;height:100%;background:linear-gradient(90deg,var(--green),var(--red));border-radius:inherit}.chips{display:flex;gap:8px;flex-wrap:wrap}.chip{padding:7px 11px;border:1px solid var(--line);border-radius:999px;color:var(--muted);background:#0a1513}.chip.green{color:var(--green);border-color:#3a765f}.chip.amber{color:var(--amber);border-color:#7b6135}.chip.red{color:var(--red);border-color:#7b3d3a}.notice{border:1px solid #6d5932;background:#241e12;border-radius:16px;padding:14px 17px;color:#f8dda9}.notice strong{color:var(--amber)}nav{position:sticky;top:0;z-index:20;background:#07100fd9;backdrop-filter:blur(18px);border-block:1px solid #183029}nav .wrap{display:flex;gap:20px;overflow:auto;padding-block:12px}nav a{white-space:nowrap;color:var(--muted);text-decoration:none;font-weight:700}nav a:hover,nav a:focus-visible{color:var(--green)}section{padding:72px 0;border-bottom:1px solid #17302a}.section-head{display:flex;justify-content:space-between;gap:24px;align-items:end;margin-bottom:28px}.section-head h2{font-size:clamp(30px,4vw,52px);line-height:1.08;letter-spacing:-.035em;margin:0}.section-head p{max-width:560px;color:var(--muted);margin:0}.grid{display:grid;gap:18px}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.card{background:linear-gradient(145deg,#101e1bd9,#0b1513e8);border:1px solid var(--line);border-radius:20px;padding:22px;box-shadow:0 10px 35px #0003}.metric{font-size:34px;font-weight:850;letter-spacing:-.03em}.muted{color:var(--muted)}.green{color:var(--green)}.amber{color:var(--amber)}.red{color:var(--red)}.cyan{color:var(--cyan)}.kicker{color:var(--muted);font-size:13px}.gate{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 0;border-bottom:1px solid #203832}.gate:last-child{border:0}.lamp{display:inline-flex;align-items:center;gap:8px;font-weight:800}.lamp:before{content:"";width:10px;height:10px;border-radius:50%;background:currentColor;box-shadow:0 0 14px currentColor}.architecture{display:grid;gap:14px}.lane{border:1px solid var(--line);border-radius:18px;padding:18px;background:#0a1513}.lane-title{display:flex;justify-content:space-between;gap:10px;margin-bottom:12px;font-weight:800}.nodes{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}.node{min-height:88px;padding:13px;border-radius:13px;border:1px solid #35554c;background:#12231f}.node b{display:block}.node small{color:var(--muted)}.arrow{text-align:center;color:var(--green);font:700 13px ui-monospace,monospace}.shot{overflow:hidden;padding:0}.shot img{width:100%;display:block;aspect-ratio:16/10;object-fit:cover;background:#0a1210}.shot.mobile img{aspect-ratio:auto;height:520px;object-fit:contain;background:#07100f}.shot figcaption{padding:15px 18px;color:var(--muted)}.evidence{font:700 11px ui-monospace,monospace;letter-spacing:.08em;color:var(--cyan)}table{width:100%;border-collapse:collapse;background:#0b1614;border:1px solid var(--line);border-radius:18px;overflow:hidden;display:table}th,td{text-align:left;padding:14px;border-bottom:1px solid #203832;vertical-align:top}th{color:#d9e9e4;background:#12231f}td{color:#bdcec8}tr:last-child td{border-bottom:0}.journey{display:grid;grid-template-columns:56px 1fr auto;gap:14px;align-items:start;padding:19px 0;border-bottom:1px solid #203832}.journey:last-child{border:0}.step{width:46px;height:46px;display:grid;place-items:center;border-radius:14px;background:#18352d;color:var(--green);font-weight:900}.journey h3{margin:0 0 3px;font-size:18px}.journey p{margin:0;color:var(--muted)}.status{font-weight:800;padding:5px 9px;border-radius:8px;background:#3a2c13;color:var(--amber);white-space:nowrap}.status.pass{background:#113c2d;color:var(--green)}.finding{border-left:3px solid var(--amber);padding-left:17px;margin:22px 0}.finding h3{margin:0 0 5px}.footer{padding:42px 0 70px;color:var(--muted)}code{color:#d4c2ff;background:#1a1722;padding:.12em .35em;border-radius:5px}a{color:var(--cyan)}.links{display:flex;gap:12px;flex-wrap:wrap}.button{display:inline-block;text-decoration:none;padding:10px 14px;border:1px solid #37695b;border-radius:10px;background:#10251f;color:#d9f5ea;font-weight:750}.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(max-width:850px){.hero,.g2,.g3{grid-template-columns:1fr}.hero{padding-top:40px}.nodes{grid-template-columns:1fr 1fr}.section-head{display:block}.section-head p{margin-top:12px}.journey{grid-template-columns:46px 1fr}.journey .status{grid-column:2}.table-scroll{overflow-x:auto}table{min-width:720px}}
+    @media(max-width:480px){.wrap{width:min(100% - 22px,1240px)}h1{font-size:42px}.nodes{grid-template-columns:1fr}.hero{min-height:auto}.card{padding:17px}section{padding:52px 0}}
+    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+  </style>
+</head>
+<body>
+  <header class="wrap hero">
+    <div>
+      <div class="eyebrow">独立阶段审计 · 2026.10.04</div>
+      <h1>对话链通过。<br><span class="red">发布硬门未通过。</span></h1>
+      <p class="lede">cyberWife 的真实模型、记忆隐私、Avatar 和打断主体成立；但本轮60分钟复验触发 Windows 可用内存硬门，阶段验收必须判 FAIL。</p>
+      <div class="links"><a class="button" href="../cyberWife-b3-b5-delivery-gap.drawio">打开阶段 Draw.io</a><a class="button" href="cyberwife-v1-stage-audit-architecture.html">查看架构图</a><a class="button" href="2026-10-04-stage-audit.md">阅读审计正文</a></div>
+    </div>
+    <aside class="verdict" aria-label="验收结论">
+      <div class="tag red">release decision</div>
+      <div class="big">验收不通过</div>
+      <p>工程候选保留；V1 发布被 G4 硬门阻断。</p>
+      <div class="meter" aria-hidden="true"><span></span></div>
+      <div class="chips"><span class="chip red">G4 资源失败</span><span class="chip green">G3 隐私替代验证</span><span class="chip amber">G1 功能证据</span><span class="chip amber">G2 感知体验</span><span class="chip amber">G5/G6</span></div>
+    </aside>
+  </header>
+  <nav aria-label="报告章节"><div class="wrap"><a href="#summary">结论</a><a href="#architecture">架构</a><a href="#journeys">用户旅程</a><a href="#chain">对话链记录</a><a href="#evidence">截图证据</a><a href="#tests">自动化测试</a><a href="#gaps">差距与建议</a></div></nav>
+
+  <main>
+    <section id="summary"><div class="wrap">
+      <div class="section-head"><h2>先看结论</h2><p>自动化覆盖擅长证明状态、数据、取消和资源；真人感知与全新环境不能由 mock、截图或旧报告代替。</p></div>
+      <div class="notice"><strong>证据边界：</strong>下方产品截图来自 Headless Chromium 的交互合同测试，API 使用确定性桩并已脱敏；它证明页面和状态呈现，不证明真实模型在截图时运行。真实模型指标单独标为 E3。</div>
+      <div class="grid g3" style="margin-top:18px">
+        <article class="card"><div class="kicker">快速自动化</div><div class="metric green">348 passed</div><div class="muted">后端 326 + 根验收 4 + Avatar 9 + Playwright 9；另有 WSL 环境 4 项 PowerShell skip。</div></article>
+        <article class="card"><div class="kicker">浏览器生产构建</div><div class="metric green">23 modules</div><div class="muted">Vite 生产构建通过；三尺寸 UI、焦点圈闭、aria-live 与减少动效自动化通过。</div></article>
+        <article class="card"><div class="kicker">目标机真实模型</div><div class="metric red">EXIT 2</div><div class="muted">20完整+10打断全PASS；Windows最低可用内存1,840.566MiB，低于2GiB硬门。</div></article>
+      </div>
+      <div class="grid g2" style="margin-top:18px">
+        <div class="card"><div class="gate"><span>G1 功能完整</span><span class="lamp amber">黄</span></div><div class="gate"><span>G2 感知体验</span><span class="lamp amber">黄</span></div><div class="gate"><span>G3 本机隐私</span><span class="lamp green">绿*</span></div></div>
+        <div class="card"><div class="gate"><span>G4 资源长稳</span><span class="lamp red">红</span></div><div class="gate"><span>G5 架构一致</span><span class="lamp amber">黄</span></div><div class="gate"><span>G6 一键交付</span><span class="lamp amber">黄</span></div></div>
+      </div>
+      <p class="muted">* G3 使用用户批准的替代方法：loopback + 出站白盒 + 运行期连接采样；不宣称等价于物理断网。</p>
+    </div></section>
+
+    <section id="architecture"><div class="wrap">
+      <div class="section-head"><h2>目标架构 vs 当前实现</h2><p>数据面已经贯通，主要偏差不是“模型没接上”，而是 Application 层仍直接依赖 Infrastructure 具体类。</p></div>
+      <div class="architecture card">
+        <div class="lane"><div class="lane-title"><span>Windows 体验与模型层</span><span class="green">已实现</span></div><div class="nodes"><div class="node"><b>Chrome / UI</b><small>主舞台、设置、字幕、状态</small></div><div class="node"><b>RuntimeLauncher</b><small>start / stop / status / recover</small></div><div class="node"><b>llama.cpp</b><small>loopback :8090</small></div><div class="node"><b>HostBridge</b><small>浏览器安全空操作</small></div></div></div>
+        <div class="arrow">REST + WebSocket ↓　Windows ↔ WSL loopback</div>
+        <div class="lane"><div class="lane-title"><span>WSL 应用与推理层</span><span class="green">已实现</span></div><div class="nodes"><div class="node"><b>ApiGateway</b><small>:7860 · 状态与业务 API</small></div><div class="node"><b>TurnPipeline</b><small>generation fence / cancel</small></div><div class="node"><b>Speech Worker</b><small>ASR + CosyVoice :8091</small></div><div class="node"><b>Avatar Worker</b><small>Wav2Lip / H.264 :8010</small></div></div></div>
+        <div class="arrow">Ports / Adapters ↓</div>
+        <div class="lane"><div class="lane-title"><span>数据与治理层</span><span class="amber">部分偏差</span></div><div class="nodes"><div class="node"><b>SQLite / FTS / vector</b><small>记忆、来源、删除一致性</small></div><div class="node"><b>AssetStore</b><small>人物/声音版本与回退</small></div><div class="node"><b>Metrics / Logger</b><small>脱敏与逐轮追踪</small></div><div class="node" style="border-color:#87682d"><b>依赖方向</b><small>Application 仍直连具体基础设施</small></div></div></div>
+      </div>
+      <figure class="card shot" style="margin:18px 0 0"><img src="stage-audit-evidence/06-current-architecture.webp" alt="当前实现架构图，展示浏览器、Windows运行时、WSL网关、语音与Avatar服务、存储边界"><figcaption><span class="evidence">E2 · HEADLESS CAPTURE</span>　当前实现架构可视化；详细交互版见报告顶部链接。</figcaption></figure>
+    </div></section>
+
+    <section id="journeys"><div class="wrap">
+      <div class="section-head"><h2>四条 PRD 用户旅程</h2><p>旅程不是“接口存在”即通过；这里明确标出真实用户入口和感知证据的缺口。</p></div>
+      <div class="card">
+        <div class="journey"><div class="step">01</div><div><h3>首次设置</h3><p>五步、草稿续接、授权门、真实运行检查、人物与声音版本回退均已实现。</p></div><span class="status">缺干净机安装</span></div>
+        <div class="journey"><div class="step">02</div><div><h3>连续对话与插话</h3><p>Chrome getUserMedia 虚拟麦克风注入授权真实 WAV，驱动 ASR→LLM→TTS→Avatar；generation fence 阻断旧轮次，插话恢复监听。</p></div><span class="status">缺物理麦克风 / A/V量化</span></div>
+        <div class="journey"><div class="step">03</div><div><h3>记忆与隐私控制</h3><p>搜索、编辑、删除、全清、本次不记录、30天清理、loopback 与出站检查。</p></div><span class="status pass">自动化覆盖强</span></div>
+        <div class="journey"><div class="step">04</div><div><h3>故障恢复</h3><p>Avatar/TTS 降级、单服务重试、同页恢复和重复 start/stop 已覆盖。</p></div><span class="status">缺安装失败恢复</span></div>
+      </div>
+    </div></section>
+
+    <section id="chain"><div class="wrap">
+      <div class="section-head"><h2>完整对话链记录</h2><p>真实 Windows Chrome 媒体入口、真实模型和 Avatar；正文只保留 SHA-256，逐事件原始证据留在本机忽略目录。</p></div>
+      <div class="grid g3">
+        <article class="card"><div class="kicker">浏览器输入</div><div class="metric green">645 帧</div><div class="muted">getUserMedia / AudioWorklet，16kHz mono PCM16；非法二进制帧 0。</div></article>
+        <article class="card"><div class="kicker">语音输出</div><div class="metric green">1,630 块</div><div class="muted">4 次文本 final、3 次完整播放；另 1 轮被有效插话取消。</div></article>
+        <article class="card"><div class="kicker">Avatar 输出</div><div class="metric green">895 帧</div><div class="muted">H.264→WebCodecs；停止后输入轨 0、AudioContext closed。</div></article>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <div class="tag cyan">E3 · WINDOWS CHROME + REAL MODELS</div>
+        <h3>端到端边界</h3>
+        <p class="muted">Chrome getUserMedia → AudioWorklet → 20ms PCM → Gateway → VAD/ASR → transcript.final → llama.cpp 流式文本 → CosyVoice PCM → 浏览器播放确认；同一 PCM → Wav2Lip → Annex-B H.264 → WebCodecs/canvas。打断时 generation 作废并清理 LLM、TTS、音频源与 Avatar 队列。</p>
+        <div class="table-scroll"><table><thead><tr><th>event_seq</th><th>归属</th><th>事件</th><th>可验证状态</th></tr></thead><tbody>
+          <tr><td>1</td><td>session</td><td><code>state.changed</code></td><td>listening / ws_connected</td></tr>
+          <tr><td>2 → 8</td><td>turn 1</td><td>transcript.final → thinking → speaking → reply.text.final</td><td>正文哈希存在</td></tr>
+          <tr><td>593 → 594</td><td>turn 1</td><td>reply.audio.complete → state.changed</td><td>播放完成，回到 listening</td></tr>
+          <tr><td>595 → 600</td><td>turn 2</td><td>transcript.final → thinking → speaking → reply.text.final</td><td>第二轮生成开始</td></tr>
+          <tr><td>835 → 836</td><td>turn 2</td><td>barge_in.detected → turn.cancelled</td><td>旧 generation 作废</td></tr>
+          <tr><td>837 → 842</td><td>turn 3</td><td>transcript.final → thinking → speaking → reply.text.final</td><td>插话后新轮接续</td></tr>
+          <tr><td>1157 → 1158</td><td>turn 3</td><td>reply.audio.complete → state.changed</td><td>播放完成，回到 listening</td></tr>
+          <tr><td>1159 → 1165</td><td>turn 4</td><td>transcript.final → thinking → speaking → reply.text.final</td><td>第四轮生成开始</td></tr>
+          <tr><td>1664 → 1665</td><td>turn 4</td><td>reply.audio.complete → state.changed</td><td>严格递增并回到 listening</td></tr>
+        </tbody></table></div>
+        <p class="muted"><strong>证据：</strong><code>audit/v1/B5/B5.4A-conversation-final/result.json</code>（本机不入 Git）。独立打断矩阵为早/中/晚各10次、30/30通过，静音P95=2.6ms、旧generation音频=0、Avatar重连=0、decoder backlog=0。</p>
+      </div>
+      <div class="card" style="margin-top:18px">
+        <div class="tag cyan">本轮 60 分钟 · 完整动作账本</div>
+        <h3>20 个完整轮次 + 10 次打断：30/30 功能通过</h3>
+        <p class="muted">每行来自本轮 <code>actions.json</code>；时长包含该真实模型动作从输入到完成/取消的处理时间。整轮最终仍因 Windows 宿主余量硬门判 FAIL。</p>
+        <div class="table-scroll"><table><thead><tr><th>轮次</th><th>类型</th><th>耗时(ms)</th><th>事件数</th><th>结果</th></tr></thead><tbody>
+          <tr><td>1</td><td>完整</td><td>9,856.766</td><td>340</td><td class="green">PASS</td></tr><tr><td>2</td><td>完整</td><td>12,408.846</td><td>529</td><td class="green">PASS</td></tr><tr><td>3</td><td>打断</td><td>5,603.915</td><td>9</td><td class="green">PASS</td></tr>
+          <tr><td>4</td><td>完整</td><td>7,579.890</td><td>290</td><td class="green">PASS</td></tr><tr><td>5</td><td>完整</td><td>9,168.225</td><td>430</td><td class="green">PASS</td></tr><tr><td>6</td><td>打断</td><td>6,180.913</td><td>9</td><td class="green">PASS</td></tr>
+          <tr><td>7</td><td>完整</td><td>7,156.676</td><td>260</td><td class="green">PASS</td></tr><tr><td>8</td><td>完整</td><td>9,180.022</td><td>318</td><td class="green">PASS</td></tr><tr><td>9</td><td>打断</td><td>5,627.762</td><td>10</td><td class="green">PASS</td></tr>
+          <tr><td>10</td><td>完整</td><td>7,978.063</td><td>318</td><td class="green">PASS</td></tr><tr><td>11</td><td>完整</td><td>10,734.814</td><td>483</td><td class="green">PASS</td></tr><tr><td>12</td><td>打断</td><td>5,920.905</td><td>9</td><td class="green">PASS</td></tr>
+          <tr><td>13</td><td>完整</td><td>8,977.881</td><td>346</td><td class="green">PASS</td></tr><tr><td>14</td><td>完整</td><td>8,729.517</td><td>406</td><td class="green">PASS</td></tr><tr><td>15</td><td>打断</td><td>5,597.103</td><td>9</td><td class="green">PASS</td></tr>
+          <tr><td>16</td><td>完整</td><td>14,881.668</td><td>753</td><td class="green">PASS</td></tr><tr><td>17</td><td>完整</td><td>8,662.819</td><td>342</td><td class="green">PASS</td></tr><tr><td>18</td><td>打断</td><td>5,922.866</td><td>10</td><td class="green">PASS</td></tr>
+          <tr><td>19</td><td>完整</td><td>9,019.165</td><td>376</td><td class="green">PASS</td></tr><tr><td>20</td><td>完整</td><td>8,486.797</td><td>372</td><td class="green">PASS</td></tr><tr><td>21</td><td>打断</td><td>5,928.424</td><td>10</td><td class="green">PASS</td></tr>
+          <tr><td>22</td><td>完整</td><td>11,343.946</td><td>511</td><td class="green">PASS</td></tr><tr><td>23</td><td>完整</td><td>10,660.868</td><td>451</td><td class="green">PASS</td></tr><tr><td>24</td><td>打断</td><td>5,399.554</td><td>9</td><td class="green">PASS</td></tr>
+          <tr><td>25</td><td>完整</td><td>6,884.326</td><td>222</td><td class="green">PASS</td></tr><tr><td>26</td><td>完整</td><td>9,721.902</td><td>448</td><td class="green">PASS</td></tr><tr><td>27</td><td>打断</td><td>4,967.652</td><td>9</td><td class="green">PASS</td></tr>
+          <tr><td>28</td><td>完整</td><td>11,385.435</td><td>493</td><td class="green">PASS</td></tr><tr><td>29</td><td>完整</td><td>8,475.977</td><td>340</td><td class="green">PASS</td></tr><tr><td>30</td><td>打断</td><td>6,110.539</td><td>10</td><td class="green">PASS</td></tr>
+        </tbody></table></div>
+      </div>
+    </div></section>
+
+    <section id="evidence"><div class="wrap">
+      <div class="section-head"><h2>可视化交互证据</h2><p>所有人物区域已脱敏。截图只承担 UI 合同证据，不承担真实模型性能结论。</p></div>
+      <div class="grid g2">
+        <figure class="card shot"><img src="stage-audit-evidence/01-main-stage.webp" alt="桌面端主舞台，显示人物区域、对话字幕和开始对话入口"><figcaption><span class="evidence">E2 · 1440×900</span>　主舞台：唯一高权重语音入口、状态与字幕层。</figcaption></figure>
+        <figure class="card shot"><img src="stage-audit-evidence/02-memory-control.webp" alt="设置抽屉中的记忆管理页面"><figcaption><span class="evidence">E2 · 1440×900</span>　记忆控制：搜索、来源、编辑、删除与隐私入口。</figcaption></figure>
+        <figure class="card shot"><img src="stage-audit-evidence/03-runtime-ready.webp" alt="运行状态页面，显示本地服务组件状态"><figcaption><span class="evidence">E2 · 1440×900</span>　运行诊断：组件状态、影响说明与恢复动作。</figcaption></figure>
+        <figure class="card shot"><img src="stage-audit-evidence/05-consent-gate.webp" alt="首次设置素材授权门页面"><figcaption><span class="evidence">E2 · 1440×900</span>　授权门：未确认前禁止使用真人照片与声音。</figcaption></figure>
+        <figure class="card shot mobile"><img src="stage-audit-evidence/04-mobile-runtime.webp" alt="420乘720移动窄视口下的运行状态页面"><figcaption><span class="evidence">E2 · 420×720</span>　窄视口：页面可用但它不是手机远程访问承诺。</figcaption></figure>
+        <article class="card"><div class="tag cyan">证据解释</div><h3>截图能证明什么？</h3><p class="muted">能证明路由、组件、布局、状态文案和基本交互符合已冻结 UI 合同；不能证明截图中的“就绪”来自真实探针，也不能证明音质、口型或延迟。</p><h3>真实模型证据在哪里？</h3><p class="muted">目标机脚本生成独立 audit 目录，记录模型事件、轮次、资源采样、生命周期和退出码；仓库只提交脱敏总结，不提交用户素材、权重或原始 audit。</p></article>
+      </div>
+    </div></section>
+
+    <section id="tests"><div class="wrap">
+      <div class="section-head"><h2>本轮自动化结果</h2><p>测试按 Python 包边界分开执行，避免两个顶层 <code>tests</code> 包在同进程发生导入遮蔽。</p></div>
+      <div class="table-scroll"><table><thead><tr><th>范围</th><th>结果</th><th>覆盖重点</th><th>判断</th></tr></thead><tbody>
+        <tr><td>Backend</td><td class="green"><strong>326 passed</strong><br>4 skipped</td><td>API、状态机、适配器、存储、隐私、生命周期合同</td><td>通过；skip 为 WSL 无 PowerShell</td></tr>
+        <tr><td>Stage contracts</td><td class="green"><strong>4 passed</strong></td><td>soak 判定器、发布冻结</td><td>通过</td></tr>
+        <tr><td>Avatar</td><td class="green"><strong>9 passed</strong></td><td>worker、调度与媒体输出</td><td>通过；不替代口型感知验收</td></tr>
+        <tr><td>Playwright</td><td class="green"><strong>9 passed</strong></td><td>三尺寸 axe、焦点、状态播报、减少动效</td><td>自动化子集通过；不替代真实读屏</td></tr>
+        <tr><td>Production build</td><td class="green"><strong>PASS</strong></td><td>23 modules</td><td>通过</td></tr>
+        <tr><td>Windows scripts</td><td class="green"><strong>AST PASS</strong></td><td>launcher、llama、主机解析、总验收</td><td>语法通过</td></tr>
+        <tr><td>60分钟真实组合</td><td class="red"><strong>FAIL / exit 2</strong></td><td>20完整+10打断全PASS；RAM 13,637.863MiB；GPU 12.479GiB；Windows余量最低1,840.566MiB</td><td>2GiB宿主余量硬门失败</td></tr>
+      </tbody></table></div>
+      <h3 style="margin-top:32px">PRD 验收用例清单</h3>
+      <div class="table-scroll"><table><thead><tr><th>ID</th><th>真实场景</th><th>证据与结果</th><th>本轮判断</th></tr></thead><tbody>
+        <tr><td>AC-01</td><td>五步首次设置、草稿续接、授权</td><td>隔离 Chrome 5/5；真实 API/SQLite</td><td class="green">通过</td></tr>
+        <tr><td>AC-02</td><td>人物/声音版本、预览、激活、回退</td><td>真实文件、403授权阻断、激活故障回滚</td><td class="green">通过</td></tr>
+        <tr><td>AC-03</td><td>连续语音对话</td><td>真实模型 20/20；浏览器媒体链另有完整事件记录</td><td class="green">通过</td></tr>
+        <tr><td>AC-04</td><td>普通缓存未命中首响</td><td>30/30；历史候选 P95=6.175s≤7s</td><td class="green">通过</td></tr>
+        <tr><td>AC-04A</td><td>严格问候缓存</td><td>3/3命中、P95=14ms；24负例与版本失效0误命中</td><td class="green">通过</td></tr>
+        <tr><td>AC-05</td><td>早/中/晚插话</td><td>30/30；静音P95=2.6ms；旧generation音频0</td><td class="green">通过</td></tr>
+        <tr><td>AC-06</td><td>Avatar媒体、降级、原页恢复</td><td>双FPS≥25、三周期恢复≤0.54s</td><td class="amber">功能通过；A/V量化缺失</td></tr>
+        <tr><td>AC-07</td><td>形成并召回长期记忆</td><td>真实BGE/SQLite/sqlite-vec、来源与token预算</td><td class="green">通过</td></tr>
+        <tr><td>AC-08</td><td>编辑、删除、全清与事务回滚</td><td>源记录/FTS/vector/meta原子一致，删除后0召回</td><td class="green">通过</td></tr>
+        <tr><td>AC-09</td><td>创建时/会话中开启不记录</td><td>业务表增量0、原始音频增量0、WAL归零</td><td class="green">通过</td></tr>
+        <tr><td>AC-10</td><td>29/30/31天保留与故障重试</td><td>隔离真实SQLite/sqlite-vec、可控时钟</td><td class="green">通过</td></tr>
+        <tr><td>AC-11</td><td>三尺寸、键盘、读屏、减少动效</td><td>axe/焦点/aria-live/reduced-motion 9/9</td><td class="amber">自动化子集通过；真人读屏未验</td></tr>
+        <tr><td>AC-12</td><td>LLM/Speech/Avatar/Gateway故障恢复</td><td>4组件×3轮=12/12；同页恢复、无假ready</td><td class="green">通过</td></tr>
+        <tr><td>AC-13</td><td>本机边界、出站、日志与原始音频</td><td>真实5轮、连接采样、白盒出站0、敏感命中0</td><td class="green">批准替代门通过</td></tr>
+        <tr><td>AC-14</td><td>60分钟、20完整+10打断、生命周期</td><td>721样本；对话30/30；Windows最低余量1,840.566MiB；stop×2归零</td><td class="red">FAIL；recover因硬门失败未执行</td></tr>
+      </tbody></table></div>
+    </div></section>
+
+    <section id="gaps"><div class="wrap">
+      <div class="section-head"><h2>为什么不是全绿</h2><p>以下不是润色项，而是 PRD 或目标架构中尚未获得同等级证据的承诺。</p></div>
+      <div class="grid g2">
+        <article class="card"><div class="finding"><h3>1. 依赖方向没有完全落地</h3><p class="muted"><code>api_gateway.py</code> 与 <code>turn_pipeline.py</code> 直接导入具体 repository、asset store、logger 和 metrics。模型 adapter 边界成立，但 NFR-07 只能判部分通过。</p></div><div class="finding"><h3>2. 人类感知验证不足</h3><p class="muted">已有 FPS、降级恢复和媒体合同，没有 A/V drift、口型主观质量、真实麦克风 20 轮与真实读屏全旅程。</p></div></article>
+        <article class="card"><div class="finding"><h3>3. 一键启动不等于干净安装</h3><p class="muted">当前目标机 start×2 / recover / stop×2 已有证据；全新 Windows+WSL 从依赖安装到首次开聊尚未独立复现。</p></div><div class="finding"><h3>4. 统一测试入口有工具债</h3><p class="muted">根目录与 backend 都有顶层 <code>tests</code> 包，合并收集会遮蔽模块。分开运行不影响测试结果，但发布工具应提供真正的一条命令。</p></div></article>
+      </div>
+      <div class="card" style="margin-top:18px"><h3>建议关闭顺序</h3><ol><li>物理麦克风 20 轮自由对话 + 浏览器事件证据。</li><li>共同时间戳量化 A/V drift，并补 5 段真人口型评分。</li><li>NVDA/Narrator 在三视口完成关键任务。</li><li>干净 Windows 用户或虚拟机跑安装→启动→恢复→卸载。</li><li>抽取 repository / asset / observability ports，并增加依赖规则测试。</li></ol></div>
+    </div></section>
+  </main>
+
+  <footer class="wrap footer"><strong>审计声明：</strong>本报告优先于历史 B5.6 无条件 PASS。未观察到的行为不写成通过；Headless 合同、白盒证据、目标机真实模型和人工感知证据保持分层。<br>生成位置：<code>docs/review/cyberwife-v1-stage-acceptance-report.html</code></footer>
+</body>
+</html>

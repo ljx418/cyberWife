@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/memory.schema.json",
+  "title": "记忆资源（FR-12）",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "content", "confidence", "created_at"],
+  "properties": {
+    "id": {"type": "integer"},
+    "source_session_id": {"type": ["integer", "null"]},
+    "content": {"type": "string", "minLength": 1, "maxLength": 2000},
+    "confidence": {"type": "number", "minimum": 0, "maximum": 1},
+    "edited": {"type": "boolean"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"}
+  }
+}

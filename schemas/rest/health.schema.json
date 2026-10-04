@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cyberwife.local/schemas/rest/health.schema.json",
+  "title": "Health 聚合响应",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "components", "resources", "version"],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["ready", "loading", "degraded", "error"]
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": {"$ref": "#/$defs/component"},
+      "properties": {
+        "vad": {"$ref": "#/$defs/component"},
+        "asr": {"$ref": "#/$defs/component"},
+        "llm": {"$ref": "#/$defs/component"},
+        "tts": {"$ref": "#/$defs/component"},
+        "avatar": {"$ref": "#/$defs/component"},
+        "embedding": {"$ref": "#/$defs/component"}
+      }
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "vram_used_gb": {"type": "number"},
+        "vram_total_gb": {"type": "number"},
+        "ram_used_gb": {"type": "number"},
+        "ram_total_gb": {"type": "number"},
+        "disk_free_gb": {"type": "number"}
+      }
+    },
+    "version": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["app", "schema"],
+      "properties": {
+        "app": {"type": "string"},
+        "schema": {"type": "string"}
+      }
+    }
+  },
+  "$defs": {
+    "component": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "last_probe"],
+      "properties": {
+        "status": {"type": "string", "enum": ["ready", "loading", "degraded", "error"]},
+        "logical_id": {"type": "string"},
+        "revision": {"type": "string"},
+        "device": {"type": "string"},
+        "dtype": {"type": "string"},
+        "latency_ms": {"type": "integer", "minimum": 0},
+        "last_probe": {"type": "string", "format": "date-time"},
+        "last_error": {"type": "string"},
+        "fallback_active": {"type": "boolean"}
+      }
+    }
+  }
+}
