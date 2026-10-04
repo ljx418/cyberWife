@@ -25,7 +25,7 @@
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；Playwright 14/14；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
-| INST1 | CONDITIONAL | 便携安装入口、目标机17/17 verify（含动态形象工作流/模型与真实import）、受控Speech venv真实启停PASS；离线/显式联网依赖准备入口 | 干净Windows+WSL独立复现待验 |
+| INST1 | CONDITIONAL | 便携安装入口、目标机17/17 verify、受控Speech venv真实启停PASS；两个全新隔离Python 3.12 venv真实安装、`pip check`与项目源码导入10/10 PASS；缺失`python3.12-venv`时`uv --seed`回退已实测 | 全新Windows用户+干净WSL+GPU驱动+本地模型工件的整机组合复现待验 |
 
 ## 3. 已完成依赖链
 
@@ -43,4 +43,4 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；UX4/UX5、ARCH1、RES1已关闭Idle/口型、分层和资源红项。ACC1完成三视口15/15键盘任务并准备Narrator签字工具，但仍缺人工读屏听感与物理麦克风；INST1完成依赖准备入口、17项目标机verify、受控Speech venv与真实生命周期，但缺干净Windows+WSL独立复现。当前剩余均为必须依赖新外部环境或人类现场感知的高风险验收门，V1仍未全绿。
+已锁定的B0～B5功能开发项均有实现；UX4/UX5、ARCH1、RES1已关闭Idle/口型、分层和资源红项。ACC1完成三视口15/15键盘任务并准备Narrator签字工具，但仍缺人工读屏听感与物理麦克风；INST1已关闭Python依赖从零安装风险，并完成17项目标机verify、受控Speech venv与真实生命周期，但缺全新Windows用户、干净WSL、GPU驱动和本地模型工件的整机组合复现。当前剩余均为必须依赖新外部环境或人类现场感知的高风险验收门，V1仍未全绿。

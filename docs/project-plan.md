@@ -10,7 +10,7 @@
 
 前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
 
-V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。后续UX5/ARCH1/RES1已关闭口型量化、架构分层和AC-14资源红项；ACC1完成三视口15/15键盘任务并准备Narrator现场签字工具，INST1完成依赖准备入口、17/17目标机verify和受控Speech venv。人工读屏听感、物理麦克风与干净Windows+WSL独立复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
+V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。后续UX5/ARCH1/RES1已关闭口型量化、架构分层和AC-14资源红项；ACC1完成三视口15/15键盘任务并准备Narrator现场签字工具，INST1完成17/17目标机verify、受控Speech venv，以及Core/Avatar两个全新隔离Python 3.12环境的真实安装与10/10验证。人工读屏听感、物理麦克风与全新Windows用户+干净WSL+驱动/工件整机复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
 
 ## 2. 固定边界
 
