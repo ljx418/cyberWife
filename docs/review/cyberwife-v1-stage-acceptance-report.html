@@ -69,7 +69,8 @@
     </div></section>
 
     <section id="chain"><div class="wrap">
-      <div class="section-head"><h2>完整对话链记录</h2><p>真实 Windows Chrome 媒体入口、真实模型和 Avatar；正文只保留 SHA-256，逐事件原始证据留在本机忽略目录。</p></div>
+      <div class="section-head"><h2>完整对话链记录</h2><p>真实 Windows Chrome 媒体入口、真实模型和 Avatar；完整指协议控制链完整，不是可还原的逐字对话正文。</p></div>
+      <div class="notice"><strong>隐私边界：</strong>测试产物没有保存明文逐字稿或授权音频，只保存正文 SHA-256、计数与事件顺序；逐事件原始证据留在本机忽略目录。因此可以审计“哪一轮何时进入何状态、何时播放完成或被打断”，但不能从报告恢复用户和角色的原话。</div>
       <div class="grid g3">
         <article class="card"><div class="kicker">浏览器输入</div><div class="metric green">645 帧</div><div class="muted">getUserMedia / AudioWorklet，16kHz mono PCM16；非法二进制帧 0。</div></article>
         <article class="card"><div class="kicker">语音输出</div><div class="metric green">1,630 块</div><div class="muted">4 次文本 final、3 次完整播放；另 1 轮被有效插话取消。</div></article>

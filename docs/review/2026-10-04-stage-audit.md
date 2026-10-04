@@ -63,7 +63,7 @@
 
 ## 5A. 完整对话链记录
 
-存在完整、可追溯的浏览器对话链证据。为避免把用户正文和授权音频上传 Git，仓库报告只保留哈希、计数和事件顺序；原始逐事件证据位于本机忽略目录 `audit/`。
+存在完整、可追溯的浏览器协议事件链证据。这里的“完整”指从媒体输入到播放结束/打断取消的控制链完整，不代表保存了可还原的逐字对话正文。按隐私设计，测试产物只记录正文 SHA-256、计数和事件顺序；没有保存明文逐字稿或授权音频。原始逐事件证据位于本机忽略目录 `audit/`。
 
 代表性真实链来自 `audit/v1/B5/B5.4A-conversation-final/result.json`：Windows Chrome 通过标准 `getUserMedia`/AudioWorklet 注入授权真实 WAV，经真实 Gateway、ASR、LLM、CosyVoice 与 Avatar 完成。它记录 645 个输入二进制帧、0 个非法帧、4 个 `transcript.final`、4 个 `reply.text.final`、1630 个音频块、3 个完整播放、895 个 Avatar 解码帧；事件序列严格递增。浏览器停止前输入轨为 1，停止后输入轨为 0 且 AudioContext=`closed`。
 
