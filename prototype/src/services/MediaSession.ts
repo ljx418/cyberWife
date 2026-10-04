@@ -48,10 +48,21 @@ class CyberWifeFirstSoundMeter extends AudioWorkletProcessor {
 registerProcessor('cyberwife-first-sound-meter', CyberWifeFirstSoundMeter);
 `;
 
+// Wav2Lip consumes two 20ms PCM chunks per video frame and needs right-side
+// context before its first generated frame.  On the target RTX machine a
+// batch of four reaches the browser in 218-370ms (warm/cold). Holding only
+// the first audio source of each generation aligns audible onset with that
+// real mouth frame;
+// subsequent chunks remain gapless on nextStartAt.  This stays well inside
+// the PRD's 7s first-sound budget and is cancelled by the existing generation
+// fence during barge-in.
+export const AVATAR_AUDIO_PREROLL_SECONDS = 0.295;
+
 let context: AudioContext | null = null;
 let meter: AudioWorkletNode | null = null;
 let outputPromise: Promise<AudioContext> | null = null;
 let nextStartAt = 0;
+let lastFirstChunkLeadSeconds = 0;
 let armedKey = "";
 let activeSocket: WebSocket | null = null;
 const markers = new Map<string, Marker>();
@@ -196,7 +207,8 @@ export const MediaSession = {
     if (!meter) return false;
     activeSocket = ws;
     const key = `${env.session_id}:${env.turn_id}:${generation}:${traceId}`;
-    if (armedKey !== key) {
+    const firstChunkForTurn = armedKey !== key;
+    if (firstChunkForTurn) {
       armedKey = key;
       markers.set(key, {
         key,
@@ -228,7 +240,11 @@ export const MediaSession = {
       if (hasNonSilent && !cancelledGenerations.has(generationId)) confirmRendered(key);
       confirmEnded(key);
     };
-    const scheduledAt = Math.max(audioContext.currentTime + 0.005, nextStartAt);
+    const minimumLead = firstChunkForTurn ? AVATAR_AUDIO_PREROLL_SECONDS : 0.005;
+    const scheduledAt = Math.max(audioContext.currentTime + minimumLead, nextStartAt);
+    if (firstChunkForTurn) {
+      lastFirstChunkLeadSeconds = Math.max(0, scheduledAt - audioContext.currentTime);
+    }
     source.start(scheduledAt);
     nextStartAt = scheduledAt + buffer.duration;
     return true;
@@ -275,6 +291,7 @@ export const MediaSession = {
       latestGeneration: Math.max(0, ...latestGenerations.values()),
       cancelledGenerationKeys: [...cancelledGenerations],
       latestGenerationBySession: Object.fromEntries(latestGenerations),
+      lastFirstChunkLeadSeconds,
     };
   },
 
@@ -284,6 +301,7 @@ export const MediaSession = {
     meter = null;
     outputPromise = null;
     nextStartAt = 0;
+    lastFirstChunkLeadSeconds = 0;
     armedKey = "";
     activeSocket = null;
     markers.clear();

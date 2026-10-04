@@ -1,4 +1,6 @@
 
+import os
+
 import cv2
 import numpy as np
 from tqdm import tqdm
@@ -52,3 +54,20 @@ def blend_lower_face(original, generated):
     mask = cv2.GaussianBlur(mask, (kernel, kernel), 0)[:, :, None]
     mixed = original.astype(np.float32) * (1.0 - mask) + generated.astype(np.float32) * mask
     return np.clip(mixed, 0, 255).astype(np.uint8)
+
+
+def composite_wav2lip_face(original, generated, mode=None):
+    """Composite a generated face with an explicit, auditable mode.
+
+    ``full`` matches upstream LiveTalking and is useful for quality
+    calibration. ``lower`` preserves the glasses/eye region and remains the
+    compatibility default until the calibrated UX5 evidence selects a mode.
+    """
+    selected = (mode or os.environ.get("CW_AVATAR_BLEND_MODE", "lower")).strip().lower()
+    if selected == "full":
+        if original.shape != generated.shape:
+            raise ValueError("face blend inputs must have identical shapes")
+        return generated.astype(np.uint8, copy=False)
+    if selected == "lower":
+        return blend_lower_face(original, generated)
+    raise ValueError(f"unsupported Wav2Lip blend mode: {selected}")

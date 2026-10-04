@@ -168,7 +168,7 @@ function Start-ManagedComponent([string]$Name) {
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'avatar' {
-            $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', 'CW_AVATAR_DATA_ROOT=/home/administrator/.cyberWife/avatar/avatars', $AvatarPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'wav2lip', '--batch_size', '8', '--modelfile', $AvatarModelWsl, '--avatar_id', $AvatarId)
+            $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', 'CW_AVATAR_DATA_ROOT=/home/administrator/.cyberWife/avatar/avatars', $AvatarPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'wav2lip', '--batch_size', '4', '--modelfile', $AvatarModelWsl, '--avatar_id', $AvatarId)
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'gateway' {

@@ -41,7 +41,7 @@ from avatars.base_avatar import BaseAvatar
 
 from tqdm import tqdm
 from utils.logger import logger
-from utils.image import blend_lower_face, read_imgs, mirror_index
+from utils.image import composite_wav2lip_face, read_imgs, mirror_index
 from utils.device import initialize_device
 from registry import register
 
@@ -145,5 +145,5 @@ class LipReal(BaseAvatar):
         y1, y2, x1, x2 = bbox
         res_frame = cv2.resize(pred_frame.astype(np.uint8),(x2-x1,y2-y1))
         original_face = combine_frame[y1:y2, x1:x2]
-        combine_frame[y1:y2, x1:x2] = blend_lower_face(original_face, res_frame)
+        combine_frame[y1:y2, x1:x2] = composite_wav2lip_face(original_face, res_frame)
         return combine_frame

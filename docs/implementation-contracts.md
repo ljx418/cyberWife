@@ -295,10 +295,10 @@ LLM 8K context，预留约 1500 token 给输出、500 token 给系统与控制�
 ### 8.2 配置与二进制帧
 
 ```json
-{"type":"video.config","version":1,"session_id":"...","codec":"avc1.42E01F","format":"annexb","fps":25,"queue_limit":2,"audio":"gateway-pcm"}
+{"type":"video.config","version":2,"session_id":"...","codec":"avc1.42E01F","format":"annexb","fps":25,"queue_limit":2,"audio":"gateway-pcm"}
 ```
 
-每条二进制消息包含一个Annex-B access unit。14字节小端头：`version:u8`、`flags:u8`（bit0=key）、`width:u16`、`height:u16`、`timestamp_ms:u32`、`sequence:u32`，其后为H.264 payload。关键帧必须携带SPS/PPS。编码优先`h264_nvenc`，同进程只允许回退`libx264/ultrafast/zerolatency`。
+每条二进制消息包含一个Annex-B access unit。version 2 使用18字节小端头：`version:u8`、`flags:u8`（bit0=key）、`width:u16`、`height:u16`、`timestamp_ms:u32`、`sequence:u32`、`generation:u32`，其后为H.264 payload；version 1 的14字节头仅作旧客户端兼容。关键帧必须携带SPS/PPS。编码优先`h264_nvenc`，同进程只允许回退`libx264/ultrafast/zerolatency`。
 
 ### 8.3 背压、恢复与FPS
 
@@ -310,6 +310,7 @@ LLM 8K context，预留约 1500 token 给输出、500 token 给系统与控制�
 - 新WS会话与幸存的对话generation属于不同生命周期：仅在首帧建连期间允许该新会话的generation-0 idle关键帧建立canvas；连接赋值后立即恢复严格generation fence，下一回答由`setGeneration`切至当前代次。不得把旧WS的迟帧用于建连。
 - Avatar在某个非零generation建立后，其无音频元数据的idle帧继承最近generation；只有新进程/新session尚未收到真实音频时才输出generation 0。该规则避免同一回答尾部被误判旧帧并在媒体时间轴制造FPS缺口。
 - 验收同时要求媒体/服务端finalfps≥25、inferfps≥25、decoder backlog≤3、WebSocket队列丢帧=0；浏览器墙钟值保留诊断并在B5检查长期漂移。
+- 目标机Wav2Lip使用`batch_size=4`。浏览器对每个新turn的第一个PCM源预留295ms Avatar lead，后续20ms源继续无缝排程；打断沿用generation栅栏立即取消，不等待预留时间。该值来自UX5同一目标机冷/热四次真实首嘴型帧218.060～370.307ms的中点校准，变更模型、batch或硬件后必须重测，不得照搬。
 
 ---
 

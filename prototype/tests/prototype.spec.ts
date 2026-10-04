@@ -150,6 +150,7 @@ test('浏览器媒体合同只为首个非静音 PCM 回传一次播放确认', 
       await MediaSession.handleServerEvent({
         ...common, payload: { ...common.payload, audio_chunk_b64: encode(0) },
       }, socket)
+      const firstChunkLeadSeconds = MediaSession.snapshot().lastFirstChunkLeadSeconds
       await new Promise((resolve) => setTimeout(resolve, 80))
       const afterSilence = sent.length
       await MediaSession.handleServerEvent({
@@ -160,7 +161,7 @@ test('浏览器媒体合同只为首个非静音 PCM 回传一次播放确认', 
       }, socket)
       await new Promise((resolve) => setTimeout(resolve, 200))
       await MediaSession.stop()
-      return { afterSilence, sent: sent.map((item) => JSON.parse(item)) }
+      return { afterSilence, firstChunkLeadSeconds, sent: sent.map((item) => JSON.parse(item)) }
     }
     const button = document.createElement('button')
     button.id = 'run-audio-probe'
@@ -173,6 +174,8 @@ test('浏览器媒体合同只为首个非静音 PCM 回传一次播放确认', 
   await page.locator('#run-audio-probe').click()
   const result = await page.evaluate(() => (window as any).__audioProbePromise)
   expect(result.afterSilence).toBe(0)
+  expect(result.firstChunkLeadSeconds).toBeGreaterThanOrEqual(0.29)
+  expect(result.firstChunkLeadSeconds).toBeLessThanOrEqual(0.30)
   expect(result.sent).toHaveLength(1)
   expect(result.sent[0]).toMatchObject({
     type: 'audio.playback.started', session_id: '7', turn_id: 3, generation: 2,
