@@ -45,6 +45,25 @@ def _smooth(boxes: np.ndarray, radius: int = 2) -> np.ndarray:
     return np.rint(result).astype(np.int32)
 
 
+def _mae(left: np.ndarray, right: np.ndarray) -> float:
+    return float(np.mean(np.abs(left.astype(np.float32) - right.astype(np.float32))))
+
+
+def _loop_metrics(frames: list[np.ndarray]) -> dict[str, float | str]:
+    first_last = _mae(frames[0], frames[-1])
+    midpoint = len(frames) // 2
+    turnaround = _mae(frames[midpoint - 1], frames[midpoint])
+    mirrored = [_mae(frames[index], frames[-index - 1]) for index in range(midpoint)]
+    palindrome = float(np.mean(mirrored)) if mirrored else 0.0
+    mode = "closed_palindrome" if first_last <= 3.0 and palindrome <= 3.0 else "ping_pong"
+    return {
+        "mode": mode,
+        "first_last_mae": round(first_last, 4),
+        "turnaround_mae": round(turnaround, 4),
+        "palindrome_mae": round(palindrome, 4),
+    }
+
+
 def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id: str) -> Path:
     if not source_portrait.is_file() or not idle_video.is_file():
         raise FileNotFoundError("source portrait or idle video is missing")
@@ -74,8 +93,15 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
         ])
         frames.append(canvas)
     capture.release()
-    if not 64 <= len(frames) <= 120 or not 12 <= source_fps <= 30:
-        raise RuntimeError(f"idle video outside 4-7s contract: frames={len(frames)}, fps={source_fps:.3f}")
+    duration = len(frames) / source_fps if source_fps else 0
+    if not 4 <= duration <= 10.5 or not 12 <= source_fps <= 30:
+        raise RuntimeError(
+            f"idle video outside 4-10.5s contract: frames={len(frames)}, "
+            f"fps={source_fps:.3f}, duration={duration:.3f}"
+        )
+    loop_metrics = _loop_metrics(frames)
+    if duration > 7 and loop_metrics["mode"] != "closed_palindrome":
+        raise RuntimeError(f"long idle video is not a closed palindrome: {loop_metrics}")
 
     boxes = _smooth(np.asarray(raw_boxes))
     if np.max(np.abs(np.diff(boxes, axis=0))) > 48:
@@ -113,7 +139,11 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
             "coordinates": median_box,
             "frame_count": len(frames),
             "source_fps": round(source_fps, 3),
-            "loop_mode": "ping_pong",
+            "duration_seconds": round(duration, 3),
+            "loop_mode": loop_metrics["mode"],
+            "loop_seam": {
+                key: value for key, value in loop_metrics.items() if key != "mode"
+            },
             "face_detector": "scrfd",
             "visual_approval_required": True,
         }
