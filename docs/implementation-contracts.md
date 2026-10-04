@@ -668,6 +668,11 @@ CREATE TABLE profile_history (
 | `GET/POST /api/v1/consents` | FR-02 授权授予/撤销 |
 | `GET /api/v1/assets/{portrait\|voice}` | FR-04/05 列出/历史版本（回退） |
 | `POST /api/v1/assets/{id}/activate` | FR-04/05 原子激活 |
+| `POST /api/v1/assets/{id}/avatar-builds` | 为授权照片创建静态安全版本；生成失败时仍可保留静态人物 |
+| `POST /api/v1/avatar-builds/{id}/idle-generation` | 排队执行互斥的本机正面化与10秒Idle生成；同一时刻仅一个任务 |
+| `GET /api/v1/avatar-builds/{id}/idle-generation` | 返回落盘状态、阶段和进度，不返回私有路径 |
+| `GET /api/v1/avatar-builds/{id}/idle-generation/{frontal\|video}` | 仅在待审/已激活状态提供 `private, no-store` 预览 |
+| `POST /api/v1/avatar-builds/{id}/idle-generation/approve` | 服务端视觉确认门；构建视频Avatar并原子激活同源照片/数据 |
 | `PATCH /api/v1/sessions/{id}/no_record` | FR-13 本次不记录会话内切换 |
 | `GET /api/v1/audit?entity=&action=` | NFR-04/G3 数据隐私复核（无独立 FR 行，对应 G3） |
 | `GET /api/v1/retention/now` | FR-14 30 天保留查询 |

@@ -93,6 +93,17 @@ export interface AvatarBuild {
   error_code?: string | null;
 }
 
+export interface IdleGenerationJob {
+  derivative_id: number;
+  status: "queued" | "generating" | "awaiting_approval" | "failed" | "active";
+  phase: string;
+  progress: number;
+  error_code?: string | null;
+  has_frontal_preview: boolean;
+  has_video_preview: boolean;
+  updated_at: string;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${GATEWAY_BASE}${path}`, {
     method,
@@ -171,6 +182,11 @@ export const ConversationClient = {
   async createAvatarBuild(id: number) { return request<AvatarBuild>("POST", `/api/v1/assets/${id}/avatar-builds`); },
   async getAvatarBuild(id: number) { return request<AvatarBuild>("GET", `/api/v1/avatar-builds/${id}`); },
   async activateAvatarBuild(id: number) { return request<AvatarBuild>("POST", `/api/v1/avatar-builds/${id}/activate`); },
+  async startIdleGeneration(id: number) { return request<IdleGenerationJob>("POST", `/api/v1/avatar-builds/${id}/idle-generation`); },
+  async getIdleGeneration(id: number) { return request<IdleGenerationJob>("GET", `/api/v1/avatar-builds/${id}/idle-generation`); },
+  idlePreviewUrl: (id: number, kind: "frontal" | "video", revision: string | number = Date.now()) =>
+    `${GATEWAY_BASE}/api/v1/avatar-builds/${id}/idle-generation/${kind}?v=${encodeURIComponent(String(revision))}`,
+  async approveIdleGeneration(id: number) { return request<AvatarBuild>("POST", `/api/v1/avatar-builds/${id}/idle-generation/approve`); },
   async getActiveAvatar() { return request<AvatarBuild>("GET", "/api/v1/avatar/active"); },
   async restoreAsset(kind: "portrait" | "voice") { return request<AvatarBuild | Record<string, unknown>>("POST", `/api/v1/assets/${kind}/restore`); },
   async getMemories(query = "") { return request<{ items: Array<any> }>("GET", `/api/v1/memories?q=${encodeURIComponent(query)}`); },

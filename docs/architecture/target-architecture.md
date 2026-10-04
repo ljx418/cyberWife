@@ -40,6 +40,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
 | Avatar | H.264/WebCodecs全链、打断清队列、降级/恢复与长稳态通过 | 补A/V同步量化和真人口型感知证据 | 已开发/感知验收待补 |
+| 人物生成 | Qwen Image正面化→Wan Idle→10秒闭环→双预览→人工确认→Wav2Lip数据构建；文件任务状态可恢复 | 逐素材人工身份/自然度签署 | 已开发/人工门持续执行 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | start/status/recover/stop、幂等和失败回退已实现 | 补干净机安装与首次启动复现 | 目标机通过/干净机待验 |

@@ -270,8 +270,9 @@ switch ($Action) {
     'start' {
         Assert-Preflight
         $started = New-Object System.Collections.Generic.List[string]
+        $targets = if ($Component -eq 'all') { @('llama', 'speech', 'avatar', 'gateway') } else { @($Component) }
         try {
-            foreach ($name in @('llama', 'speech', 'avatar', 'gateway')) {
+            foreach ($name in $targets) {
                 try {
                     if (Start-ManagedComponent $name) { $started.Add($name) }
                 } catch {

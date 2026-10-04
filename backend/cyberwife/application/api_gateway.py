@@ -550,6 +550,72 @@ class ApiGateway:
                 raise HTTPException(status_code=404, detail="audit.entity_not_found")
             return self._avatar_asset_service.public_record(row)
 
+        @app.post("/api/v1/avatar-builds/{derivative_id}/idle-generation", status_code=202)
+        async def start_idle_generation(derivative_id: int, background_tasks: BackgroundTasks):
+            if self._avatar_asset_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                job = await asyncio.to_thread(
+                    self._avatar_asset_service.queue_idle_generation, derivative_id
+                )
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
+            except RuntimeError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
+            if job["status"] in {"queued", "generating"}:
+                background_tasks.add_task(
+                    self._avatar_asset_service.run_idle_generation, derivative_id
+                )
+            return job
+
+        @app.get("/api/v1/avatar-builds/{derivative_id}/idle-generation")
+        async def get_idle_generation(derivative_id: int):
+            if self._avatar_asset_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                return await asyncio.to_thread(
+                    self._avatar_asset_service.get_idle_generation, derivative_id
+                )
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+
+        @app.get("/api/v1/avatar-builds/{derivative_id}/idle-generation/{kind}")
+        async def get_idle_preview(derivative_id: int, kind: str):
+            if self._avatar_asset_service is None or kind not in {"frontal", "video"}:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            try:
+                target = await asyncio.to_thread(
+                    self._avatar_asset_service.idle_preview_path, derivative_id, kind
+                )
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            except ValueError:
+                raise HTTPException(status_code=422, detail="asset.invalid")
+            media_type = "image/png" if kind == "frontal" else "video/mp4"
+            return FileResponse(
+                target,
+                media_type=media_type,
+                headers={"Cache-Control": "no-store, private"},
+            )
+
+        @app.post("/api/v1/avatar-builds/{derivative_id}/idle-generation/approve")
+        async def approve_idle_generation(derivative_id: int):
+            if self._avatar_asset_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                row = await asyncio.to_thread(
+                    self._avatar_asset_service.approve_idle_generation, derivative_id
+                )
+            except PermissionError:
+                raise HTTPException(status_code=403, detail="auth.consent_required")
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
+            return self._avatar_asset_service.public_record(row)
+
         @app.post("/api/v1/avatar-builds/{derivative_id}/activate")
         async def activate_avatar_build(derivative_id: int):
             if self._avatar_asset_service is None or not self._repository:

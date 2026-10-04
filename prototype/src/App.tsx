@@ -7,7 +7,7 @@ import type {
   ThemeMode,
   VisualVariant,
 } from './types'
-import { ConversationClient, type AvatarBuild, type HealthResponse, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
+import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { AvatarSession } from './services/AvatarSession'
@@ -98,6 +98,7 @@ function App() {
   const [assetCounts, setAssetCounts] = useState({ portrait: 0, voice: 0 })
   const [activePortraitRevision, setActivePortraitRevision] = useState<number | null>(null)
   const [activeAvatarId, setActiveAvatarId] = useState('wav2lip256_avatar1')
+  const [idleJob, setIdleJob] = useState<IdleGenerationJob | null>(null)
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [runtimeRows, setRuntimeRows] = useState<RuntimeService[]>(runtimeServices)
   const [onboardingStatus, setOnboardingStatus] = useState('正在读取本机设置…')
@@ -173,6 +174,16 @@ function App() {
       const active = response.items.find((item) => Boolean(item.is_active))
       if (active) setActivePortraitRevision(Number(active.id) || Date.now())
       if (avatar.avatar_id) setActiveAvatarId(avatar.avatar_id)
+      if (avatar.id) {
+        void ConversationClient.getIdleGeneration(avatar.id)
+          .then(async (job) => {
+            const resumed = job.status === 'queued' || job.status === 'generating'
+              ? await ConversationClient.startIdleGeneration(avatar.id!)
+              : job
+            setIdleJob((current) => current ?? resumed)
+          })
+          .catch(() => {})
+      }
       if (avatar.face_box && avatar.frame_size) {
         const [y1, y2, x1, x2] = avatar.face_box
         const [width, height] = avatar.frame_size
@@ -438,7 +449,7 @@ function App() {
     finally { setDeleteTarget(null) }
   }
 
-  const uploadAndActivate = async (kind: 'portrait' | 'voice', file: File) => {
+  const uploadAndActivate = async (kind: 'portrait' | 'voice', file: File): Promise<AvatarBuild | void> => {
     try {
       setOnboardingStatus(`正在校验${kind === 'portrait' ? '照片' : '声音'}…`)
       const uploaded = await ConversationClient.uploadAsset(kind, file)
@@ -462,15 +473,53 @@ function App() {
           const [width, height] = active.frame_size
           setAvatarFocus({ x: ((x1 + x2) / 2 / width) * 100, y: ((y1 + y2) / 2 / height) * 100 })
         }
+        const response = await ConversationClient.getAssets(kind)
+        setAssetCounts((value) => ({ ...value, [kind]: response.items.length }))
+        setActivePortraitRevision(uploaded.id)
+        setOnboardingStatus('人物照片已保存；可继续生成动态待机形象')
+        return active
       } else {
         await ConversationClient.activateAsset(uploaded.id)
       }
       const response = await ConversationClient.getAssets(kind)
       setAssetCounts((value) => ({ ...value, [kind]: response.items.length }))
-      if (kind === 'portrait') setActivePortraitRevision(uploaded.id)
-      setOnboardingStatus(`${kind === 'portrait' ? '人物' : '声音'}已保存并激活到本机`)
+      setOnboardingStatus('声音已保存并激活到本机')
     } catch (error) {
       setOnboardingStatus(`文件未保存：${String(error)}`)
+      throw error
+    }
+  }
+
+  const generateIdleAvatar = async (derivativeId: number) => {
+    try {
+      setOnboardingStatus('正在准备本机生成；对话模型会暂时释放显存…')
+      let job = await ConversationClient.startIdleGeneration(derivativeId)
+      setIdleJob(job)
+      const deadline = Date.now() + 30 * 60_000
+      while (job.status === 'queued' || job.status === 'generating') {
+        if (Date.now() >= deadline) throw new Error('动态形象生成超时；当前人物保持不变')
+        setOnboardingStatus(`本机生成中：${job.phase}（${job.progress}%）`)
+        await new Promise((resolve) => window.setTimeout(resolve, 2000))
+        job = await ConversationClient.getIdleGeneration(derivativeId)
+        setIdleJob(job)
+      }
+      if (job.status === 'failed') throw new Error(job.error_code || '动态形象生成失败；当前人物保持不变')
+      setOnboardingStatus('动态形象已生成，请检查正面照片与 10 秒循环视频后确认使用')
+    } catch (error) {
+      setOnboardingStatus(`动态形象未启用：${String(error)}`)
+      throw error
+    }
+  }
+
+  const approveIdleAvatar = async (derivativeId: number) => {
+    try {
+      setOnboardingStatus('正在构建实时口型数据并切换形象…')
+      const active = await ConversationClient.approveIdleGeneration(derivativeId)
+      setActiveAvatarId(active.avatar_id)
+      setIdleJob((current) => current ? { ...current, status: 'active', phase: 'complete', progress: 100 } : current)
+      setOnboardingStatus('动态形象已启用；待机循环与实时口型均使用本次素材')
+    } catch (error) {
+      setOnboardingStatus(`启用失败，旧人物保持不变：${String(error)}`)
       throw error
     }
   }
@@ -567,7 +616,10 @@ function App() {
         runtimeRows={runtimeRows}
         status={onboardingStatus}
         onPortrait={(file) => uploadAndActivate('portrait', file)}
-        onVoice={(file) => uploadAndActivate('voice', file)}
+        idleJob={idleJob}
+        onGenerateIdle={generateIdleAvatar}
+        onApproveIdle={approveIdleAvatar}
+        onVoice={async (file) => { await uploadAndActivate('voice', file) }}
         onPreviewVoice={() => previewVoice()}
         onNext={advanceOnboarding}
         onBack={() => setOnboardingStep((current) => Math.max(0, current - 1))}
@@ -787,7 +839,10 @@ interface OnboardingProps {
   setVoiceTranscript: (value: string) => void
   runtimeRows: RuntimeService[]
   status: string
-  onPortrait: (file: File) => Promise<void>
+  onPortrait: (file: File) => Promise<AvatarBuild | void>
+  idleJob: IdleGenerationJob | null
+  onGenerateIdle: (derivativeId: number) => Promise<void>
+  onApproveIdle: (derivativeId: number) => Promise<void>
   onVoice: (file: File) => Promise<void>
   onPreviewVoice: () => Promise<void>
   onNext: () => Promise<void>
@@ -795,7 +850,8 @@ interface OnboardingProps {
 }
 
 function Onboarding(props: OnboardingProps) {
-  const canContinue = props.step !== 0 || props.consentChecked
+  const idleBusy = props.idleJob?.status === 'queued' || props.idleJob?.status === 'generating'
+  const canContinue = (props.step !== 0 || props.consentChecked) && !idleBusy
   return (
     <main className="onboarding">
       <div className="onboarding__portrait" />
@@ -836,6 +892,9 @@ function Onboarding(props: OnboardingProps) {
             setVoiceTranscript={props.setVoiceTranscript}
             runtimeRows={props.runtimeRows}
             onPortrait={props.onPortrait}
+            idleJob={props.idleJob}
+            onGenerateIdle={props.onGenerateIdle}
+            onApproveIdle={props.onApproveIdle}
             onVoice={props.onVoice}
             onPreviewVoice={props.onPreviewVoice}
           />
@@ -865,7 +924,10 @@ interface SetupStepProps {
   voiceTranscript: string
   setVoiceTranscript: (value: string) => void
   runtimeRows: RuntimeService[]
-  onPortrait: (file: File) => Promise<void>
+  onPortrait: (file: File) => Promise<AvatarBuild | void>
+  idleJob: IdleGenerationJob | null
+  onGenerateIdle: (derivativeId: number) => Promise<void>
+  onApproveIdle: (derivativeId: number) => Promise<void>
   onVoice: (file: File) => Promise<void>
   onPreviewVoice: () => Promise<void>
 }
@@ -903,7 +965,7 @@ function SetupStep(props: SetupStepProps) {
     )
   }
   if (props.step === 2) {
-    return <PortraitSetup onPortrait={props.onPortrait} />
+    return <PortraitSetup onPortrait={props.onPortrait} idleJob={props.idleJob} onGenerateIdle={props.onGenerateIdle} onApproveIdle={props.onApproveIdle} />
   }
   if (props.step === 3) {
     return (
@@ -959,16 +1021,33 @@ async function cropPortrait(file: File, zoom: number, positionX: number, positio
   return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}-crop.png`, { type: 'image/png' })
 }
 
-function PortraitSetup({ onPortrait }: { onPortrait: (file: File) => Promise<void> }) {
+function PortraitSetup({ onPortrait, idleJob, onGenerateIdle, onApproveIdle }: {
+  onPortrait: (file: File) => Promise<AvatarBuild | void>
+  idleJob: IdleGenerationJob | null
+  onGenerateIdle: (derivativeId: number) => Promise<void>
+  onApproveIdle: (derivativeId: number) => Promise<void>
+}) {
   const [source, setSource] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [positionX, setPositionX] = useState(0)
   const [positionY, setPositionY] = useState(0)
+  const [hidePreviousJob, setHidePreviousJob] = useState(false)
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
+  useEffect(() => {
+    if (idleJob?.status === 'queued' || idleJob?.status === 'generating') setHidePreviousJob(false)
+  }, [idleJob])
+  const [submitting, setSubmitting] = useState(false)
   const saveCrop = async (file = source) => {
     if (!file) return
-    await onPortrait(await cropPortrait(file, zoom, positionX, positionY))
+    setSubmitting(true)
+    try {
+      const build = await onPortrait(await cropPortrait(file, zoom, positionX, positionY))
+      if (!build?.id) throw new Error('人物数据缺少本机标识')
+      await onGenerateIdle(build.id)
+    } finally {
+      setSubmitting(false)
+    }
   }
   return (
     <div className="setup-content setup-content--split">
@@ -981,8 +1060,7 @@ function PortraitSetup({ onPortrait }: { onPortrait: (file: File) => Promise<voi
             const file = event.target.files?.[0]
             if (!file) return
             if (preview) URL.revokeObjectURL(preview)
-            setSource(file); setPreview(URL.createObjectURL(file)); setZoom(1); setPositionX(0); setPositionY(0)
-            void cropPortrait(file, 1, 0, 0).then(onPortrait).catch(() => {})
+            setSource(file); setPreview(URL.createObjectURL(file)); setZoom(1); setPositionX(0); setPositionY(0); setHidePreviousJob(true)
           }} />
           <span>选择授权照片</span><small>JPG 或 PNG · 建议 1600px 以上</small>
         </label>
@@ -990,10 +1068,30 @@ function PortraitSetup({ onPortrait }: { onPortrait: (file: File) => Promise<voi
           <label>缩放<input type="range" min="1" max="2.5" step="0.05" value={zoom} onChange={(event) => setZoom(Number(event.target.value))} /></label>
           <label>水平<input type="range" min="-100" max="100" value={positionX} onChange={(event) => setPositionX(Number(event.target.value))} /></label>
           <label>垂直<input type="range" min="-100" max="100" value={positionY} onChange={(event) => setPositionY(Number(event.target.value))} /></label>
-          <button className="secondary-button" type="button" onClick={() => { void saveCrop().catch(() => {}) }}>应用裁切并保存</button>
+          <button className="primary-button" type="button" disabled={submitting} onClick={() => { void saveCrop().catch(() => {}) }}>
+            {submitting ? '正在本机生成…' : '生成动态形象'}
+          </button>
         </div>}
       </div>
-      <div className="portrait-preview" role="img" aria-label="人物裁切预览" style={preview ? { backgroundImage: `url("${preview}")`, backgroundSize: `${zoom * 100}% auto`, backgroundPosition: `${(positionX + 100) / 2}% ${(positionY + 100) / 2}%` } : undefined} />
+      <div className="portrait-review">
+        <div className="portrait-preview" role="img" aria-label="人物裁切预览" style={preview ? { backgroundImage: `url("${preview}")`, backgroundSize: `${zoom * 100}% auto`, backgroundPosition: `${(positionX + 100) / 2}% ${(positionY + 100) / 2}%` } : undefined} />
+        {idleJob && !hidePreviousJob && <div className="idle-job" aria-live="polite">
+          {(idleJob.status === 'queued' || idleJob.status === 'generating') && <>
+            <strong>正在生成动态形象</strong>
+            <progress max="100" value={idleJob.progress} />
+            <small>{idleJob.phase} · {idleJob.progress}%</small>
+          </>}
+          {(idleJob.status === 'awaiting_approval' || idleJob.status === 'active') && <>
+            <strong>{idleJob.status === 'active' ? '当前动态形象' : '启用前人工检查'}</strong>
+            <div className="idle-review-grid">
+              <figure><img src={ConversationClient.idlePreviewUrl(idleJob.derivative_id, 'frontal', idleJob.updated_at)} alt="标准化正面照片" /><figcaption>正面标准照</figcaption></figure>
+              <figure><video src={ConversationClient.idlePreviewUrl(idleJob.derivative_id, 'video', idleJob.updated_at)} autoPlay loop muted playsInline controls /><figcaption>10 秒首尾闭环待机</figcaption></figure>
+            </div>
+            {idleJob.status === 'awaiting_approval' && <button className="primary-button" type="button" onClick={() => { void onApproveIdle(idleJob.derivative_id).catch(() => {}) }}>确认并使用动态形象</button>}
+          </>}
+          {idleJob.status === 'failed' && <small className="idle-job__error">生成失败：{idleJob.error_code || '未知错误'}；原人物未被替换。</small>}
+        </div>}
+      </div>
     </div>
   )
 }

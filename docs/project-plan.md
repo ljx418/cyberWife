@@ -1,7 +1,8 @@
 # cyberWife V1 项目里程碑与交付计划
 
 **版本**：3.1  
-**日期**：2026-10-04  
+**日期**：2026-10-05
+
 **状态**：B0～B5及B2.5工程阶段完成；独立60分钟复验触发Windows内存余量硬门，V1发布阻断  
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
@@ -47,6 +48,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | B3 | 可随时打断并长期多轮稳定 | InterruptionController、CancellationToken | B2 Pass | 打断 P95≤400ms；1h 稳态 |
 | B4 | 记忆可查改删且支持不记录 | MemoryService、RetentionService、Repository | B3 Pass | 删除0召回；不记录0写入 |
 | B5 | 本机边界、一键、故障恢复后形成候选版 | 所有后端实体、验收工具 | B3+B4 Pass | AC-01～14 全 Pass；P0/P1=0 |
+| UX4 | 用户在引导内把照片稳定生成并启用为动态人物 | AvatarAssetService、avatar_idle_pipeline、Onboarding | 三张工作流样片获人工批准 | UX4-AC01～08 Pass；未确认不替换；四服务恢复 |
 
 ## 5. 每阶段交付包
 
