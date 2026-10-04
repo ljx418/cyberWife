@@ -43,10 +43,52 @@ function Test-WslPython([string]$Python, [string[]]$Modules) {
     return ($LASTEXITCODE -eq 0)
 }
 
+function Get-WslCommandPath([string]$Name) {
+    $resolved = ((& wsl.exe -- which $Name 2>$null) | Out-String).Trim()
+    if ($LASTEXITCODE -eq 0 -and $resolved.StartsWith('/')) { return $resolved }
+    foreach ($candidate in @("$actualWslHome/.local/bin/$Name", "/usr/local/bin/$Name")) {
+        if ($actualWslHome -and (Test-WslPath $candidate 'x')) { return $candidate }
+    }
+    return ''
+}
+
+function Test-WslVenv([string]$Venv) {
+    $python = "$Venv/bin/python"
+    if (-not (Test-WslPath $python 'x')) { return $false }
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & wsl.exe -- $python -c 'import pathlib,pip,sys; cfg=pathlib.Path(sys.prefix,"pyvenv.cfg").read_text().lower(); raise SystemExit(0 if sys.version_info[:2] == (3,12) and "include-system-site-packages = false" in cfg else 1)' 2>$null
+    $probeExit = $LASTEXITCODE
+    $ErrorActionPreference = $savedPreference
+    return ($probeExit -eq 0)
+}
+
+function New-WslVenv([string]$Venv) {
+    $savedPreference = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    & wsl.exe -- $PythonWsl -m venv --clear $Venv 2>$null
+    $venvExit = $LASTEXITCODE
+    $ErrorActionPreference = $savedPreference
+    if ($venvExit -eq 0 -and (Test-WslPath "$Venv/bin/python" 'x')) { return }
+    $uv = Get-WslCommandPath 'uv'
+    if ($uv) {
+        $pythonPath = Get-WslCommandPath $PythonWsl
+        if (-not $pythonPath) { throw "cannot resolve WSL Python: $PythonWsl" }
+        Invoke-Wsl @($uv, 'venv', '--clear', '--seed', '--python', $pythonPath, $Venv)
+        return
+    }
+    $virtualenv = Get-WslCommandPath 'virtualenv'
+    if ($virtualenv) {
+        Invoke-Wsl @($virtualenv, '--clear', '--python', $PythonWsl, $Venv)
+        return
+    }
+    throw 'cannot create WSL venv; install python3.12-venv, uv, or virtualenv explicitly'
+}
+
 function Install-WslRuntime([string]$Venv, [string]$Requirements) {
     $python = "$Venv/bin/python"
-    if (-not (Test-WslPath $python 'x')) {
-        Invoke-Wsl @($PythonWsl, '-m', 'venv', $Venv)
+    if (-not (Test-WslVenv $Venv)) {
+        New-WslVenv $Venv
     }
     if ($DependencyMode -eq 'wheelhouse') {
         if (-not $WheelhouseWsl -or -not (Test-WslPath $WheelhouseWsl 'd')) {
@@ -63,8 +105,10 @@ function Install-WslRuntime([string]$Venv, [string]$Requirements) {
 }
 
 $wslCommand = Get-Command wsl.exe -ErrorAction SilentlyContinue
-if ($wslCommand -and [string]::IsNullOrWhiteSpace($WslHome)) {
-    $WslHome = ((& wsl.exe -- sh -lc 'printf %s "$HOME"') | Out-String).Trim()
+$actualWslHome = ''
+if ($wslCommand) {
+    $actualWslHome = ((& wsl.exe -- sh -lc 'printf %s "$HOME"') | Out-String).Trim()
+    if ([string]::IsNullOrWhiteSpace($WslHome)) { $WslHome = $actualWslHome }
 }
 $dataRoot = if ($WslHome) { "$WslHome/.cyberWife" } else { '' }
 $coreVenv = "$dataRoot/venvs/cosyvoice"

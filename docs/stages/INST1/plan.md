@@ -27,6 +27,16 @@
 5. 模型、CosyVoice源码与授权素材继续只接受本机已有工件，不由安装器暗中下载。
 6. 完整生命周期复核时若发现“HTTP 200但JSON仍为loading”，必须修正启动器功能健康语义并重跑；不得以端口存活签ready。
 
+## INST1.2 隔离环境依赖复现（2026-10-05）
+
+在不改动当前生产venv的前提下，使用临时私有根目录创建两个不继承system-site-packages的Python 3.12 venv，按仓库运行时requirements执行真实解析和安装。验证顺序：
+
+1. `pip check`必须无0冲突，`pyvenv.cfg`必须明确`include-system-site-packages = false`。
+2. Core venv导入Gateway/Speech/Cosy关键模块；Avatar venv导入LiveTalking/Wav2Lip关键模块。
+3. Core venv实际加载本机CosyVoice源码、ASR、VAD与Embedding适配器；Avatar venv执行上游启动导入检查。
+4. 不复制模型和授权资产；只验证依赖可复现性。完成后仅删除本轮`mktemp`生成且已校验前缀的临时目录。
+5. 该证据可关闭“WSL Python依赖从零安装”风险，但不能替代全新Windows用户、WSL发行版、GPU驱动和模型工件组合的AC06外部门。
+
 ## 停止条件
 
 脚本不得结束外部进程、不得覆盖已有私有配置/数据、不得把模型文件纳入Git。没有第二台干净Windows/WSL时，只能签“安装器合同/目标机verify”，不能冒充干净机端到端PASS。

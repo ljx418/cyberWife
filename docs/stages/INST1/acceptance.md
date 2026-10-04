@@ -11,5 +11,6 @@
 | INST1-AC07 | 依赖准备 | 离线wheelhouse可复现；联网安装需双重显式开关；隔离venv的`pip check`与关键import全通过 |
 | INST1-AC08 | Speech解释器 | 生产启动命令使用受控venv，无系统`python3`逃逸；四组件生命周期回归通过 |
 | INST1-AC09 | 功能健康 | 端口HTTP 200且JSON状态符合各组件ready集合才签就绪；Speech在VAD/ASR/Embedding预热完成前必须为loading |
+| INST1-AC10 | 全新隔离venv | Core/Avatar均不继承system packages；真实安装完成；`pip check`=0冲突；关键import与项目源码加载PASS |
 
 AC01～05可在目标机/隔离目录验证；AC06必须有新的系统环境证据。

@@ -37,6 +37,8 @@ cd C:\workSpace\cyberWife
 
 默认`-DependencyMode none`，不发生依赖下载。在线模式没有`-AllowNetworkInstall`会立即失败；离线模式只从指定wheelhouse解析。两种模式都执行`pip check`。
 
+创建venv时安装器依次尝试Python标准`venv`、`uv`和`virtualenv`。如三者均不存在，脚本会要求操作者显式安装`python3.12-venv`或其中一个创建器；安装器不自动执行`sudo apt`。
+
 安装器不会安装驱动、修改防火墙、下载模型或结束进程。缺少的模型、CosyVoice源码和授权素材必须由操作者按来源/许可证准备后重新verify。
 
 ## 4. 照片生成动态形象
