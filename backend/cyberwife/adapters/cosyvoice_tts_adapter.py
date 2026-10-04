@@ -114,6 +114,7 @@ class CosyVoiceTtsAdapter(TtsPort):
     _model = None
     _model_key: tuple[str, bool] | None = None
     _load_lock = threading.Lock()
+    _speaker_cache_lock = threading.Lock()
 
     def __init__(
         self,
@@ -255,6 +256,17 @@ class CosyVoiceTtsAdapter(TtsPort):
         # to download WeText resources at runtime; upstream explicitly
         # supports this mode for benchmark reproduction.
         prompt_wav = str(reference)
+        speaker_key = "cw_" + hashlib.sha256(
+            reference.read_bytes() + b"\0" + reference_transcript.encode("utf-8")
+        ).hexdigest()[:24]
+        with CosyVoiceTtsAdapter._speaker_cache_lock:
+            if speaker_key not in model.list_available_spks():
+                normalized_prompt = model.frontend.text_normalize(
+                    reference_transcript,
+                    split=False,
+                    text_frontend=True,
+                )
+                model.add_zero_shot_spk(normalized_prompt, prompt_wav, speaker_key)
         self._cancel_event.clear()
         started = time.perf_counter()
         first_packet_ms: float | None = None
@@ -266,8 +278,9 @@ class CosyVoiceTtsAdapter(TtsPort):
                 text,
                 reference_transcript,
                 prompt_wav,
+                zero_shot_spk_id=speaker_key,
                 stream=self._stream,
-                text_frontend=False,
+                text_frontend=True,
             )
             for output in outputs:
                 if self._cancel_event.is_set():
@@ -316,6 +329,16 @@ class CosyVoiceTtsAdapter(TtsPort):
         del request_id  # TtsPort does not yet pass a request id into synthesize_stream.
         self._cancel_event.set()
         return True
+
+    def clear_private_cache(self) -> None:
+        """Erase cached user voice features immediately after consent revocation."""
+        model = CosyVoiceTtsAdapter._model
+        if model is None:
+            return
+        with CosyVoiceTtsAdapter._speaker_cache_lock:
+            for key in list(model.frontend.spk2info):
+                if str(key).startswith("cw_"):
+                    model.frontend.spk2info.pop(key, None)
 
     def release_transient_memory(self) -> None:
         """Return completed-turn CPU temporaries without unloading the model.

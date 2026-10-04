@@ -1,5 +1,6 @@
 
 import cv2
+import numpy as np
 from tqdm import tqdm
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -29,4 +30,25 @@ def mirror_index(size, index):
     if turn % 2 == 0:
         return res
     else:
-        return size - res - 1 
+        return size - res - 1
+
+
+def blend_lower_face(original, generated):
+    """Feather a Wav2Lip result into the lower face while preserving eyes/glasses."""
+    if original.shape != generated.shape or original.ndim != 3:
+        raise ValueError("face blend inputs must have identical HxWxC shapes")
+    height, width = original.shape[:2]
+    mask = np.zeros((height, width), dtype=np.float32)
+    start = max(0, int(height * 0.38))
+    full = max(start + 1, int(height * 0.56))
+    mask[full:, :] = 1.0
+    mask[start:full, :] = np.linspace(0.0, 1.0, full - start, dtype=np.float32)[:, None]
+    edge = max(2, int(min(height, width) * 0.055))
+    horizontal = np.ones(width, dtype=np.float32)
+    horizontal[:edge] = np.linspace(0.0, 1.0, edge, dtype=np.float32)
+    horizontal[-edge:] = np.linspace(1.0, 0.0, edge, dtype=np.float32)
+    mask *= horizontal[None, :]
+    kernel = max(3, edge // 2 * 2 + 1)
+    mask = cv2.GaussianBlur(mask, (kernel, kernel), 0)[:, :, None]
+    mixed = original.astype(np.float32) * (1.0 - mask) + generated.astype(np.float32) * mask
+    return np.clip(mixed, 0, 255).astype(np.uint8)

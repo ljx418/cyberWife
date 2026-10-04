@@ -46,6 +46,7 @@ from control_server import AvatarControlServer
 import argparse
 import random
 import shutil
+from collections import OrderedDict
 import asyncio
 import torch
 from io import BytesIO
@@ -60,7 +61,7 @@ app = Flask(__name__)
 #sockets = Sockets(app)
 opt = None
 model = None
-global_avatars = {} # avatar_id: payload
+global_avatars = OrderedDict() # bounded avatar_id: payload
         
 
 #####webrtc###############################
@@ -84,7 +85,15 @@ def build_avatar_session(sessionid:str, params:dict)->BaseAvatar:
     if (avatar_id and avatar_id != opt.avatar_id):
         # Avoid reloading if already cached globally
         if avatar_id not in global_avatars:
+            # max_session=1 means no other live session reaches this branch.
+            # Keep the startup fallback plus at most one content-addressed
+            # portrait so repeated uploads cannot grow host RAM forever.
+            for cached_id in list(global_avatars):
+                if cached_id != opt.avatar_id:
+                    global_avatars.pop(cached_id, None)
             global_avatars[avatar_id] = load_avatar(avatar_id)
+        else:
+            global_avatars.move_to_end(avatar_id)
         avatar_this = global_avatars[avatar_id]
     else:
         # Default avatar loaded at startup

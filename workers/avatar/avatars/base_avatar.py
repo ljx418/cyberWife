@@ -399,12 +399,12 @@ class BaseAvatar:
         logger.info('baseavatar inference thread stop')
 
     def process_frames(self,quit_event):
-        enable_transition = False  # 设置为False禁用过渡效果，True启用
+        enable_transition = True
         
         _last_speaking = False
         _transition_start = time.time()
         if enable_transition:
-            _transition_duration = 0.1  # 过渡时间
+            _transition_duration = 0.12
             _last_silent_frame = None  # 静音帧缓存
             _last_speaking_frame = None  # 说话帧缓存
 
@@ -464,7 +464,8 @@ class BaseAvatar:
                 else:
                     combine_frame = current_frame
 
-            cv2.putText(combine_frame, "LiveTalking", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128,128,128), 1)
+            if os.environ.get("CW_AVATAR_WATERMARK") == "1":
+                cv2.putText(combine_frame, "LiveTalking", (10, 20), cv2.FONT_HERSHEY_SIMPLEX, 0.3, (128,128,128), 1)
             
             # B3: carry the audio generation into every derived video frame.
             generations = [

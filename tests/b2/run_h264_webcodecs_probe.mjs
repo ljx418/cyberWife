@@ -20,8 +20,9 @@ const result = await page.evaluate(async () => {
   const snapshots = []
   const session = new AvatarSessionController({ pollIntervalMs: 250, reconnectMaxMs: 2000 })
   const unsubscribe = session.subscribe(value => snapshots.push(value))
+  const activeAvatar = await fetch('http://127.0.0.1:7860/api/v1/avatar/active').then(response => response.json())
   const startedAt = performance.now()
-  await session.start(canvas)
+  await session.start(canvas, activeAvatar.avatar_id)
   const readyAt = performance.now()
   const first = session.snapshot()
   await new Promise(resolve => setTimeout(resolve, 5000))
@@ -39,6 +40,11 @@ const result = await page.evaluate(async () => {
   const value = {
     measured_at: new Date().toISOString(),
     user_agent: navigator.userAgent,
+    active_avatar: {
+      avatar_id: activeAvatar.avatar_id,
+      source_sha256: activeAvatar.source_sha256,
+      frame_count: activeAvatar.frame_count,
+    },
     secure_context: window.isSecureContext,
     video_decoder_available: typeof VideoDecoder !== 'undefined',
     ready_ms: Math.round(readyAt - startedAt),
@@ -59,6 +65,13 @@ const result = await page.evaluate(async () => {
     value.server_metrics?.late_video_frames_dropped === 0
   unsubscribe()
   await session.stop()
+  value.post_stop = {
+    hidden: canvas.hidden,
+    opacity: canvas.style.opacity,
+    layer: canvas.dataset.avatarLayer,
+  }
+  value.pass = value.pass && value.post_stop.hidden === true &&
+    value.post_stop.opacity === '0' && value.post_stop.layer === 'static'
   canvas.remove()
   return value
 })

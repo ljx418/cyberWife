@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import AsyncIterator
 
 from pathlib import Path
-from fastapi import FastAPI, File, HTTPException, Request, UploadFile, status, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -93,6 +93,8 @@ class ApiGateway:
         tts_preview=None,
         shutdown_hooks=None,
         static_root: Path | None = None,
+        avatar_asset_service=None,
+        privacy_cache_clear=None,
     ) -> None:
         self._registry = registry
         self._aggregator = aggregator
@@ -105,6 +107,8 @@ class ApiGateway:
         self._tts_probe = tts_probe
         self._tts_preview = tts_preview
         self._shutdown_hooks = tuple(shutdown_hooks or ())
+        self._avatar_asset_service = avatar_asset_service
+        self._privacy_cache_clear = privacy_cache_clear
         self._static_root = Path(static_root) if static_root else Path(__file__).resolve().parents[3] / "prototype" / "dist"
         self._session_runtimes: dict[int, SessionRuntime] = {}
         self._session_tokens: dict[str, int] = {}
@@ -430,7 +434,10 @@ class ApiGateway:
             if not self._repository:
                 raise HTTPException(status_code=503, detail="health.component_unavailable")
             try:
-                return await asyncio.to_thread(self._repository.revoke_consent, scope)
+                result = await asyncio.to_thread(self._repository.revoke_consent, scope)
+                if scope in {"voice", "all"} and self._privacy_cache_clear is not None:
+                    await asyncio.to_thread(self._privacy_cache_clear)
+                return result
             except ValueError:
                 raise HTTPException(status_code=422, detail="asset.invalid")
 
@@ -502,11 +509,76 @@ class ApiGateway:
             if not self._repository:
                 raise HTTPException(status_code=503, detail="health.component_unavailable")
             try:
+                asset = await asyncio.to_thread(self._repository.get_asset_version, asset_id)
+                if asset is None:
+                    raise KeyError(asset_id)
+                if asset.get("kind") == "portrait" and self._avatar_asset_service is not None:
+                    raise HTTPException(
+                        status_code=409,
+                        detail="avatar.build_required",
+                    )
                 return await asyncio.to_thread(self._repository.activate_asset, asset_id)
             except PermissionError:
                 raise HTTPException(status_code=403, detail="auth.consent_required")
             except KeyError:
                 raise HTTPException(status_code=404, detail="audit.entity_not_found")
+
+        @app.post("/api/v1/assets/{asset_id}/avatar-builds", status_code=202)
+        async def create_avatar_build(asset_id: int, background_tasks: BackgroundTasks):
+            if self._avatar_asset_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                row = await asyncio.to_thread(
+                    self._avatar_asset_service.create_build, asset_id, engine="wav2lip"
+                )
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            if row["status"] not in {"ready", "active", "building"}:
+                background_tasks.add_task(
+                    self._avatar_asset_service.run_build, int(row["id"])
+                )
+            return self._avatar_asset_service.public_record(row)
+
+        @app.get("/api/v1/avatar-builds/{derivative_id}")
+        async def get_avatar_build(derivative_id: int):
+            if self._avatar_asset_service is None or not self._repository:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            row = await asyncio.to_thread(
+                self._repository.get_avatar_derivative, derivative_id
+            )
+            if row is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            return self._avatar_asset_service.public_record(row)
+
+        @app.post("/api/v1/avatar-builds/{derivative_id}/activate")
+        async def activate_avatar_build(derivative_id: int):
+            if self._avatar_asset_service is None or not self._repository:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                row = await asyncio.to_thread(
+                    self._repository.activate_avatar_derivative, derivative_id
+                )
+            except PermissionError:
+                raise HTTPException(status_code=403, detail="auth.consent_required")
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            except ValueError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
+            return self._avatar_asset_service.public_record(row)
+
+        @app.get("/api/v1/avatar/active")
+        async def get_active_avatar():
+            if self._avatar_asset_service is None or not self._repository:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            row = await asyncio.to_thread(self._repository.get_active_avatar_derivative)
+            if row is None:
+                return {
+                    "status": "legacy_fallback",
+                    "engine": "wav2lip",
+                    "avatar_id": "wav2lip256_avatar1",
+                    "source_sha256": None,
+                }
+            return self._avatar_asset_service.public_record(row)
 
         @app.post("/api/v1/assets/{kind}/restore")
         async def restore_asset(kind: str):
@@ -515,6 +587,11 @@ class ApiGateway:
             if not self._repository:
                 raise HTTPException(status_code=503, detail="health.component_unavailable")
             try:
+                if kind == "portrait" and self._avatar_asset_service is not None:
+                    row = await asyncio.to_thread(
+                        self._repository.restore_previous_avatar_derivative
+                    )
+                    return self._avatar_asset_service.public_record(row)
                 return await asyncio.to_thread(self._repository.restore_previous_asset, kind)
             except PermissionError:
                 raise HTTPException(status_code=403, detail="auth.consent_required")

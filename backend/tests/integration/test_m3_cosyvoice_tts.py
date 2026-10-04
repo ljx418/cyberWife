@@ -43,11 +43,17 @@ def test_cancel_is_available_for_single_worker(tmp_path: Path):
     assert adapter.cancel("turn-1") is True
 
 
+def test_private_voice_cache_clear_is_safe_before_model_load(tmp_path: Path):
+    adapter = CosyVoiceTtsAdapter(str(tmp_path), source_dir=str(tmp_path))
+    adapter.clear_private_cache()
+
+
 def test_runtime_inference_is_explicitly_offline():
     import inspect
 
     source = inspect.getsource(CosyVoiceTtsAdapter.synthesize_stream)
-    assert "text_frontend=False" in source
+    assert "text_frontend=True" in source
+    assert "zero_shot_spk_id=speaker_key" in source
 
 
 def test_soundfile_compat_loader_preserves_tensor_contract(tmp_path: Path):

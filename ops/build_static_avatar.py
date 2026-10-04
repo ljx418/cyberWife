@@ -13,6 +13,11 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+try:
+    from ops.scrfd_detector import detect_faces
+except ModuleNotFoundError:  # direct ``python ops/build_static_avatar.py``
+    from scrfd_detector import detect_faces
+
 
 def build(source: Path, output_root: Path, avatar_id: str) -> Path:
     if not source.is_file():
@@ -56,9 +61,25 @@ def build(source: Path, output_root: Path, avatar_id: str) -> Path:
         if cascade.empty():
             raise RuntimeError(f"face cascade could not be loaded: {cascade_path}")
         faces = cascade.detectMultiScale(gray, scaleFactor=1.08, minNeighbors=5, minSize=(96, 96))
-        if len(faces) != 1:
-            raise RuntimeError(f"expected exactly one frontal face, found {len(faces)}")
-        x, y, w, h = [int(value) for value in faces[0]]
+        detector = "haar"
+        if len(faces) == 1:
+            x, y, w, h = [int(value) for value in faces[0]]
+        else:
+            scrfd_path = Path(os.environ.get(
+                "CW_FACE_DETECTOR_ONNX",
+                "/mnt/c/ComfyUI-aki-v2/ComfyUI/models/insightface/models/buffalo_l/det_10g.onnx",
+            ))
+            if not scrfd_path.is_file():
+                raise RuntimeError(
+                    f"expected exactly one frontal face, found {len(faces)}; offline SCRFD model missing"
+                )
+            robust_faces = detect_faces(canvas, scrfd_path)
+            if len(robust_faces) != 1:
+                raise RuntimeError(f"expected exactly one face, found {len(robust_faces)}")
+            x1d, y1d, x2d, y2d, _ = robust_faces[0]
+            x, y = int(x1d), int(y1d)
+            w, h = int(x2d - x1d), int(y2d - y1d)
+            detector = "scrfd"
         pad_x = int(w * 0.18)
         pad_top = int(h * 0.20)
         pad_bottom = int(h * 0.32)
@@ -83,6 +104,7 @@ def build(source: Path, output_root: Path, avatar_id: str) -> Path:
             "face_size": [256, 256],
             "coordinates": [y1, y2, x1, x2],
             "frame_count": 1,
+            "face_detector": detector,
         }, ensure_ascii=False, indent=2), encoding="utf-8")
         if target.exists():
             raise FileExistsError(f"incomplete target exists; refusing to overwrite: {target}")

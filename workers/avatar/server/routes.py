@@ -5,6 +5,7 @@
 import json
 import asyncio
 import ipaddress
+import re
 from threading import Event, Thread
 from aiohttp import web
 import numpy as np
@@ -264,8 +265,13 @@ async def avatar_websocket(request):
     if not origin_host or not _is_loopback_host(origin_host):
         return web.json_response({"code": -1, "msg": "loopback Origin required"}, status=403)
 
+    avatar_id = request.query.get("avatar_id", "")
+    if avatar_id and not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", avatar_id):
+        return web.json_response({"code": -1, "msg": "invalid avatar_id"}, status=422)
     try:
-        sessionid = await session_manager.create_session({})
+        sessionid = await session_manager.create_session(
+            {"avatar": avatar_id} if avatar_id else {}
+        )
     except Exception as error:
         logger.warning("H.264 WebSocket session rejected: %s", error)
         return web.json_response({"code": -1, "msg": str(error)}, status=503)

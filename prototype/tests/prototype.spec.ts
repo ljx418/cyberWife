@@ -175,3 +175,43 @@ test('打断只停止旧 generation 且不关闭 AudioContext', async ({ page })
   expect(result.after.contextState).not.toBe('closed')
   expect(result.elapsedMs).toBeLessThan(100)
 })
+
+test('Avatar 停止或降级后透明画布让写真立即恢复而非黑屏', async ({ page }) => {
+  await page.route('http://127.0.0.1:8011/healthz', (route) => route.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify({ status: 'ready', protocol: 'avatar-control-v1' }),
+  }))
+  await page.goto('/?preview=1')
+  const result = await page.evaluate(async () => {
+    Object.defineProperty(window, 'VideoDecoder', { value: undefined, configurable: true })
+    const { AvatarSessionController } = await import('/src/services/AvatarSession.ts')
+    const canvas = document.createElement('canvas')
+    canvas.width = 64
+    canvas.height = 64
+    document.body.appendChild(canvas)
+    const controller = new AvatarSessionController({
+      controlUrl: 'http://127.0.0.1:8011',
+      pollIntervalMs: 10_000,
+    })
+    await controller.start(canvas, 'wav2lip256_p_deadbeefdeadbeef')
+    const degraded = {
+      hidden: canvas.hidden,
+      opacity: canvas.style.opacity,
+      layer: canvas.dataset.avatarLayer,
+      state: controller.snapshot().state,
+    }
+    await controller.stop()
+    return {
+      degraded,
+      stopped: {
+        hidden: canvas.hidden,
+        opacity: canvas.style.opacity,
+        layer: canvas.dataset.avatarLayer,
+        state: controller.snapshot().state,
+      },
+    }
+  })
+  expect(result.degraded).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'static_fallback' })
+  expect(result.stopped).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'stopped' })
+})

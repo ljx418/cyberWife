@@ -16,12 +16,13 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"acceptance-image"
 WAV = b"RIFF" + b"\x00" * 32
 
 
-def stack(tmp_path):
+def stack(tmp_path, **gateway_kwargs):
     db = tmp_path / "complete.db"
     repo = SqliteRepository(db, ROOT / "migrations" / "0001_init.sql")
     registry = ModelRegistry(ROOT)
     app = ApiGateway(
-        registry, HealthAggregator(registry), repository=repo, assets_root=tmp_path / "assets"
+        registry, HealthAggregator(registry), repository=repo, assets_root=tmp_path / "assets",
+        **gateway_kwargs,
     ).build_app()
     return TestClient(app), repo, db
 
@@ -58,6 +59,14 @@ def test_consent_blocks_upload_activation_and_revocation_withdraws_pointer(tmp_p
     assert upload(client, "portrait", "third.png", PNG).status_code == 403
     audits = client.get("/api/v1/audit", params={"entity": "consent"}).json()["items"]
     assert {item["action"] for item in audits} >= {"consent.granted", "consent.revoked"}
+
+
+def test_voice_revocation_clears_process_private_cache(tmp_path):
+    cleared = []
+    client, _repo, _ = stack(tmp_path, privacy_cache_clear=lambda: cleared.append(True))
+    client.post("/api/v1/consents", json={"scope": "voice", "policy_version": "v1"})
+    assert client.delete("/api/v1/consents/voice").status_code == 200
+    assert cleared == [True]
 
 
 @pytest.mark.parametrize("fault_point", ["after_archive", "after_pointer", "before_commit"])

@@ -71,6 +71,7 @@ export class AvatarSessionController {
   private mediaGeneration = 0;
   private conversationSessionId: string | null = null;
   private canvas: HTMLCanvasElement | null = null;
+  private avatarId = "wav2lip256_avatar1";
   private timer: number | null = null;
   private active = false;
   private connecting: Promise<void> | null = null;
@@ -120,12 +121,14 @@ export class AvatarSessionController {
     return () => this.listeners.delete(listener);
   }
 
-  async start(canvas?: HTMLCanvasElement): Promise<void> {
+  async start(canvas?: HTMLCanvasElement, avatarId?: string): Promise<void> {
     if (canvas) this.canvas = canvas;
+    if (avatarId && /^[A-Za-z0-9_-]{1,80}$/.test(avatarId)) this.avatarId = avatarId;
     if (!this.canvas) {
       this.canvas = document.createElement("canvas");
       this.canvas.hidden = true;
     }
+    this.setCanvasLive(false);
     if (this.active && this.current.state === "ready") return;
     this.active = true;
     this.setState("connecting");
@@ -142,6 +145,8 @@ export class AvatarSessionController {
     if (this.timer !== null) window.clearTimeout(this.timer);
     this.timer = null;
     this.closeTransport();
+    this.setCanvasLive(false);
+    this.clearCanvas();
     this.canvas = null;
     this.decoderConfig = null;
     this.mediaGeneration = 0;
@@ -207,6 +212,7 @@ export class AvatarSessionController {
       if (typeof VideoDecoder === "undefined") throw new Error("WebCodecs VideoDecoder unavailable");
       const wsUrl = new URL("/ws/v1/avatar", this.baseUrl);
       wsUrl.protocol = "ws:";
+      wsUrl.searchParams.set("avatar_id", this.avatarId);
       const socket = new WebSocket(wsUrl);
       socket.binaryType = "arraybuffer";
       this.frameTimes = [];
@@ -226,7 +232,8 @@ export class AvatarSessionController {
             if (!this.canvas) return;
             if (this.canvas.width !== frame.displayWidth) this.canvas.width = frame.displayWidth;
             if (this.canvas.height !== frame.displayHeight) this.canvas.height = frame.displayHeight;
-            this.canvas.getContext("2d", { alpha: false })?.drawImage(frame, 0, 0);
+            this.canvas.getContext("2d", { alpha: true })?.drawImage(frame, 0, 0);
+            this.setCanvasLive(true);
             const now = performance.now();
             this.frameTimes.push(now);
             if (this.frameTimes.length > 128) this.frameTimes.shift();
@@ -368,8 +375,16 @@ export class AvatarSessionController {
     if (this.canvas) this.canvas.getContext("2d")?.clearRect(0, 0, this.canvas.width, this.canvas.height);
   }
 
+  private setCanvasLive(live: boolean): void {
+    if (!this.canvas) return;
+    this.canvas.hidden = !live;
+    this.canvas.dataset.avatarLayer = live ? "live" : "static";
+    this.canvas.style.opacity = live ? "1" : "0";
+  }
+
   private softDegrade(): void {
     if (!this.active) return;
+    this.setCanvasLive(false);
     this.clearCanvas();
     this.setState("static_fallback", { fallbackKind: "soft", controlStatus: "ready" });
     this.schedule(this.pollIntervalMs);
@@ -378,6 +393,7 @@ export class AvatarSessionController {
   private hardDegrade(): void {
     if (!this.active) return;
     this.closeTransport();
+    this.setCanvasLive(false);
     this.clearCanvas();
     this.setState("static_fallback", {
       reconnectAttempts: this.current.reconnectAttempts + 1,

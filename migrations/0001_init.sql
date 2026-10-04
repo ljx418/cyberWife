@@ -59,6 +59,27 @@ CREATE TABLE IF NOT EXISTS active_assets (
   asset_id INTEGER NOT NULL REFERENCES asset_versions(id) ON DELETE RESTRICT
 );
 
+-- 写真到实时 Avatar 的可审计派生物。写真只有在派生物 ready 后才可
+-- 与 active pointer 一起原子切换，避免页面写真和嘴型人物来自不同源。
+CREATE TABLE IF NOT EXISTS avatar_derivatives (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  asset_id INTEGER NOT NULL REFERENCES asset_versions(id) ON DELETE CASCADE,
+  engine TEXT NOT NULL CHECK (engine IN ('wav2lip','musetalk')),
+  avatar_id TEXT NOT NULL UNIQUE,
+  source_sha256 TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('queued','building','ready','active','archived','failed')),
+  manifest_json TEXT NOT NULL DEFAULT '{}',
+  error_code TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE(asset_id, engine)
+);
+
+CREATE TABLE IF NOT EXISTS active_avatar_derivative (
+  singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
+  derivative_id INTEGER NOT NULL REFERENCES avatar_derivatives(id) ON DELETE RESTRICT
+);
+
 -- ─────────────────────────────────────────────────────────
 -- §2 表 5：sessions + turns（FR-08/13/14）
 -- ─────────────────────────────────────────────────────────
@@ -179,6 +200,9 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 INSERT OR IGNORE INTO schema_migrations(version, applied_at)
 VALUES (1, datetime('now'));
 
+INSERT OR IGNORE INTO schema_migrations(version, applied_at)
+VALUES (2, datetime('now'));
+
 -- ─────────────────────────────────────────────────────────
 -- 索引（按查询热点）
 -- ─────────────────────────────────────────────────────────
@@ -188,3 +212,4 @@ CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_events(action, created_at D
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_events(entity_type, entity_id_hash);
 CREATE INDEX IF NOT EXISTS idx_sessions_expires ON sessions(expires_at);
 CREATE INDEX IF NOT EXISTS idx_asset_versions_kind ON asset_versions(kind, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_avatar_derivatives_asset ON avatar_derivatives(asset_id, engine);

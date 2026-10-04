@@ -41,7 +41,7 @@ from avatars.base_avatar import BaseAvatar
 
 from tqdm import tqdm
 from utils.logger import logger
-from utils.image import read_imgs, mirror_index
+from utils.image import blend_lower_face, read_imgs, mirror_index
 from utils.device import initialize_device
 from registry import register
 
@@ -144,5 +144,6 @@ class LipReal(BaseAvatar):
         combine_frame = self.frame_list_cycle[idx].copy()
         y1, y2, x1, x2 = bbox
         res_frame = cv2.resize(pred_frame.astype(np.uint8),(x2-x1,y2-y1))
-        combine_frame[y1:y2, x1:x2] = res_frame
+        original_face = combine_frame[y1:y2, x1:x2]
+        combine_frame[y1:y2, x1:x2] = blend_lower_face(original_face, res_frame)
         return combine_frame

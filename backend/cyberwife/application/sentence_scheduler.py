@@ -13,7 +13,8 @@ def playable_prefix(text: str, *, min_chars: int = 10, hard_limit: int = 18) -> 
 
     The function never rewrites text: callers can append ``text[len(prefix):]``
     without losing or duplicating a character.  A semantic boundary is
-    preferred after the minimum; otherwise exactly ``min_chars`` are emitted.
+    preferred after the minimum.  Unpunctuated text is held until
+    ``hard_limit`` so TTS does not start on a chopped phrase.
     """
     if not 4 <= min_chars <= 18:
         raise ValueError("min_chars must be between 4 and 18")
@@ -25,10 +26,10 @@ def playable_prefix(text: str, *, min_chars: int = 10, hard_limit: int = 18) -> 
     for index in range(min_chars - 1, upper):
         if text[index] in _PREFIX_BOUNDARIES:
             return text[: index + 1]
-    return text[:min_chars]
+    return text[:hard_limit] if len(text) >= hard_limit else None
 
 
-def semantic_sentences(text: str, *, soft_limit: int = 8, hard_limit: int = 18) -> list[str]:
+def semantic_sentences(text: str, *, soft_limit: int = 12, hard_limit: int = 36) -> list[str]:
     """Split text at semantic boundaries, with a bounded fallback for long prose.
 
     Punctuation stays with the preceding sentence.  Commas are only used after

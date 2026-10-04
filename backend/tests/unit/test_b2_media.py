@@ -22,7 +22,9 @@ def test_playable_prefix_is_configurable_and_lossless():
     assert prefix == "今天真的很好呀！"
     assert prefix + punctuated[len(prefix):] == punctuated
     unpunctuated = "我想认真听你慢慢说下去"
-    assert playable_prefix(unpunctuated, min_chars=8) == unpunctuated[:8]
+    assert playable_prefix(unpunctuated, min_chars=8) is None
+    long_unpunctuated = "我想认真听你慢慢说下去也不会突然打断你"
+    assert playable_prefix(long_unpunctuated, min_chars=8, hard_limit=18) == long_unpunctuated[:18]
 
 
 def test_playable_prefix_rejects_unsafe_threshold():

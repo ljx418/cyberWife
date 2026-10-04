@@ -7,7 +7,7 @@ import type {
   ThemeMode,
   VisualVariant,
 } from './types'
-import { ConversationClient, type HealthResponse, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
+import { ConversationClient, type AvatarBuild, type HealthResponse, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { AvatarSession } from './services/AvatarSession'
@@ -97,6 +97,8 @@ function App() {
   const [settingsStatus, setSettingsStatus] = useState('尚未读取')
   const [assetCounts, setAssetCounts] = useState({ portrait: 0, voice: 0 })
   const [activePortraitRevision, setActivePortraitRevision] = useState<number | null>(null)
+  const [activeAvatarId, setActiveAvatarId] = useState('wav2lip256_avatar1')
+  const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [runtimeRows, setRuntimeRows] = useState<RuntimeService[]>(runtimeServices)
   const [onboardingStatus, setOnboardingStatus] = useState('正在读取本机设置…')
   const [voiceTranscript, setVoiceTranscript] = useState('今天终于有一点空闲了，你想先聊什么？')
@@ -167,9 +169,15 @@ function App() {
   }, [])
 
   useEffect(() => {
-    void ConversationClient.getAssets('portrait').then((response) => {
+    void Promise.all([ConversationClient.getAssets('portrait'), ConversationClient.getActiveAvatar()]).then(([response, avatar]) => {
       const active = response.items.find((item) => Boolean(item.is_active))
       if (active) setActivePortraitRevision(Number(active.id) || Date.now())
+      if (avatar.avatar_id) setActiveAvatarId(avatar.avatar_id)
+      if (avatar.face_box && avatar.frame_size) {
+        const [y1, y2, x1, x2] = avatar.face_box
+        const [width, height] = avatar.frame_size
+        setAvatarFocus({ x: ((x1 + x2) / 2 / width) * 100, y: ((y1 + y2) / 2 / height) * 100 })
+      }
     }).catch(() => {})
   }, [])
 
@@ -350,7 +358,7 @@ function App() {
         socket.addEventListener('open', () => { window.clearTimeout(timeout); resolve() }, { once: true })
         socket.addEventListener('error', () => { window.clearTimeout(timeout); reject(new Error('本机会话连接失败')) }, { once: true })
       })
-      void AvatarSession.start(avatarCanvasRef.current ?? undefined)
+      void AvatarSession.start(avatarCanvasRef.current ?? undefined, activeAvatarId)
       await InputAudioSession.start({
         onUtteranceStart: () => {
           const ws = socketRef.current
@@ -434,7 +442,29 @@ function App() {
     try {
       setOnboardingStatus(`正在校验${kind === 'portrait' ? '照片' : '声音'}…`)
       const uploaded = await ConversationClient.uploadAsset(kind, file)
-      await ConversationClient.activateAsset(uploaded.id)
+      if (kind === 'portrait') {
+        setOnboardingStatus('照片已保存，正在生成本机人物数据…')
+        let build = await ConversationClient.createAvatarBuild(uploaded.id)
+        const deadline = Date.now() + 30_000
+        while (build.status === 'queued' || build.status === 'building') {
+          if (!build.id || Date.now() >= deadline) throw new Error('人物数据生成超时，旧人物保持不变')
+          await new Promise((resolve) => window.setTimeout(resolve, 250))
+          build = await ConversationClient.getAvatarBuild(build.id)
+        }
+        if (build.status !== 'ready' && build.status !== 'active') {
+          throw new Error(build.error_code || '人物数据生成失败，旧人物保持不变')
+        }
+        if (!build.id) throw new Error('人物数据缺少本机标识')
+        const active = await ConversationClient.activateAvatarBuild(build.id)
+        setActiveAvatarId(active.avatar_id)
+        if (active.face_box && active.frame_size) {
+          const [y1, y2, x1, x2] = active.face_box
+          const [width, height] = active.frame_size
+          setAvatarFocus({ x: ((x1 + x2) / 2 / width) * 100, y: ((y1 + y2) / 2 / height) * 100 })
+        }
+      } else {
+        await ConversationClient.activateAsset(uploaded.id)
+      }
       const response = await ConversationClient.getAssets(kind)
       setAssetCounts((value) => ({ ...value, [kind]: response.items.length }))
       if (kind === 'portrait') setActivePortraitRevision(uploaded.id)
@@ -576,9 +606,17 @@ function App() {
         className="portrait"
         role="img"
         aria-label="本机人物形象"
-        style={activePortraitRevision ? { backgroundImage: `url("${ConversationClient.activeAssetUrl('portrait', activePortraitRevision)}")` } : undefined}
+        style={activePortraitRevision ? {
+          backgroundImage: `url("${ConversationClient.activeAssetUrl('portrait', activePortraitRevision)}")`,
+          backgroundPosition: `${avatarFocus.x}% ${avatarFocus.y}%`,
+        } : undefined}
       />
-      <canvas ref={avatarCanvasRef} className="avatar-video" aria-label="本机实时人物画面" />
+      <canvas
+        ref={avatarCanvasRef}
+        className="avatar-video"
+        aria-label="本机实时人物画面"
+        style={{ objectPosition: `${avatarFocus.x}% ${avatarFocus.y}%` }}
+      />
       <div className="portrait-shade" />
       <div className="ambient-grain" />
 
@@ -710,6 +748,15 @@ function App() {
           setSettingsStatus={setSettingsStatus}
           assetCounts={assetCounts}
           runtimeRows={runtimeRows}
+          onPortraitRestored={(active) => {
+            setActiveAvatarId(active.avatar_id)
+            if (active.asset_id) setActivePortraitRevision(active.asset_id)
+            if (active.face_box && active.frame_size) {
+              const [y1, y2, x1, x2] = active.face_box
+              const [width, height] = active.frame_size
+              setAvatarFocus({ x: ((x1 + x2) / 2 / width) * 100, y: ((y1 + y2) / 2 / height) * 100 })
+            }
+          }}
           onAssetUploaded={async (kind, file) => { try { await uploadAndActivate(kind, file); setSettingsStatus(`${kind === 'portrait' ? '人物' : '声音'}新版本已激活`) } catch (error) { setSettingsStatus(`新版本未激活：${String(error)}`) } }}
           onPreviewVoice={async () => { try { await previewVoice(); setSettingsStatus('正在播放当前声音的真实本机试听') } catch (error) { setSettingsStatus(`试听失败：${String(error)}`) } }}
         />
@@ -979,6 +1026,7 @@ interface SettingsDrawerProps {
   setSettingsStatus: (status: string) => void
   assetCounts: { portrait: number; voice: number }
   runtimeRows: RuntimeService[]
+  onPortraitRestored: (active: AvatarBuild) => void
   onAssetUploaded: (kind: 'portrait' | 'voice', file: File) => Promise<void>
   onPreviewVoice: () => Promise<void>
 }
@@ -1009,7 +1057,7 @@ function SettingsDrawer(props: SettingsDrawerProps) {
           {props.activeTab === 'profile' && (
             <section>
               <SectionHeader index="01" title="人物形象" description="新文件先由本机校验并创建版本，成功后原子激活；上一可用版本始终可恢复。" />
-              <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><label className="secondary-button asset-file-button">选择新照片<input type="file" accept="image/jpeg,image/png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void props.onAssetUploaded('portrait', file) }} /></label><button className="secondary-button" type="button" onClick={async () => { try { await ConversationClient.restoreAsset('portrait'); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
+              <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><label className="secondary-button asset-file-button">选择新照片<input type="file" accept="image/jpeg,image/png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void props.onAssetUploaded('portrait', file) }} /></label><button className="secondary-button" type="button" onClick={async () => { try { const restored = await ConversationClient.restoreAsset('portrait') as AvatarBuild; props.onPortraitRestored(restored); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
               <hr />
               <SectionHeader index="02" title="界面主题" description="默认使用电影感深色，也可选择柔和浅色或跟随系统。" />
               <div className="segmented" role="radiogroup" aria-label="界面主题">

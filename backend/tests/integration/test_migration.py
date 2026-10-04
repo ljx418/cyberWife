@@ -25,7 +25,7 @@ def test_schema_file_exists():
     # 校验关键表名全部出现
     expected_tables = [
         "consents", "profiles", "profile_history",
-        "asset_versions", "active_assets",
+        "asset_versions", "active_assets", "avatar_derivatives", "active_avatar_derivative",
         "sessions", "turns",
         "memories", "session_transcripts", "session_summaries",
         "memory_fts", "memory_vectors_meta",
@@ -44,7 +44,7 @@ def test_migration_runs_on_empty_db(fresh_db):
     tables = [row[0] for row in cur.fetchall()]
     expected = {
         "consents", "profiles", "profile_history",
-        "asset_versions", "active_assets",
+        "asset_versions", "active_assets", "avatar_derivatives", "active_avatar_derivative",
         "sessions", "turns",
         "memories", "session_transcripts", "session_summaries",
         "memory_fts", "memory_vectors_meta",
@@ -79,6 +79,7 @@ def test_schema_migrations_recorded(fresh_db):
     row = conn.execute("SELECT version FROM schema_migrations WHERE version=1").fetchone()
     assert row is not None
     assert row[0] == 1
+    assert conn.execute("SELECT version FROM schema_migrations WHERE version=2").fetchone() is not None
 
 
 def test_audit_events_constraints(fresh_db):

@@ -80,6 +80,19 @@ export interface SessionCreated {
   ws_url: string;
 }
 
+export interface AvatarBuild {
+  id?: number;
+  asset_id?: number;
+  engine: "wav2lip" | "musetalk";
+  avatar_id: string;
+  source_sha256: string | null;
+  status: "queued" | "building" | "ready" | "active" | "archived" | "failed" | "legacy_fallback";
+  frame_count?: number;
+  frame_size?: [number, number] | null;
+  face_box?: [number, number, number, number] | null;
+  error_code?: string | null;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${GATEWAY_BASE}${path}`, {
     method,
@@ -155,7 +168,11 @@ export const ConversationClient = {
     return upload<{ id: number; entity_id_hash: string; mime: string; size_bytes: number }>(`/api/v1/assets/${kind}/preview`, file);
   },
   async activateAsset(id: number) { return request("POST", `/api/v1/assets/${id}/activate`); },
-  async restoreAsset(kind: "portrait" | "voice") { return request("POST", `/api/v1/assets/${kind}/restore`); },
+  async createAvatarBuild(id: number) { return request<AvatarBuild>("POST", `/api/v1/assets/${id}/avatar-builds`); },
+  async getAvatarBuild(id: number) { return request<AvatarBuild>("GET", `/api/v1/avatar-builds/${id}`); },
+  async activateAvatarBuild(id: number) { return request<AvatarBuild>("POST", `/api/v1/avatar-builds/${id}/activate`); },
+  async getActiveAvatar() { return request<AvatarBuild>("GET", "/api/v1/avatar/active"); },
+  async restoreAsset(kind: "portrait" | "voice") { return request<AvatarBuild | Record<string, unknown>>("POST", `/api/v1/assets/${kind}/restore`); },
   async getMemories(query = "") { return request<{ items: Array<any> }>("GET", `/api/v1/memories?q=${encodeURIComponent(query)}`); },
   async editMemory(id: number, content: string) { return request("PATCH", `/api/v1/memories/${id}`, { content }); },
   async deleteMemory(id: number) { return request("DELETE", `/api/v1/memories/${id}`); },

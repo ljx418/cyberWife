@@ -191,6 +191,9 @@ class SqliteRepository:
                     )
                     self._conn.execute("DELETE FROM active_assets WHERE kind=?", (target,))
                     self._conn.execute("UPDATE asset_versions SET status='archived' WHERE kind=? AND status='active'", (target,))
+                    if target == "portrait":
+                        self._conn.execute("DELETE FROM active_avatar_derivative WHERE singleton=1")
+                        self._conn.execute("UPDATE avatar_derivatives SET status='archived' WHERE status='active'")
                 self._audit_event("consent.revoked", "consent", scope)
                 self._conn.execute("COMMIT")
             except BaseException:
@@ -276,6 +279,193 @@ class SqliteRepository:
         if row is None:
             raise KeyError(kind)
         return self.activate_asset(int(row["id"]), action="asset.rollback")
+
+    # ── Portrait-derived realtime avatars ──────────────────────────────
+    def create_avatar_derivative(
+        self,
+        asset_id: int,
+        *,
+        engine: str,
+        avatar_id: str,
+    ) -> dict:
+        if engine not in {"wav2lip", "musetalk"}:
+            raise ValueError("invalid_avatar_engine")
+        with self._lock:
+            asset = self._conn.execute(
+                "SELECT id, kind, sha256 FROM asset_versions WHERE id=?",
+                (asset_id,),
+            ).fetchone()
+            if asset is None or asset["kind"] != "portrait":
+                raise KeyError(asset_id)
+            existing = self._conn.execute(
+                "SELECT * FROM avatar_derivatives WHERE asset_id=? AND engine=?",
+                (asset_id, engine),
+            ).fetchone()
+            if existing is not None:
+                return dict(existing)
+            now = _utcnow()
+            cursor = self._conn.execute(
+                "INSERT INTO avatar_derivatives(asset_id, engine, avatar_id, source_sha256, status, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, 'queued', ?, ?)",
+                (asset_id, engine, avatar_id, asset["sha256"], now, now),
+            )
+            self._audit_event("avatar.build.queued", "asset", asset_id)
+            row = self._conn.execute(
+                "SELECT * FROM avatar_derivatives WHERE id=?", (cursor.lastrowid,)
+            ).fetchone()
+        assert row is not None
+        return dict(row)
+
+    def get_avatar_derivative(self, derivative_id: int) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT d.*, v.relative_path, v.filename_or_revision "
+                "FROM avatar_derivatives d JOIN asset_versions v ON v.id=d.asset_id WHERE d.id=?",
+                (derivative_id,),
+            ).fetchone()
+        return dict(row) if row else None
+
+    def update_avatar_derivative(
+        self,
+        derivative_id: int,
+        *,
+        status: str,
+        manifest: dict | None = None,
+        error_code: str | None = None,
+    ) -> dict:
+        if status not in {"queued", "building", "ready", "active", "archived", "failed"}:
+            raise ValueError("invalid_avatar_status")
+        with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE avatar_derivatives SET status=?, manifest_json=?, error_code=?, updated_at=? WHERE id=?",
+                (status, json.dumps(manifest or {}, ensure_ascii=False), error_code, _utcnow(), derivative_id),
+            )
+            if cursor.rowcount != 1:
+                raise KeyError(derivative_id)
+            self._audit_event(f"avatar.build.{status}", "asset", derivative_id)
+        result = self.get_avatar_derivative(derivative_id)
+        assert result is not None
+        return result
+
+    def claim_avatar_derivative_build(self, derivative_id: int) -> dict | None:
+        """Atomically claim one queued/failed build; duplicate requests are no-ops."""
+        with self._lock:
+            cursor = self._conn.execute(
+                "UPDATE avatar_derivatives SET status='building', error_code=NULL, updated_at=? "
+                "WHERE id=? AND status IN ('queued','failed')",
+                (_utcnow(), derivative_id),
+            )
+            if cursor.rowcount != 1:
+                return None
+            self._audit_event("avatar.build.building", "asset", derivative_id)
+        result = self.get_avatar_derivative(derivative_id)
+        assert result is not None
+        return result
+
+    def promote_avatar_derivative_artifact(
+        self,
+        derivative_id: int,
+        *,
+        avatar_id: str,
+        manifest: dict,
+    ) -> dict:
+        """Replace a static build with a visually approved idle-video build."""
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT status, source_sha256 FROM avatar_derivatives WHERE id=?",
+                (derivative_id,),
+            ).fetchone()
+            if row is None:
+                raise KeyError(derivative_id)
+            if manifest.get("source_sha256") != row["source_sha256"]:
+                raise ValueError("avatar.source_mismatch")
+            if manifest.get("visual_approved") is not True:
+                raise ValueError("avatar.visual_approval_required")
+            next_status = "active" if row["status"] == "active" else "ready"
+            self._conn.execute(
+                "UPDATE avatar_derivatives SET avatar_id=?, status=?, manifest_json=?, "
+                "error_code=NULL, updated_at=? WHERE id=?",
+                (avatar_id, next_status, json.dumps(manifest, ensure_ascii=False), _utcnow(), derivative_id),
+            )
+            self._audit_event("avatar.idle.promoted", "asset", derivative_id)
+        result = self.get_avatar_derivative(derivative_id)
+        assert result is not None
+        return result
+
+    def get_active_avatar_derivative(self) -> dict | None:
+        with self._lock:
+            row = self._conn.execute(
+                "SELECT d.*, v.relative_path FROM active_avatar_derivative a "
+                "JOIN avatar_derivatives d ON d.id=a.derivative_id "
+                "JOIN asset_versions v ON v.id=d.asset_id "
+                "WHERE a.singleton=1 AND d.status='active' AND v.status='active'",
+            ).fetchone()
+        return dict(row) if row else None
+
+    def activate_avatar_derivative(self, derivative_id: int, *, fault_injector=None) -> dict:
+        """Atomically switch the portrait and its same-source Avatar dataset."""
+        with self._lock:
+            self._conn.execute("BEGIN IMMEDIATE")
+            try:
+                row = self._conn.execute(
+                    "SELECT d.*, v.kind, v.sha256 FROM avatar_derivatives d "
+                    "JOIN asset_versions v ON v.id=d.asset_id WHERE d.id=?",
+                    (derivative_id,),
+                ).fetchone()
+                if row is None:
+                    raise KeyError(derivative_id)
+                if row["status"] not in {"ready", "active", "archived"}:
+                    raise ValueError("avatar.not_ready")
+                if row["kind"] != "portrait" or row["sha256"] != row["source_sha256"]:
+                    raise ValueError("avatar.source_mismatch")
+                if not self.consent_active("portrait"):
+                    raise PermissionError("auth.consent_required")
+                self._conn.execute("UPDATE asset_versions SET status='archived' WHERE kind='portrait' AND status='active'")
+                self._conn.execute("UPDATE avatar_derivatives SET status='archived' WHERE status='active'")
+                if fault_injector:
+                    fault_injector("after_archive")
+                self._conn.execute("UPDATE asset_versions SET status='active' WHERE id=?", (row["asset_id"],))
+                self._conn.execute("UPDATE avatar_derivatives SET status='active', updated_at=? WHERE id=?", (_utcnow(), derivative_id))
+                self._conn.execute(
+                    "INSERT INTO active_assets(kind, asset_id) VALUES ('portrait', ?) "
+                    "ON CONFLICT(kind) DO UPDATE SET asset_id=excluded.asset_id",
+                    (row["asset_id"],),
+                )
+                self._conn.execute(
+                    "INSERT INTO active_avatar_derivative(singleton, derivative_id) VALUES (1, ?) "
+                    "ON CONFLICT(singleton) DO UPDATE SET derivative_id=excluded.derivative_id",
+                    (derivative_id,),
+                )
+                if fault_injector:
+                    fault_injector("before_commit")
+                self._audit_event("avatar.activated", "asset", derivative_id)
+                self._conn.execute("COMMIT")
+            except BaseException:
+                self._conn.execute("ROLLBACK")
+                raise
+        result = self.get_active_avatar_derivative()
+        assert result is not None
+        return result
+
+    def restore_previous_avatar_derivative(self) -> dict:
+        """Restore a portrait and its matching realtime dataset as one unit."""
+        with self._lock:
+            current = self._conn.execute(
+                "SELECT derivative_id FROM active_avatar_derivative WHERE singleton=1"
+            ).fetchone()
+            params: list[object] = []
+            sql = (
+                "SELECT d.id FROM avatar_derivatives d "
+                "JOIN asset_versions v ON v.id=d.asset_id "
+                "WHERE v.kind='portrait' AND d.status='archived'"
+            )
+            if current is not None:
+                sql += " AND d.id<>?"
+                params.append(int(current["derivative_id"]))
+            row = self._conn.execute(sql + " ORDER BY d.id DESC LIMIT 1", params).fetchone()
+        if row is None:
+            raise KeyError("portrait")
+        return self.activate_avatar_derivative(int(row["id"]))
 
     def _audit_event(self, action: str, entity_type: str, entity_id) -> None:
         import hashlib

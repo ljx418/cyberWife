@@ -48,6 +48,7 @@ from cyberwife.adapters.speech_embedding_adapter import SpeechEmbeddingAdapter  
 from cyberwife.application.memory_service import MemoryService  # noqa: E402
 from cyberwife.application.retention_service import RetentionService  # noqa: E402
 from cyberwife.application.launcher_service import LauncherService  # noqa: E402
+from cyberwife.application.avatar_asset_service import AvatarAssetService  # noqa: E402
 
 
 # ADR-006 修订后默认资产根（Windows 端）
@@ -121,6 +122,11 @@ def main() -> None:
     memory_service = MemoryService(repo, memory_repository, embedding)
     retention_service = RetentionService(repo, data_root=data_root)
     launcher_service = LauncherService(repo_root)
+    avatar_asset_service = AvatarAssetService(
+        repo,
+        assets_root=assets_root,
+        avatar_root=data_root / "avatar" / "avatars",
+    )
     llm = LlamaCppAdapter(
         host=llama_host,
         port=int(server.get("llama_port", 8090)),
@@ -279,6 +285,8 @@ def main() -> None:
         tts_probe=lambda: _probe_tts(tts, configured_tts, reference_audio, reference_text),
         tts_preview=preview_tts,
         shutdown_hooks=(pipeline.close, media_pipeline.close),
+        avatar_asset_service=avatar_asset_service,
+        privacy_cache_clear=getattr(tts, "clear_private_cache", None),
     )
     app = gateway.build_app()
 
