@@ -3,14 +3,14 @@
 **版本**：3.1  
 **日期**：2026-10-05
 
-**状态**：B0～B5及B2.5工程阶段完成；独立60分钟复验触发Windows内存余量硬门，V1发布阻断  
+**状态**：B0～B5及B2.5工程阶段完成；RES1已关闭Windows内存余量硬门；V1仍因人工读屏、物理麦克风与干净机安装条件阻断
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
 ## 1. 项目现状
 
 前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
 
-V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。后续UX5/ARCH1/RES1已关闭口型量化、架构分层和AC-14资源红项；ACC1完成三视口15/15键盘任务，INST1完成便携安装入口和目标机verify。真实NVDA、物理麦克风与干净Windows+WSL独立复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
+V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。后续UX5/ARCH1/RES1已关闭口型量化、架构分层和AC-14资源红项；ACC1完成三视口15/15键盘任务并准备Narrator现场签字工具，INST1完成依赖准备入口、17/17目标机verify和受控Speech venv。人工读屏听感、物理麦克风与干净Windows+WSL独立复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
 
 ## 2. 固定边界
 

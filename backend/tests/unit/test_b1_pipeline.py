@@ -104,6 +104,20 @@ def test_speech_http_rejects_format_and_size():
     assert response.status_code == 422
 
 
+def test_speech_health_is_ready_only_after_startup_warm():
+    runtime = SpeechRuntime(
+        "/unused",
+        vad_factory=lambda: _Vad(),
+        asr_factory=lambda: _Asr(),
+        embedding_factory=lambda: _Embedding(),
+    )
+    cold = TestClient(build_app(runtime=runtime)).get("/health").json()
+    warm = TestClient(build_app(runtime=runtime, runtime_warmed=True)).get("/health").json()
+    assert cold["status"] == "loading"
+    assert warm["status"] == "ready"
+    assert warm["components"]["tts"]["status"] == "loading"
+
+
 @pytest.mark.asyncio
 async def test_turn_pipeline_final_creates_one_turn_and_sanitizes():
     orchestrator = ConversationOrchestrator()

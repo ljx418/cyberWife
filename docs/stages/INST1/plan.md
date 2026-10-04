@@ -14,6 +14,19 @@
 4. 增加PowerShell合同测试和隔离临时目录dry-run；当前目标机执行verify。
 5. 输出安装、备份、卸载和数据清除边界文档。
 
+## INST1.1 闭环修正（2026-10-05）
+
+目标机复核发现，上述`prepare`只生成目录与配置，并未准备Python依赖；Speech进程还使用系统`python3`。这不足以支撑“新WSL用户可复现安装”，原结论降级为局部完成。
+
+修正顺序：
+
+1. 将已真实运行的Core/Speech/Cosy与Avatar顶层依赖固定为两份Python 3.12运行时锁文件，不继承系统site-packages。
+2. `prepare`支持显式`wheelhouse`或`online`模式创建隔离venv；默认`none`仍不联网。`online`必须同时显式给出`-AllowNetworkInstall`。
+3. 运行器增加`SpeechPythonWsl`，默认指向受控Core/Cosy venv，不再调用系统Python。
+4. 依赖准备后执行pip一致性、关键模块import、前端生产构建与原有verify；任一失败都不签就绪。
+5. 模型、CosyVoice源码与授权素材继续只接受本机已有工件，不由安装器暗中下载。
+6. 完整生命周期复核时若发现“HTTP 200但JSON仍为loading”，必须修正启动器功能健康语义并重跑；不得以端口存活签ready。
+
 ## 停止条件
 
 脚本不得结束外部进程、不得覆盖已有私有配置/数据、不得把模型文件纳入Git。没有第二台干净Windows/WSL时，只能签“安装器合同/目标机verify”，不能冒充干净机端到端PASS。

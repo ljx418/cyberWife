@@ -22,7 +22,7 @@
     {"id": "tts", "type": "backend", "label": "TTS Adapters", "sublabel": "CosyVoice2默认 · Qwen回退", "pos": [1035, 80], "size": [205, 72]},
     {"id": "avatar", "type": "backend", "label": "LiveTalking Avatar", "sublabel": "Wav2Lip · H.264 WS :8010", "pos": [1035, 260], "size": [205, 72]},
     {"id": "persistence", "type": "database", "label": "本机持久化", "sublabel": "SQLite WAL · FTS5 · sqlite-vec", "pos": [765, 430], "size": [205, 72]},
-    {"id": "models", "type": "database", "label": "本机模型与授权资产", "sublabel": "7个ACTIVE logical_id", "pos": [1035, 430], "size": [205, 72]},
+    {"id": "models", "type": "database", "label": "本机模型与授权资产", "sublabel": "7实时+10离线形象", "pos": [1035, 430], "size": [205, 72]},
     {"id": "launcher", "type": "security", "label": "Windows RuntimeLauncher", "sublabel": "start/status/recover/stop", "pos": [245, 80], "size": [190, 72]},
     {"id": "evidence", "type": "security", "label": "发布与验收证据", "sublabel": "AC/OX · 资源 · 哈希冻结", "pos": [500, 550], "size": [200, 72]}
   ],

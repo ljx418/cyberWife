@@ -8,5 +8,8 @@
 | INST1-AC04 | verify | 四组件工件、venv、模型与前端均完整才返回0 |
 | INST1-AC05 | 生命周期 | 新生成配置下start/status/recover/stop通过 |
 | INST1-AC06 | 干净环境 | 全新Windows 11用户+干净WSL从工件准备到一键启动独立复现 |
+| INST1-AC07 | 依赖准备 | 离线wheelhouse可复现；联网安装需双重显式开关；隔离venv的`pip check`与关键import全通过 |
+| INST1-AC08 | Speech解释器 | 生产启动命令使用受控venv，无系统`python3`逃逸；四组件生命周期回归通过 |
+| INST1-AC09 | 功能健康 | 端口HTTP 200且JSON状态符合各组件ready集合才签就绪；Speech在VAD/ASR/Embedding预热完成前必须为loading |
 
 AC01～05可在目标机/隔离目录验证；AC06必须有新的系统环境证据。

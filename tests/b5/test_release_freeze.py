@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from ops.release_freeze import ACTIVE_MODELS, build_manifest
+from ops.release_freeze import ACTIVE_MODELS, DEPENDENCY_FILES, WORKFLOW_MODELS, build_manifest
 
 
 def _write(path: Path, value: str) -> None:
@@ -14,11 +14,7 @@ def _write(path: Path, value: str) -> None:
 
 
 def _fixture(tmp_path: Path) -> tuple[Path, Path]:
-    for name in (
-        "requirements-m0.txt", "backend/requirements-m1.txt",
-        "backend/requirements-m3-cosyvoice.txt", "prototype/package-lock.json",
-        "workers/avatar/requirements-cyberwife-v1.txt",
-    ):
+    for name in DEPENDENCY_FILES:
         _write(tmp_path / name, "locked\n")
     _write(tmp_path / "prototype/dist/index.html", "<main>release</main>\n")
     _write(tmp_path / "backend/app.py", "VERSION = 1\n")
@@ -38,7 +34,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path]:
     workflow = tmp_path / "workflow.json"
     _write(workflow, json.dumps({
         "extra": {"cyberwife_model_coverage": {
-            "covered_logical_ids": sorted(ACTIVE_MODELS),
+            "covered_logical_ids": sorted(WORKFLOW_MODELS),
             "explicitly_not_covered": ["unused-model"],
         }},
     }))

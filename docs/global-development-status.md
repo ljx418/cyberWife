@@ -12,7 +12,7 @@
 
 | 阶段 | 当前状态 | 已有真实证据 | 仍缺内容 |
 |---|---|---|---|
-| G-UX / DOC-B | PASS（ACC1自动部分） | 前端方向已批准；三视口15/15完整键盘任务、Playwright 14/14 | NVDA未安装；真读屏完整任务仍需人工/辅助技术实测 |
+| G-UX / DOC-B | PASS（ACC1自动部分） | 前端方向已批准；三视口15/15完整键盘任务、Playwright 14/14；Narrator/Chrome存在 | 真读屏完整任务仍需人工听感签字 |
 | B0 | PASS | 幂等生命周期、六组件真实probe | 无 |
 | B1 | PASS | 真实PCM→VAD→ASR→LLM 20/20 | 无 |
 | B2 | PASS（性能门） | H.264/WebCodecs双FPS≥25、故障降级与原页恢复 | 未形成A/V偏移量或口型主观评分证据 |
@@ -24,8 +24,8 @@
 | UX5 | PASS（用户批准） | 真实Cosy PCM→Wav2Lip→H.264采集；batch 4；四次冷/热首帧218.060～370.307ms；295ms预缓冲后绝对偏差P95≤76.940ms；inferfps≥144.569、finalfps≥25.642、0丢帧；相对错位分析通过；用户于2026-10-05认可并通过验收 | 公开SyncNet置信度低且+200/+400控制不稳定，只作诊断；商业发布仍受Wav2Lip许可证阻断 |
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
-| ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；Playwright 14/14 | NVDA未安装；物理麦克风现场旅程待验 |
-| INST1 | CONDITIONAL | 便携安装入口、目标机13/13 verify、真实生命周期PASS | 干净Windows+WSL独立复现待验 |
+| ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；Playwright 14/14；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
+| INST1 | CONDITIONAL | 便携安装入口、目标机17/17 verify（含动态形象工作流/模型与真实import）、受控Speech venv真实启停PASS；离线/显式联网依赖准备入口 | 干净Windows+WSL独立复现待验 |
 
 ## 3. 已完成依赖链
 
@@ -43,4 +43,4 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；UX4/UX5、ARCH1、RES1已关闭Idle/口型、分层和资源红项。ACC1完成三视口15/15键盘任务但缺真实NVDA与物理麦克风；INST1完成便携安装入口、目标机verify与生命周期，但缺干净Windows+WSL独立复现。当前剩余均为必须依赖新外部环境或人类现场感知的高风险验收门，V1仍未全绿。
+已锁定的B0～B5功能开发项均有实现；UX4/UX5、ARCH1、RES1已关闭Idle/口型、分层和资源红项。ACC1完成三视口15/15键盘任务并准备Narrator签字工具，但仍缺人工读屏听感与物理麦克风；INST1完成依赖准备入口、17项目标机verify、受控Speech venv与真实生命周期，但缺干净Windows+WSL独立复现。当前剩余均为必须依赖新外部环境或人类现场感知的高风险验收门，V1仍未全绿。

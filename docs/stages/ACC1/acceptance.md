@@ -6,7 +6,7 @@
 | ACC1-AC02 | 焦点与控件语义 | Tab顺序可达；Dialog圈闭；Escape关闭并恢复触发点；控件均有名称 |
 | ACC1-AC03 | 六态、错误与字幕播报 | Accessibility Tree与aria-live含真实状态；无重复/遗漏的关键状态 |
 | ACC1-AC04 | 对比度与减少动效 | axe serious/critical=0；减少动效不丢必要信息 |
-| ACC1-AC05 | 真实NVDA任务 | 设置、开聊、打断、改人设、删记忆的控件与状态均可理解地播报 |
+| ACC1-AC05 | 真实读屏任务 | 使用Windows Narrator或NVDA；设置、开聊、打断、改人设、删记忆的控件与状态均可理解地播报 |
 | ACC1-AC06 | Chrome物理麦克风自由对话 | 默认物理输入产生非静音PCM、ASR final和可听回复；至少3轮连续、1次打断；旧轮泄漏0 |
 | ACC1-AC07 | 隐私回归 | 原始麦克风音频文件新增=0；日志无正文/绝对私有路径 |
 

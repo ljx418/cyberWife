@@ -17,5 +17,5 @@
 
 ## 非目标
 
-- 不用授权WAV冒充物理麦克风，不用Accessibility Tree冒充真实NVDA播报。
+- 不用授权WAV冒充物理麦克风，不用Accessibility Tree冒充Narrator/NVDA的真实播报听感。
 - 不修改已批准视觉方向，不读取或删除用户正式记忆。

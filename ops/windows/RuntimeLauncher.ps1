@@ -19,6 +19,7 @@ param(
     [string]$WslHome = '',
     [string]$DataRootWsl = '',
     [string]$AvatarPythonWsl = '',
+    [string]$SpeechPythonWsl = '',
     [string]$ConfigWsl = 'config/runtime.local.toml',
     [ValidateSet('auto', 'dual', 'single')]
     [string]$LlamaSlotProfile = 'auto',
@@ -60,14 +61,15 @@ if ([string]::IsNullOrWhiteSpace($WslHome) -or -not $WslHome.StartsWith('/')) {
 if ([string]::IsNullOrWhiteSpace($DataRootWsl)) { $DataRootWsl = "$WslHome/.cyberWife" }
 if ([string]::IsNullOrWhiteSpace($AvatarPythonWsl)) { $AvatarPythonWsl = "$DataRootWsl/venvs/avatar-v1-py312/bin/python" }
 if ([string]::IsNullOrWhiteSpace($CosyVoicePythonWsl)) { $CosyVoicePythonWsl = "$DataRootWsl/venvs/cosyvoice/bin/python" }
+if ([string]::IsNullOrWhiteSpace($SpeechPythonWsl)) { $SpeechPythonWsl = $CosyVoicePythonWsl }
 if ($LlamaUbatchSize -gt $LlamaBatchSize) {
     throw 'LlamaUbatchSize must be less than or equal to LlamaBatchSize'
 }
 $Components = [ordered]@{
-    llama = @{ Port = 8090; Marker = 'llama-server'; Health = 'http://127.0.0.1:8090/health' }
-    speech = @{ Port = 8091; Marker = 'workers.speech_worker.server'; Health = 'http://127.0.0.1:8091/health' }
-    avatar = @{ Port = 8010; Marker = 'app.py --bind 127.0.0.1'; Health = 'http://127.0.0.1:8010/health'; ControlHealth = 'http://127.0.0.1:8011/healthz' }
-    gateway = @{ Port = 7860; Marker = 'cyberwife.api.server'; Health = 'http://127.0.0.1:7860/api/v1/health' }
+    llama = @{ Port = 8090; Marker = 'llama-server'; Health = 'http://127.0.0.1:8090/health'; ReadyStates = @('ok') }
+    speech = @{ Port = 8091; Marker = 'workers.speech_worker.server'; Health = 'http://127.0.0.1:8091/health'; ReadyStates = @('ready') }
+    avatar = @{ Port = 8010; Marker = 'app.py --bind 127.0.0.1'; Health = 'http://127.0.0.1:8010/health'; ReadyStates = @('ready'); ControlHealth = 'http://127.0.0.1:8011/healthz' }
+    gateway = @{ Port = 7860; Marker = 'cyberwife.api.server'; Health = 'http://127.0.0.1:7860/api/v1/health'; ReadyStates = @('ready', 'degraded') }
 }
 
 function Write-Stage([string]$Message) {
@@ -102,16 +104,19 @@ function Remove-OwnedRecord([string]$Name) {
     if (Test-Path $path) { Remove-Item -Force $path }
 }
 
-function Test-Endpoint([string]$Uri, [int]$TimeoutSec = 2) {
+function Test-Endpoint([string]$Uri, [string[]]$ReadyStates = @(), [int]$TimeoutSec = 2) {
     try {
         $response = Invoke-WebRequest -Uri $Uri -TimeoutSec $TimeoutSec -UseBasicParsing -ErrorAction Stop
-        return ($response.StatusCode -eq 200)
+        if ($response.StatusCode -ne 200) { return $false }
+        if ($ReadyStates.Count -eq 0) { return $true }
+        $payload = $response.Content | ConvertFrom-Json
+        return ($ReadyStates -contains ($payload.status -as [string]).ToLowerInvariant())
     } catch { return $false }
 }
 
 function Test-ComponentEndpoint([string]$Name) {
-    if (-not (Test-Endpoint $Components[$Name].Health)) { return $false }
-    if ($Name -eq 'avatar' -and -not (Test-Endpoint $Components[$Name].ControlHealth)) { return $false }
+    if (-not (Test-Endpoint $Components[$Name].Health $Components[$Name].ReadyStates)) { return $false }
+    if ($Name -eq 'avatar' -and -not (Test-Endpoint $Components[$Name].ControlHealth @('ready'))) { return $false }
     return $true
 }
 
@@ -175,7 +180,7 @@ function Start-ManagedComponent([string]$Name) {
             $process = Start-Process -FilePath $LlamaCppPath -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'speech' {
-            $args = @('--cd', $WorkspaceWsl, 'env', 'PYTHONPATH=backend:.', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', 'python3', '-m', 'workers.speech_worker.server', '--host', '127.0.0.1', '--port', '8091', '--probe-timeout', '120', '--asr-device', 'cuda', '--asr-compute-type', 'float16')
+            $args = @('--cd', $WorkspaceWsl, 'env', 'PYTHONPATH=backend:.', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', $SpeechPythonWsl, '-m', 'workers.speech_worker.server', '--host', '127.0.0.1', '--port', '8091', '--probe-timeout', '120', '--asr-device', 'cuda', '--asr-compute-type', 'float16')
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'avatar' {
@@ -245,6 +250,8 @@ function Assert-Preflight {
     if ($LASTEXITCODE -ne 0) { throw "WSL runtime config missing: $ConfigWsl" }
     & wsl.exe test -x $AvatarPythonWsl
     if ($LASTEXITCODE -ne 0) { throw "Avatar Python runtime missing: $AvatarPythonWsl" }
+    & wsl.exe test -x $SpeechPythonWsl
+    if ($LASTEXITCODE -ne 0) { throw "Speech Python runtime missing: $SpeechPythonWsl" }
     if ($TtsProfile -ne 'qwen') {
         & wsl.exe test -x $CosyVoicePythonWsl
         if ($LASTEXITCODE -ne 0) { throw "CosyVoice Python runtime missing: $CosyVoicePythonWsl" }
@@ -327,9 +334,9 @@ switch ($Action) {
     'restart' {
         if ($Component -eq 'all') {
             & $PSCommandPath -Action stop -Component all -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -PidDir $PidDir -LogDir $LogDir
-            & $PSCommandPath -Action start -Component all -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
+            & $PSCommandPath -Action start -Component all -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -SpeechPythonWsl $SpeechPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
         } else {
-            & $PSCommandPath -Action recover -Component $Component -Force -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
+            & $PSCommandPath -Action recover -Component $Component -Force -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -SpeechPythonWsl $SpeechPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
         }
     }
 }

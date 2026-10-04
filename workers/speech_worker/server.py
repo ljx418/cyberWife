@@ -165,7 +165,12 @@ class SpeechRuntime:
                 pass
 
 
-def build_app(timeout_s: float = 120.0, runtime: SpeechRuntime | None = None) -> FastAPI:
+def build_app(
+    timeout_s: float = 120.0,
+    runtime: SpeechRuntime | None = None,
+    *,
+    runtime_warmed: bool = False,
+) -> FastAPI:
     app = FastAPI(title="cyberWife Speech Runtime", version="1.0.0")
     runner = FunctionalProbeRunner(REPO_ROOT, speech_url=None, timeout_s=timeout_s)
     states = {name: {"status": "loading", "last_error": "probe_not_run"} for name in ("vad", "asr", "tts", "embedding")}
@@ -175,10 +180,16 @@ def build_app(timeout_s: float = 120.0, runtime: SpeechRuntime | None = None) ->
         if asr_entry is None:
             raise RuntimeError("ASR model is absent from registry")
         runtime = SpeechRuntime(asr_entry.absolute_path)
+    if runtime_warmed:
+        for component in ("vad", "asr", "embedding"):
+            states[component] = {"status": "ready", "last_error": None, "source": "startup_warm"}
 
     @app.get("/health")
     async def health() -> dict:
-        statuses = [value["status"] for value in states.values()]
+        # TTS has a probe endpoint for the aggregate gateway, but it is not a
+        # dependency of this speech process. Only the three models warmed by
+        # SpeechRuntime determine whether this worker is functionally ready.
+        statuses = [states[name]["status"] for name in ("vad", "asr", "embedding")]
         overall = "ready" if statuses and all(value == "ready" for value in statuses) else "error" if any(value == "error" for value in statuses) else "loading"
         return {"status": overall, "components": states}
 
@@ -278,7 +289,12 @@ def main() -> None:
         asr_compute_type=args.asr_compute_type,
     )
     runtime.warm()
-    uvicorn.run(build_app(args.probe_timeout, runtime), host=args.host, port=args.port, log_level="info")
+    uvicorn.run(
+        build_app(args.probe_timeout, runtime, runtime_warmed=True),
+        host=args.host,
+        port=args.port,
+        log_level="info",
+    )
 
 
 if __name__ == "__main__":

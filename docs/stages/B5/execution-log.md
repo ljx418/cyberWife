@@ -12,7 +12,7 @@
 | B5.4B 设置真实闭环 | P0/P1=0 | 已完成 | 隔离Chrome五步5/5、no-record迁移、真实Cosy试听PASS | FR-01～06/11/13 PASS | PASS |
 | B5.4C 发布组合 | 4项P1已关闭 | 已完成 | AC-01～13、AC-04A、OX-01～12同候选PASS | 无规格漂移 | PASS |
 | B5.5 生命周期发布 | P0/P1=0 | 已完成 | 60分钟、数据生命周期、start/recover/stop PASS | AC-14/NFR资源PASS | PASS |
-| B5.6 冻结 | 3项P1已关闭 | 已完成 | 一键、静态UI、回归、7模型/工作流、清单PASS | 全PRD逐项PASS | PASS |
+| B5.6 冻结 | 3项P1已关闭 | 已完成 | 一键、静态UI、回归、7实时+10离线形象模型/工作流、清单PASS | 全PRD逐项PASS | PASS |
 
 ## 2026-10-04 B5.5正式出门
 
@@ -26,7 +26,7 @@
 
 - Gateway直接托管生产前端；根目录一键启动/停止入口完成真实Windows→WSL验证，重复启动PID不变、停止两次归零。
 - 后端326 passed/4 skipped、Avatar发布环境9 passed、Playwright 9 passed、生产build PASS。
-- 7个ACTIVE模型与ComfyUI保留工作流精确一致；Silero JIT固定实测SHA；发布清单连续两次一致且无私有绝对路径。
+- 7个实时ACTIVE模型与10个离线形象模型共同与ComfyUI保留索引精确一致；Silero JIT固定实测SHA；发布清单连续两次一致且无私有绝对路径。
 - FR-01～20、NFR-01～10、AC-01～14、AC-04A、OX-01～12逐项PASS，开放P0/P1=0。V1个人/研究用途GO；Wav2Lip限制使商业用途NO-GO。
 
 ## B5.1开发前验收标准与审计

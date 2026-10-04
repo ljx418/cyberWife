@@ -25,6 +25,20 @@ ACTIVE_MODELS = {
     "bge-small-zh-v1.5",
 }
 
+AVATAR_WORKFLOW_MODELS = {
+    "wan22-i2v-high-noise-14b-fp8",
+    "wan22-i2v-low-noise-14b-fp8",
+    "wan22-i2v-lightx2v-high-lora",
+    "wan22-i2v-lightx2v-low-lora",
+    "umt5-xxl-fp8",
+    "wan21-vae",
+    "insightface-scrfd-det10g",
+    "qwen-image-2.1-q6-k",
+    "qwen3vl-8b-bf16",
+    "qwen-image-2.1-vae-bf16",
+}
+WORKFLOW_MODELS = ACTIVE_MODELS | AVATAR_WORKFLOW_MODELS
+
 SOURCE_ROOTS = ("backend", "prototype/src", "prototype/tests", "ops", "tests", "docs", "config")
 SOURCE_SUFFIXES = {
     ".cmd", ".css", ".drawio", ".html", ".js", ".json", ".md", ".mjs",
@@ -38,8 +52,10 @@ DEPENDENCY_FILES = (
     "requirements-m0.txt",
     "backend/requirements-m1.txt",
     "backend/requirements-m3-cosyvoice.txt",
+    "backend/requirements-runtime-core-cu128.txt",
     "prototype/package-lock.json",
     "workers/avatar/requirements-cyberwife-v1.txt",
+    "workers/avatar/requirements-runtime-cu128.txt",
 )
 ROOT_SOURCE_FILES = ("Start-cyberWife.cmd", "Stop-cyberWife.cmd", "README.md")
 EVIDENCE_FILES = (
@@ -134,8 +150,8 @@ def collect_models(registry_path: Path, workflow_path: Path) -> tuple[list[dict[
     coverage = workflow.get("extra", {}).get("cyberwife_model_coverage", {})
     covered = set(coverage.get("covered_logical_ids", []))
     rows = {item["logical_id"]: item for item in registry.get("models", [])}
-    if covered != ACTIVE_MODELS:
-        raise ValueError(f"workflow coverage mismatch: expected={sorted(ACTIVE_MODELS)}, actual={sorted(covered)}")
+    if covered != WORKFLOW_MODELS:
+        raise ValueError(f"workflow coverage mismatch: expected={sorted(WORKFLOW_MODELS)}, actual={sorted(covered)}")
     if not ACTIVE_MODELS.issubset(rows):
         raise ValueError(f"registry missing active models: {sorted(ACTIVE_MODELS - set(rows))}")
 
@@ -160,7 +176,9 @@ def collect_models(registry_path: Path, workflow_path: Path) -> tuple[list[dict[
     return models, {
         "covered_logical_ids": sorted(covered),
         "coverage_sha256": sha256_file(workflow_path),
-        "active_count": len(covered),
+        "covered_count": len(covered),
+        "runtime_logical_ids": sorted(ACTIVE_MODELS),
+        "offline_avatar_build_logical_ids": sorted(AVATAR_WORKFLOW_MODELS),
         "deletion_candidates": sorted(coverage.get("explicitly_not_covered", [])),
     }
 
@@ -202,7 +220,7 @@ def build_manifest(workspace: Path, registry_path: Path, workflow_path: Path) ->
     }
     checks = {
         "active_models_exactly_7": len(models) == 7,
-        "workflow_matches_active_models": workflow["covered_logical_ids"] == sorted(ACTIVE_MODELS),
+        "workflow_matches_release_models": workflow["covered_logical_ids"] == sorted(WORKFLOW_MODELS),
         "all_evidence_pass": all(item["result"] == "PASS" for item in body["evidence"]),
         "production_frontend_present": any(item["path"] == "prototype/dist/index.html" for item in body["release_artifacts"]),
     }

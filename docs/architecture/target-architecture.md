@@ -18,7 +18,8 @@ App Gateway :7860
   ├─ MemoryService / RetentionService / HealthAggregator
   ├─ SQLite WAL + FTS5 + sqlite-vec + private AssetStore
   ├─ HTTP stream/cancel → Windows llama-server :8090
-  ├─ IPC/loopback → WSL SpeechRuntime :8091（VAD/ASR/Qwen TTS）
+  ├─ IPC/loopback → WSL SpeechRuntime :8091（VAD/ASR/Embedding，受控Core venv）
+  ├─ in-process adapter → CosyVoice2默认 / Qwen3-TTS显式回退
   └─ HTTP PCM → WSL AvatarRuntime :8010（LiveTalking/Wav2Lip）
                               │ loopback WS / Annex-B H.264
                               └────────────────────► Browser WebCodecs/canvas
@@ -39,12 +40,12 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | VAD/ASR | SpeechRuntime真实进程与20轮final合同通过 | 保持流式输入与不落盘 | 已开发/已验收（B1） |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
-| Avatar | H.264/WebCodecs全链、打断清队列、降级/恢复与长稳态通过 | 补A/V同步量化和真人口型感知证据 | 已开发/感知验收待补 |
+| Avatar | H.264/WebCodecs全链、打断清队列、降级/恢复与长稳态通过；UX5 A/V量化及用户视觉批准已完成 | 保持动态形象逐素材人工确认门 | 已开发/已验收 |
 | 人物生成 | Qwen Image正面化→Wan Idle→10秒闭环→双预览→人工确认→Wav2Lip数据构建；文件任务状态可恢复 | 逐素材人工身份/自然度签署 | 已开发/人工门持续执行 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
-| 启动 | audit/prepare/verify与start/status/recover/stop已实现；路径不固定WSL用户名 | 补干净机安装与首次启动独立复现 | 目标机通过/干净机待验 |
-| 验收 | 后端343 passed/5 skipped、Playwright 14/14；RES1 60分钟20完整+10打断通过，Windows最低余量4,124.074MiB | 关闭真实麦克风、真实NVDA与干净安装 | 条件阻断 |
+| 启动 | audit/prepare/verify与start/status/recover/stop已实现；路径不固定WSL用户名；17/17工件/import前检通过；Speech只使用受控venv且ready解析JSON语义 | 补干净机安装与首次启动独立复现 | 目标机通过/干净机待验 |
+| 验收 | 后端344 passed/5 skipped、工具12/12、Playwright 14/14；RES1 60分钟20完整+10打断通过，Windows最低余量4,124.074MiB | 关闭物理麦克风、人工Narrator与干净安装 | 条件阻断 |
 
 ## 3. 目标代码实体
 
@@ -264,5 +265,5 @@ B2.5 不改变本架构的依赖方向。新增 `WarmResponsePolicy`、`WarmResp
 
 - B3（已实现）：Gateway 已切换全双工 session runtime，并通过统一取消与 generation fence 验收。
 - B4（已实现）：记忆、隐私、保留和 sqlite-vec 真实往返已落地；运行时不以 FTS-only 或内存 fallback 冒充 ready。
-- B5（已实现、外部门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层和资源红项已关闭，真实NVDA/物理麦克风与干净机独立复现仍需补证。
+- B5（已实现、外部门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层和资源红项已关闭，人工Narrator听感/物理麦克风与干净机独立复现仍需补证。
 - 详细计划和真实门槛见 `stages/B3～B5`；可编辑总图为 `cyberWife-b3-b5-delivery-gap.drawio`。
