@@ -108,11 +108,26 @@ function App() {
   const [conversationError, setConversationError] = useState('')
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
+  const deleteReturnFocusRef = useRef<HTMLElement | null>(null)
   const avatarCanvasRef = useRef<HTMLCanvasElement>(null)
   const conversationStateRef = useRef<ConversationState>('idle')
   const socketRef = useRef<WebSocket | null>(null)
   const sessionRef = useRef<string | null>(null)
   const nextTurnRef = useRef(1)
+
+  const requestDelete = (target: string | 'all') => {
+    deleteReturnFocusRef.current = document.activeElement as HTMLElement | null
+    setDeleteTarget(target)
+  }
+
+  const closeDelete = () => {
+    setDeleteTarget(null)
+    window.setTimeout(() => {
+      const previous = deleteReturnFocusRef.current
+      if (previous?.isConnected) previous.focus()
+      else drawerCloseRef.current?.focus()
+    }, 0)
+  }
   const inputTurnRef = useRef<number | null>(null)
   const currentServerTurnRef = useRef<number | null>(null)
   const chunkSeqRef = useRef(0)
@@ -204,6 +219,13 @@ function App() {
   }, [settingsOpen])
 
   useEffect(() => {
+    if (!deleteTarget) return
+    window.setTimeout(() => {
+      document.querySelector<HTMLElement>('.confirm-dialog button')?.focus()
+    }, 0)
+  }, [deleteTarget])
+
+  useEffect(() => {
     if (!settingsOpen) return
     const load = async () => {
       setSettingsStatus('正在读取本机数据…')
@@ -274,11 +296,13 @@ function App() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault()
-        closeSettings()
+        if (deleteTarget) closeDelete()
+        else closeSettings()
         return
       }
       if (event.key !== 'Tab') return
-      const dialog = document.querySelector<HTMLElement>('.settings-drawer[role="dialog"]')
+      const dialog = document.querySelector<HTMLElement>('.confirm-dialog[role="alertdialog"]')
+        ?? document.querySelector<HTMLElement>('.settings-drawer[role="dialog"]')
       if (!dialog) return
       const focusable = Array.from(dialog.querySelectorAll<HTMLElement>(
         'button:not([disabled]), input:not([disabled]), textarea:not([disabled]), select:not([disabled]), [href], [tabindex]:not([tabindex="-1"])',
@@ -294,7 +318,7 @@ function App() {
     }
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [settingsOpen])
+  }, [settingsOpen, deleteTarget])
 
   const closeSettings = () => {
     setSettingsOpen(false)
@@ -446,7 +470,7 @@ function App() {
       else if (deleteTarget) { await ConversationClient.deleteMemory(Number(deleteTarget)); setMemories((items) => items.filter((item) => item.id !== deleteTarget)) }
       setSettingsStatus('删除已由本机数据库确认')
     } catch (error) { setSettingsStatus(`删除失败：${String(error)}`) }
-    finally { setDeleteTarget(null) }
+    finally { closeDelete() }
   }
 
   const uploadAndActivate = async (kind: 'portrait' | 'voice', file: File): Promise<AvatarBuild | void> => {
@@ -791,7 +815,7 @@ function App() {
           editingMemory={editingMemory}
           setEditingMemory={setEditingMemory}
           setMemories={setMemories}
-          requestDelete={setDeleteTarget}
+          requestDelete={requestDelete}
           doNotRecord={doNotRecord}
           setDoNotRecord={(enabled) => { void changeNoRecord(enabled) }}
           profileVersion={profileVersion}
@@ -848,7 +872,7 @@ function App() {
       {deleteTarget && (
         <ConfirmDialog
           isAll={deleteTarget === 'all'}
-          onCancel={() => setDeleteTarget(null)}
+          onCancel={closeDelete}
           onConfirm={confirmDelete}
         />
       )}
