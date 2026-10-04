@@ -85,7 +85,7 @@ function New-WslVenv([string]$Venv) {
     throw 'cannot create WSL venv; install python3.12-venv, uv, or virtualenv explicitly'
 }
 
-function Install-WslRuntime([string]$Venv, [string]$Requirements) {
+function Install-WslRuntime([string]$Venv, [string]$Requirements, [string]$Component) {
     $python = "$Venv/bin/python"
     if (-not (Test-WslVenv $Venv)) {
         New-WslVenv $Venv
@@ -94,7 +94,9 @@ function Install-WslRuntime([string]$Venv, [string]$Requirements) {
         if (-not $WheelhouseWsl -or -not (Test-WslPath $WheelhouseWsl 'd')) {
             throw 'DependencyMode=wheelhouse requires an existing -WheelhouseWsl directory'
         }
-        Invoke-Wsl @($python, '-m', 'pip', 'install', '--no-index', '--find-links', $WheelhouseWsl, '-r', $Requirements)
+        $componentWheelhouse = "$WheelhouseWsl/$Component"
+        $packageRoot = if (Test-WslPath $componentWheelhouse 'd') { $componentWheelhouse } else { $WheelhouseWsl }
+        Invoke-Wsl @($python, '-m', 'pip', 'install', '--no-index', '--find-links', $packageRoot, '-r', $Requirements)
     } elseif ($DependencyMode -eq 'online') {
         if (-not $AllowNetworkInstall) {
             throw 'DependencyMode=online requires explicit -AllowNetworkInstall'
@@ -150,8 +152,15 @@ tts = "cosyvoice2-0.5b"
         if (-not (Test-WslPath $coreRequirements 'f') -or -not (Test-WslPath $avatarRequirements 'f')) {
             throw 'project runtime requirement files are missing'
         }
-        Install-WslRuntime $coreVenv $coreRequirements
-        Install-WslRuntime $avatarVenv $avatarRequirements
+        if ($DependencyMode -eq 'wheelhouse' -and (Test-WslPath "$WheelhouseWsl/core" 'd')) {
+            $manifestTool = "$WorkspaceWsl/ops/acceptance/wheelhouse_manifest.py"
+            if (-not (Test-WslPath "$WheelhouseWsl/wheelhouse-manifest.json" 'f')) {
+                throw 'component wheelhouse requires wheelhouse-manifest.json'
+            }
+            Invoke-Wsl @($PythonWsl, $manifestTool, 'verify', '--root', $WheelhouseWsl)
+        }
+        Install-WslRuntime $coreVenv $coreRequirements 'core'
+        Install-WslRuntime $avatarVenv $avatarRequirements 'avatar'
     }
     $frontendIndex = Join-Path $WorkspaceWin 'prototype\dist\index.html'
     if (-not $SkipFrontendBuild -and -not (Test-Path -LiteralPath $frontendIndex)) {

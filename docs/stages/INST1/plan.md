@@ -37,6 +37,16 @@
 4. 不复制模型和授权资产；只验证依赖可复现性。完成后仅删除本轮`mktemp`生成且已校验前缀的临时目录。
 5. 该证据可关闭“WSL Python依赖从零安装”风险，但不能替代全新Windows用户、WSL发行版、GPU驱动和模型工件组合的AC06外部门。
 
+## INST1.3 离线wheelhouse复现（2026-10-05）
+
+目标是把已经通过在线解析的两套Python运行时固化为可校验的离线工件，使目标机后续安装不依赖PyPI或PyTorch索引。执行顺序：
+
+1. 使用Python 3.12分别构建`core/`与`avatar/` wheelhouse，禁止平铺混合两个运行时的不同Transformers/Numpy版本；联网构建必须显式授权。
+2. 生成不含私有绝对路径的JSON清单，记录每个wheel文件的相对路径、大小和SHA256；重复验证不得修改工件。
+3. 安装器在wheelhouse根目录存在`core/`与`avatar/`时按组件选择子目录，并在安装前强制验证清单；旧的单目录入口仅保留兼容性。
+4. 从两个新的、不继承system packages的Python 3.12 venv执行`--no-index --find-links`真实安装；网络索引不可参与。
+5. 执行INST1.2同一套10项依赖/源码导入检查，只有全通过才签INST1-AC11。wheelhouse与临时venv均位于WSL ext4，不占用C盘；临时venv验收后移入回收站。
+
 ## 停止条件
 
 脚本不得结束外部进程、不得覆盖已有私有配置/数据、不得把模型文件纳入Git。没有第二台干净Windows/WSL时，只能签“安装器合同/目标机verify”，不能冒充干净机端到端PASS。

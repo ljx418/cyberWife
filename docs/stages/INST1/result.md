@@ -1,7 +1,7 @@
 # INST1 阶段结果
 
 **日期**：2026-10-05
-**结论**：CONDITIONAL；INST1.1/INST1.2修正后实现、目标机验证及全新隔离Python运行时复现PASS，干净Windows/WSL外部环境复现未执行。
+**结论**：CONDITIONAL；INST1.1～INST1.3实现、目标机验证、全新隔离Python运行时及离线wheelhouse复现PASS，干净Windows/WSL外部环境复现未执行。
 
 ## 已完成
 
@@ -13,14 +13,15 @@
 - 首轮完整回归发现Speech的HTTP 200仍携带`status=loading`；已拒绝该假阳性并修正为JSON语义健康门。修复后五个端点状态为LLM=`ok`、Speech/Avatar/Avatar-control/Gateway=`ready`，再执行四组件受管停止全部归零。
 - 从WSL反向调用Windows启动器时，Windows PowerShell已退出但WSL `/init`会等待长期子进程；自动化只在功能ready后回收该relay。用户双击Windows `.cmd`不经该relay，未把测试工具现象误修成产品逻辑。
 - 新入口真实启动四组件全部healthy；Avatar PID `11432→15428`且其他组件保持；stop×2与端口/PID归零PASS。
-- 后端全量`344 passed, 5 skipped`；根工具/工作流`13 passed`；前端构建与Headless Playwright `14 passed`。一次错用不存在的`npm test`脚本和两次合并pytest包名冲突均按正确入口重跑通过，未伪装首跑成功。
-- 发布冻结器已同步为7个实时模型+10个离线形象模型，同一源码状态连续两次生成的release id与字节完全一致。
+- 后端全量`344 passed, 5 skipped`；根工具/工作流`15 passed`；前端构建与Headless Playwright `14 passed`。一次错用不存在的`npm test`脚本和两次合并pytest包名冲突均按正确入口重跑通过，未伪装首跑成功。
+- 发布冻结器已同步为7个实时模型+10个离线形象模型，并将在线隔离安装与离线wheelhouse结果列为必需证据；同一源码状态连续两次生成的release id与字节完全一致。
 - 安装/启动/备份/恢复/卸载/永久清除手册已落盘。
 - INST1.2在`/tmp`私有根从零创建Core与Avatar两个Python 3.12环境，均明确`include-system-site-packages = false`；实际在线安装完成，两个`pip check`均为零冲突。首次解析真实暴露`diffusers 0.40`与Cosy所需Transformers/Hugging Face Hub约束冲突，已固定为`diffusers 0.29.0 + huggingface-hub 0.36.2`后重跑通过。
 - 当前Ubuntu缺失`python3.12-venv/ensurepip`，安装器真实走通`uv --seed --python /usr/bin/python3`回退；不需要也不会自动执行`sudo apt`。机器可读证据为`audit/v1/INST1/isolated-runtime-result.json`，覆盖Python版本、venv隔离、依赖一致性、核心三方模块以及Gateway/Speech/CosyVoice/LiveTalking/Wav2Lip项目源码导入。
+- INST1.3生成Core/Avatar分仓离线wheelhouse：261个wheel、73个同盘硬链接去重、实际7.5GB，清单SHA256全量复算PASS。两个新的Python 3.12 venv只通过`--no-index --find-links`安装，安装器`ready=true`、两套`pip check`无冲突、运行时/项目源码检查10/10 PASS；不传联网授权的构建负例在写目录前返回1。脱敏汇总证据为`audit/v1/INST1/offline-install-result.json`。
 
 ## 未完成
 
-没有第二个全新Windows 11用户或干净VM+WSL可用，因此INST1-AC06未执行。INST1-AC10已经关闭Python依赖从零安装风险；目标机verify证明工件完整和参数迁移有效，但仍不能证明Windows用户、WSL发行版、GPU驱动与全部模型工件在另一台机器上的组合复现。
+没有第二个全新Windows 11用户或干净VM+WSL可用，因此INST1-AC06未执行。INST1-AC10/11已经关闭Python依赖在线与离线从零安装风险；目标机verify证明工件完整和参数迁移有效，但仍不能证明Windows用户、WSL发行版、GPU驱动与全部模型工件在另一台机器上的组合复现。
 
 开放P1：`INST1-P1-01 干净Windows+WSL独立复现待执行`。不得签INST1或V1全绿。

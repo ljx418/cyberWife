@@ -39,6 +39,15 @@ cd C:\workSpace\cyberWife
 
 创建venv时安装器依次尝试Python标准`venv`、`uv`和`virtualenv`。如三者均不存在，脚本会要求操作者显式安装`python3.12-venv`或其中一个创建器；安装器不自动执行`sudo apt`。
 
+需要准备可重复使用的离线依赖库时，在一次允许联网的维护窗口执行：
+
+```powershell
+.\ops\windows\Build-CyberWifeWheelhouse.ps1 -AllowNetworkDownload
+.\ops\windows\Install-CyberWife.ps1 -Action prepare -DependencyMode wheelhouse -WheelhouseWsl /home/<WSL用户>/.cyberWife/wheelhouse/cu128-py312
+```
+
+构建器分别保存Core与Avatar wheel，生成并验证SHA256清单；安装器在创建venv前再次验证。已有wheelhouse默认不会覆盖，只有显式`-ReplaceExisting`才会先重命名为带时间戳的备份。
+
 安装器不会安装驱动、修改防火墙、下载模型或结束进程。缺少的模型、CosyVoice源码和授权素材必须由操作者按来源/许可证准备后重新verify。
 
 ## 4. 照片生成动态形象

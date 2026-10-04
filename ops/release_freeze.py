@@ -59,6 +59,8 @@ DEPENDENCY_FILES = (
 )
 ROOT_SOURCE_FILES = ("Start-cyberWife.cmd", "Stop-cyberWife.cmd", "README.md")
 EVIDENCE_FILES = (
+    "audit/v1/INST1/isolated-runtime-result.json",
+    "audit/v1/INST1/offline-install-result.json",
     "audit/v1/B5/B5-AC00-final2/result.json",
     "audit/v1/B5/B5.4B-onboarding-final/result.json",
     "audit/v1/B5/B5.4C-accessibility-final2/result.json",
@@ -124,7 +126,7 @@ def collect_named_files(workspace: Path, names: tuple[str, ...]) -> list[dict[st
 
 
 def evidence_passed(document: dict[str, Any]) -> bool:
-    if document.get("pass") is True:
+    if document.get("pass") is True or document.get("passed") is True:
         return True
     if str(document.get("result", "")).upper() == "PASS":
         return True

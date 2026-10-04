@@ -14,6 +14,9 @@ def test_installer_requires_explicit_network_consent_and_checks_avatar_workflows
     assert "include-system-site-packages = false" in script
     assert "'--clear', '--seed', '--python'" in script
     assert "python3.12-venv, uv, or virtualenv" in script
+    assert "wheelhouse_manifest.py" in script
+    assert "wheelhouse-manifest.json" in script
+    assert "--no-index" in script and "$componentWheelhouse" in script
     assert "comfy.avatar_pipeline" in script
     assert "comfy_avatar_frontalize_api.json" in script
     assert "comfy_avatar_idle_api.json" in script
@@ -37,6 +40,9 @@ def test_runtime_requirement_files_are_release_inputs():
     ):
         assert (ROOT / relative).is_file()
         assert relative in freezer
+    assert "audit/v1/INST1/isolated-runtime-result.json" in freezer
+    assert "audit/v1/INST1/offline-install-result.json" in freezer
+    assert 'document.get("passed") is True' in freezer
 
 
 def test_isolated_runtime_verifier_checks_project_sources_and_no_system_packages():
@@ -47,6 +53,28 @@ def test_isolated_runtime_verifier_checks_project_sources_and_no_system_packages
     assert "from avatars.wav2lip_avatar import LipReal" in source
     assert '"core_pip_check"' in source
     assert '"avatar_pip_check"' in source
+
+
+def test_wheelhouse_builder_requires_network_consent_and_integrity_manifest():
+    builder = (ROOT / "ops/windows/Build-CyberWifeWheelhouse.ps1").read_text(encoding="utf-8")
+    manifest = (ROOT / "ops/acceptance/wheelhouse_manifest.py").read_text(encoding="utf-8")
+    assert "-AllowNetworkDownload explicitly" in builder
+    assert '"$staging/core"' in builder and '"$staging/avatar"' in builder
+    assert "pip', 'wheel'" in builder
+    assert "wheelhouse_manifest.py" in builder
+    assert "if ($built) { 'PASS' } else { 'SKIPPED' }" in builder
+    assert "sha256" in manifest
+    assert 'COMPONENTS = ("core", "avatar")' in manifest
+    assert "os.link(core_wheel, avatar_wheel)" in manifest
+    assert 'manifest.get("file_count") != len(expected)' in manifest
+
+
+def test_offline_install_evidence_binds_no_index_and_runtime_checks():
+    source = (ROOT / "ops/acceptance/verify_offline_install.py").read_text(encoding="utf-8")
+    assert '"stage": "INST1.3"' in source
+    assert "runtime_checks_10_of_10" in source
+    assert "installer_no_index_contract" in source
+    assert "manifest_sha256" in source
 
 
 def test_acc1_human_gate_requires_explicit_focus_consent_and_keeps_no_audio():

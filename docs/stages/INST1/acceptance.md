@@ -12,5 +12,6 @@
 | INST1-AC08 | Speech解释器 | 生产启动命令使用受控venv，无系统`python3`逃逸；四组件生命周期回归通过 |
 | INST1-AC09 | 功能健康 | 端口HTTP 200且JSON状态符合各组件ready集合才签就绪；Speech在VAD/ASR/Embedding预热完成前必须为loading |
 | INST1-AC10 | 全新隔离venv | Core/Avatar均不继承system packages；真实安装完成；`pip check`=0冲突；关键import与项目源码加载PASS |
+| INST1-AC11 | 离线wheelhouse | Core/Avatar分仓构建；清单SHA256全匹配；两个全新venv只用`--no-index`安装；INST1.2验证10/10 PASS |
 
 AC01～05可在目标机/隔离目录验证；AC06必须有新的系统环境证据。
