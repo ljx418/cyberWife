@@ -88,6 +88,7 @@ test('设置、记忆删除确认和主题切换可用', async ({ page }) => {
   await page.getByRole('button', { name: '取消' }).click()
 
   await page.getByRole('button', { name: '人物', exact: true }).click()
+  await expect(page.getByRole('dialog', { name: '她的世界' }).getByText('选择授权照片')).toBeVisible()
   await page.getByRole('radio', { name: '柔和浅色' }).click()
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'soft-light')
 })

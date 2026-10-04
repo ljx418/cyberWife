@@ -1067,6 +1067,10 @@ button:disabled {
   grid-template-columns: 1fr 190px;
   gap: 35px;
 }
+.setup-content--compact {
+  min-height: 0;
+  padding-top: 24px;
+}
 .portrait-preview {
   width: 190px;
   aspect-ratio: 4/5;

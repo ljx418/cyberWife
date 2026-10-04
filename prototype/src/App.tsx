@@ -800,6 +800,37 @@ function App() {
           setSettingsStatus={setSettingsStatus}
           assetCounts={assetCounts}
           runtimeRows={runtimeRows}
+          idleJob={idleJob}
+          onPortrait={async (file) => {
+            setSettingsStatus('正在保存照片并创建安全版本…')
+            try {
+              const build = await uploadAndActivate('portrait', file)
+              setSettingsStatus('照片已保存，正在等待动态形象生成')
+              return build
+            } catch (error) {
+              setSettingsStatus(`照片未保存：${String(error)}`)
+              throw error
+            }
+          }}
+          onGenerateIdle={async (derivativeId) => {
+            setSettingsStatus('正在本机生成动态形象；实时对话暂时不可用')
+            try {
+              await generateIdleAvatar(derivativeId)
+              setSettingsStatus('候选已生成，请预览后确认')
+            } catch (error) {
+              setSettingsStatus(`动态形象生成失败：${String(error)}`)
+              throw error
+            }
+          }}
+          onApproveIdle={async (derivativeId) => {
+            try {
+              await approveIdleAvatar(derivativeId)
+              setSettingsStatus('动态人物新版本已激活')
+            } catch (error) {
+              setSettingsStatus(`动态人物未激活：${String(error)}`)
+              throw error
+            }
+          }}
           onPortraitRestored={(active) => {
             setActiveAvatarId(active.avatar_id)
             if (active.asset_id) setActivePortraitRevision(active.asset_id)
@@ -1021,11 +1052,12 @@ async function cropPortrait(file: File, zoom: number, positionX: number, positio
   return new File([blob], `${file.name.replace(/\.[^.]+$/, '')}-crop.png`, { type: 'image/png' })
 }
 
-function PortraitSetup({ onPortrait, idleJob, onGenerateIdle, onApproveIdle }: {
+function PortraitSetup({ onPortrait, idleJob, onGenerateIdle, onApproveIdle, compact = false }: {
   onPortrait: (file: File) => Promise<AvatarBuild | void>
   idleJob: IdleGenerationJob | null
   onGenerateIdle: (derivativeId: number) => Promise<void>
   onApproveIdle: (derivativeId: number) => Promise<void>
+  compact?: boolean
 }) {
   const [source, setSource] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -1050,10 +1082,9 @@ function PortraitSetup({ onPortrait, idleJob, onGenerateIdle, onApproveIdle }: {
     }
   }
   return (
-    <div className="setup-content setup-content--split">
+    <div className={`setup-content setup-content--split ${compact ? 'setup-content--compact' : ''}`}>
       <div>
-        <p className="eyebrow">人物形象</p>
-        <h1>让她看起来熟悉。</h1>
+        {!compact && <><p className="eyebrow">人物形象</p><h1>让她看起来熟悉。</h1></>}
         <p className="setup-lead">选择正面、自然闭嘴、下巴无遮挡的照片。可调整缩放和取景，裁切结果只发送到本机保存。</p>
         <label className="file-drop">
           <input type="file" accept="image/jpeg,image/png" onChange={(event) => {
@@ -1124,6 +1155,10 @@ interface SettingsDrawerProps {
   setSettingsStatus: (status: string) => void
   assetCounts: { portrait: number; voice: number }
   runtimeRows: RuntimeService[]
+  idleJob: IdleGenerationJob | null
+  onPortrait: (file: File) => Promise<AvatarBuild | void>
+  onGenerateIdle: (derivativeId: number) => Promise<void>
+  onApproveIdle: (derivativeId: number) => Promise<void>
   onPortraitRestored: (active: AvatarBuild) => void
   onAssetUploaded: (kind: 'portrait' | 'voice', file: File) => Promise<void>
   onPreviewVoice: () => Promise<void>
@@ -1155,7 +1190,8 @@ function SettingsDrawer(props: SettingsDrawerProps) {
           {props.activeTab === 'profile' && (
             <section>
               <SectionHeader index="01" title="人物形象" description="新文件先由本机校验并创建版本，成功后原子激活；上一可用版本始终可恢复。" />
-              <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><label className="secondary-button asset-file-button">选择新照片<input type="file" accept="image/jpeg,image/png" onChange={(event) => { const file = event.target.files?.[0]; if (file) void props.onAssetUploaded('portrait', file) }} /></label><button className="secondary-button" type="button" onClick={async () => { try { const restored = await ConversationClient.restoreAsset('portrait') as AvatarBuild; props.onPortraitRestored(restored); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
+              <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><button className="secondary-button" type="button" onClick={async () => { try { const restored = await ConversationClient.restoreAsset('portrait') as AvatarBuild; props.onPortraitRestored(restored); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
+              <PortraitSetup onPortrait={props.onPortrait} idleJob={props.idleJob} onGenerateIdle={props.onGenerateIdle} onApproveIdle={props.onApproveIdle} compact />
               <hr />
               <SectionHeader index="02" title="界面主题" description="默认使用电影感深色，也可选择柔和浅色或跟随系统。" />
               <div className="segmented" role="radiogroup" aria-label="界面主题">
