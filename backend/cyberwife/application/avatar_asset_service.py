@@ -8,7 +8,7 @@ import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
-from cyberwife.infrastructure.asset_store import AssetStore
+from cyberwife.ports.assets import AssetStorePort
 
 
 _SAFE_AVATAR_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
@@ -21,13 +21,13 @@ class AvatarAssetService:
         self,
         repository,
         *,
-        assets_root: Path,
+        asset_store: AssetStorePort,
         avatar_root: Path,
         idle_job_root: Path | None = None,
         idle_pipeline_runner=None,
     ) -> None:
         self._repository = repository
-        self._store = AssetStore(assets_root)
+        self._store = asset_store
         self._avatar_root = Path(avatar_root)
         self._idle_job_root = Path(idle_job_root or self._avatar_root.parent / "idle-jobs")
         self._idle_pipeline_runner = idle_pipeline_runner

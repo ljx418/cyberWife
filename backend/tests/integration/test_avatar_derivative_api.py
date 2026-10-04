@@ -11,6 +11,7 @@ from cyberwife.application.avatar_asset_service import AvatarAssetService
 from cyberwife.application.health_aggregator import HealthAggregator
 from cyberwife.application.model_registry import ModelRegistry
 from cyberwife.infrastructure.sqlite_repository import SqliteRepository
+from cyberwife.infrastructure.asset_store import AssetStore
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -20,9 +21,10 @@ PNG = b"\x89PNG\r\n\x1a\n" + b"real-api-route-test"
 def test_portrait_api_builds_then_atomically_activates_matching_avatar(tmp_path, monkeypatch):
     repo = SqliteRepository(tmp_path / "api.db", ROOT / "migrations" / "0001_init.sql")
     registry = ModelRegistry(ROOT)
+    asset_store = AssetStore(tmp_path / "assets")
     service = AvatarAssetService(
         repo,
-        assets_root=tmp_path / "assets",
+        asset_store=asset_store,
         avatar_root=tmp_path / "avatars",
     )
 
@@ -43,6 +45,7 @@ def test_portrait_api_builds_then_atomically_activates_matching_avatar(tmp_path,
         HealthAggregator(registry),
         repository=repo,
         assets_root=tmp_path / "assets",
+        asset_store=asset_store,
         avatar_asset_service=service,
     ).build_app()
     client = TestClient(app)
@@ -67,6 +70,7 @@ def test_portrait_api_builds_then_atomically_activates_matching_avatar(tmp_path,
 def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, monkeypatch):
     repo = SqliteRepository(tmp_path / "api.db", ROOT / "migrations" / "0001_init.sql")
     registry = ModelRegistry(ROOT)
+    asset_store = AssetStore(tmp_path / "assets")
 
     pipeline_runs = 0
 
@@ -83,7 +87,7 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
 
     service = AvatarAssetService(
         repo,
-        assets_root=tmp_path / "assets",
+        asset_store=asset_store,
         avatar_root=tmp_path / "avatars",
         idle_job_root=tmp_path / "idle-jobs",
         idle_pipeline_runner=fake_idle_pipeline,
@@ -119,6 +123,7 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
         HealthAggregator(registry),
         repository=repo,
         assets_root=tmp_path / "assets",
+        asset_store=asset_store,
         avatar_asset_service=service,
     ).build_app()
     client = TestClient(app)

@@ -1,8 +1,8 @@
 # cyberWife V1 后端目标架构
 
-**版本**：2.4  
-**日期**：2026-10-04  
-**状态**：B0～B5与B2.5均已实现并在目标机运行；独立60分钟复验触发Windows内存余量硬门，发布阻断；分层实现仍有偏差  
+**版本**：2.5
+**日期**：2026-10-05
+**状态**：B0～B5、B2.5、UX4、UX5均已有目标机证据；独立60分钟复验触发Windows内存余量硬门，发布阻断；ARCH1已关闭应用层反向依赖
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -33,7 +33,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 层 | 当前仓库事实 | V1 目标 | 状态 |
 |---|---|---|---|
 | 前端 | G-UX/G-OX体验已获批准；已有 ConversationClient/MediaSession | 只做真实事件接线、局部阶段反馈与回归修复 | 已验收/冻结 |
-| API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现 | 保持合同稳定并关闭Application直连基础设施 | 已开发/分层需修改 |
+| API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
 | VAD/ASR | SpeechRuntime真实进程与20轮final合同通过 | 保持流式输入与不落盘 | 已开发/已验收（B1） |
@@ -55,9 +55,10 @@ backend/cyberwife/
 ├─ api/
 │  └─ server.py                              [修改] 仅组合依赖和启动 ASGI
 ├─ application/
-│  ├─ api_gateway.py                         [已开发/需解耦] REST/WS；仍直连SqliteRepository/AssetStore
+│  ├─ api_gateway.py                         [已开发/已解耦] REST/WS；只依赖Repository/AssetStore端口
 │  ├─ conversation_orchestrator.py           [已开发] session/turn 状态与事件序列
-│  ├─ turn_pipeline.py                       [已开发/需解耦] async主链；仍直连Logger/Metrics
+│  ├─ turn_pipeline.py                       [已开发/已解耦] async主链；Logger/Metrics经端口注入
+│  ├─ runtime_metrics.py                     [已开发] 纯内存、无I/O延迟指标
 │  ├─ interruption_controller.py             [已开发] generation/cancel/queue purge
 │  ├─ prompt_compiler.py                     [保留]
 │  ├─ output_sanitizer.py                    [保留]
@@ -73,7 +74,9 @@ backend/cyberwife/
 ├─ ports/
 │  ├─ asr.py / llm.py / tts.py / avatar.py  [保留/补取消合同]
 │  ├─ embedding.py                           [保留]
-│  └─ repositories.py                        [已开发/需扩展] 原子事务；仍需覆盖资产/观测端口
+│  ├─ repositories.py                        [已开发] 应用仓储与审计查询合同
+│  ├─ assets.py                              [已开发] 私有资产存储合同
+│  └─ observability.py                       [已开发] 日志与运行指标合同
 ├─ adapters/
 │  ├─ silero_vad_adapter.py                  [已开发]
 │  ├─ faster_whisper_adapter.py              [已开发]
@@ -86,8 +89,7 @@ backend/cyberwife/
    ├─ sqlite_repository.py                   [已开发]
    ├─ vector_index.py                        [已开发] V1 禁止内存 fallback 冒充 ready
    ├─ asset_store.py                         [已开发]
-   ├─ structured_logger.py                   [已开发/待经Port注入]
-   └─ runtime_metrics.py                     [已开发/待经Port注入]
+   └─ structured_logger.py                   [已开发/经Port注入]
 
 workers/speech_worker/
 ├─ server.py                                 [已开发] :8091
@@ -98,7 +100,7 @@ scripts/windows/RuntimeLauncher.ps1          [已开发] 生命周期与功能�
 tests/{b3,b4,b5}/                            [已开发] 目标机验收runner
 ```
 
-目标依赖只允许 `api → application → domain + ports`；`adapters/infrastructure → ports/domain`。当前模型包隔离基本满足，但 `application` 仍直接导入 `SqliteRepository`、`AssetStore`、`StructuredLogger`、`RuntimeMetrics`，因此 NFR-07 与架构门只能判部分通过；composition root/ports 解耦是明确未完成项。
+目标依赖只允许 `api → application → domain + ports`；`adapters/infrastructure → ports/domain`。ARCH1已把`SqliteRepository`、`AssetStore`、`StructuredLogger`的具体装配集中到`api/server.py`，运行指标为应用层无I/O实现，并以AST门禁持续保证`application/domain/ports`对`infrastructure/adapters/api`的反向导入为0。
 
 ## 4. 实时 TurnPipeline
 
@@ -250,7 +252,7 @@ Mock 测试只能让实体进入“合同通过”，不能进入“已验收”
 
 ## 13. 架构出门条件
 
-架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 [`backend-development-plan.md`](../backend-development-plan.md) B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。2026-10-04阶段审计发现 `application/api_gateway.py` 与 `application/turn_pipeline.py` 仍直接依赖 `infrastructure` 实体，尚未达到本文件规定的单向依赖；该项关闭前 NFR-07 只能标记部分通过。
+架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 [`backend-development-plan.md`](../backend-development-plan.md) B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1已关闭2026-10-04审计发现的Application反向依赖，341项后端测试、4项环境性skip与11项Playwright均无回退；Windows内存余量、完整AC-11/物理麦克风和干净机安装仍是独立出门项。
 
 ## 14. B2.5 优化扩展
 

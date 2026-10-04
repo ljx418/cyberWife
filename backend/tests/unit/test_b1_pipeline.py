@@ -9,7 +9,7 @@ from cyberwife.application.output_sanitizer import OutputSanitizer
 from cyberwife.application.prompt_compiler import PromptCompiler
 from cyberwife.application.turn_pipeline import TurnPipeline
 from cyberwife.domain.conversation import SessionState
-from cyberwife.infrastructure.runtime_metrics import RuntimeMetrics
+from cyberwife.application.runtime_metrics import RuntimeMetrics
 from workers.speech_worker.server import SpeechRuntime, build_app
 
 

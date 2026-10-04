@@ -14,6 +14,7 @@ from cyberwife.application.api_gateway import ApiGateway
 from cyberwife.application.health_aggregator import HealthAggregator
 from cyberwife.application.model_registry import ModelRegistry
 from cyberwife.infrastructure.sqlite_repository import SqliteRepository
+from cyberwife.infrastructure.asset_store import AssetStore
 
 
 @pytest.fixture
@@ -27,7 +28,12 @@ def client(tmp_path):
     repo.grant_consent("all", "test-v1")
     registry = ModelRegistry(repo_root)
     aggregator = HealthAggregator(registry)
-    gateway = ApiGateway(registry, aggregator, repository=repo)
+    gateway = ApiGateway(
+        registry,
+        aggregator,
+        repository=repo,
+        asset_store=AssetStore(tmp_path / "assets"),
+    )
     app = gateway.build_app()
     return TestClient(app), repo
 

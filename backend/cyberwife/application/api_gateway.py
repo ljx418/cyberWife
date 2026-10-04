@@ -26,7 +26,8 @@ from cyberwife.application.model_registry import ModelRegistry
 from cyberwife.application.conversation_orchestrator import ConversationOrchestrator
 from cyberwife.application.session_runtime import SessionRuntime
 from cyberwife.domain.conversation import RecordingPolicy, SessionState
-from cyberwife.infrastructure.sqlite_repository import SqliteRepository
+from cyberwife.ports.assets import AssetStorePort
+from cyberwife.ports.repositories import ApplicationRepositoryPort
 
 
 def _gen_trace_id() -> str:
@@ -76,14 +77,15 @@ def error_envelope(code: str, message: str, *, trace_id: str | None = None) -> d
 
 
 class ApiGateway:
-    """组合根；持有 registry + aggregator + repository。"""
+    """Application-facing HTTP/WS gateway; concrete wiring lives in api.server."""
 
     def __init__(
         self,
         registry: ModelRegistry,
         aggregator: HealthAggregator,
-        repository: SqliteRepository | None = None,
+        repository: ApplicationRepositoryPort | None = None,
         assets_root: Path | None = None,
+        asset_store: AssetStorePort | None = None,
         orchestrator: ConversationOrchestrator | None = None,
         turn_pipeline=None,
         memory_service=None,
@@ -109,6 +111,7 @@ class ApiGateway:
         self._shutdown_hooks = tuple(shutdown_hooks or ())
         self._avatar_asset_service = avatar_asset_service
         self._privacy_cache_clear = privacy_cache_clear
+        self._asset_store = asset_store
         self._static_root = Path(static_root) if static_root else Path(__file__).resolve().parents[3] / "prototype" / "dist"
         self._session_runtimes: dict[int, SessionRuntime] = {}
         self._session_tokens: dict[str, int] = {}
@@ -495,9 +498,10 @@ class ApiGateway:
             active = await asyncio.to_thread(self._repository.get_active_asset, kind)
             if active is None:
                 raise HTTPException(status_code=404, detail="audit.entity_not_found")
-            from cyberwife.infrastructure.asset_store import AssetStore
+            if self._asset_store is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
             try:
-                target = AssetStore(self._assets_root).resolve(str(active["relative_path"]))
+                target = self._asset_store.resolve(str(active["relative_path"]))
             except ValueError:
                 raise HTTPException(status_code=422, detail="asset.invalid")
             if not target.is_file():
@@ -668,16 +672,13 @@ class ApiGateway:
         async def get_audit(entity: str = "", action: str = ""):
             if not self._repository:
                 raise HTTPException(status_code=503, detail="health.component_unavailable")
-            query = "SELECT action, entity_type, entity_id_hash, result, deleted_row_count, error_code, created_at FROM audit_events WHERE 1=1"
-            params = []
-            if entity:
-                query += " AND entity_type=?"; params.append(entity)
-            if action:
-                query += " AND action=?"; params.append(action)
-            query += " ORDER BY id DESC LIMIT 200"
-            with self._repository.lock:
-                rows = self._repository.conn.execute(query, params).fetchall()
-            return {"items": [dict(row) for row in rows]}
+            rows = await asyncio.to_thread(
+                self._repository.list_audit_events,
+                entity=entity,
+                action=action,
+                limit=200,
+            )
+            return {"items": rows}
 
         # ── M2-stretch：资产上传/录音（multipart）────────────────────────
         @app.post("/api/v1/assets/{kind}/preview")
@@ -694,8 +695,6 @@ class ApiGateway:
                 raise HTTPException(status_code=422, detail="asset.invalid: no file")
             import tempfile
             from pathlib import Path as _P
-            from cyberwife.infrastructure.asset_store import AssetStore
-
             content = await file.read()
             if len(content) > 50 * 1024 * 1024:
                 raise HTTPException(status_code=413, detail="asset.too_large")
@@ -703,10 +702,11 @@ class ApiGateway:
                 tmp.write(content)
                 tmp_path = _P(tmp.name)
             try:
-                store = AssetStore(self._assets_root)
+                if self._asset_store is None:
+                    raise HTTPException(status_code=503, detail="health.component_unavailable")
                 original_name = _P(file.filename).name
                 stored_name = f"{uuid.uuid4().hex}{_P(original_name).suffix.lower()}"
-                meta = store.ingest(kind, stored_name, tmp_path)
+                meta = self._asset_store.ingest(kind, stored_name, tmp_path)
                 meta["filename_or_revision"] = original_name
                 mime = meta["mime"]
                 meta = await asyncio.to_thread(self._repository.create_asset_version, meta)
@@ -730,8 +730,6 @@ class ApiGateway:
             import base64
             import tempfile
             from pathlib import Path as _P
-            from cyberwife.infrastructure.asset_store import AssetStore
-
             filename = payload.get("filename", "recording.wav")
             data_b64 = payload.get("data_b64", "")
             try:
@@ -744,10 +742,11 @@ class ApiGateway:
                 tmp.write(content)
                 tmp_path = _P(tmp.name)
             try:
-                store = AssetStore(self._assets_root)
+                if self._asset_store is None:
+                    raise HTTPException(status_code=503, detail="health.component_unavailable")
                 original_name = _P(filename).name
                 stored_name = f"{uuid.uuid4().hex}{_P(original_name).suffix.lower()}"
-                meta = store.ingest(kind, stored_name, tmp_path)
+                meta = self._asset_store.ingest(kind, stored_name, tmp_path)
                 meta["filename_or_revision"] = original_name
                 mime = meta["mime"]
                 meta = await asyncio.to_thread(self._repository.create_asset_version, meta)

@@ -1,6 +1,6 @@
 import pytest
 
-from cyberwife.infrastructure.runtime_metrics import RuntimeMetrics
+from cyberwife.application.runtime_metrics import RuntimeMetrics
 
 
 def test_runtime_metrics_only_completes_after_browser_confirmation():

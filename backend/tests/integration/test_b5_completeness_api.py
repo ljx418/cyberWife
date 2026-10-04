@@ -9,6 +9,7 @@ from cyberwife.application.api_gateway import ApiGateway
 from cyberwife.application.health_aggregator import HealthAggregator
 from cyberwife.application.model_registry import ModelRegistry
 from cyberwife.infrastructure.sqlite_repository import SqliteRepository
+from cyberwife.infrastructure.asset_store import AssetStore
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -22,6 +23,7 @@ def stack(tmp_path, **gateway_kwargs):
     registry = ModelRegistry(ROOT)
     app = ApiGateway(
         registry, HealthAggregator(registry), repository=repo, assets_root=tmp_path / "assets",
+        asset_store=AssetStore(tmp_path / "assets"),
         **gateway_kwargs,
     ).build_app()
     return TestClient(app), repo, db

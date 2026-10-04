@@ -49,6 +49,9 @@ from cyberwife.application.memory_service import MemoryService  # noqa: E402
 from cyberwife.application.retention_service import RetentionService  # noqa: E402
 from cyberwife.application.launcher_service import LauncherService  # noqa: E402
 from cyberwife.application.avatar_asset_service import AvatarAssetService  # noqa: E402
+from cyberwife.application.runtime_metrics import RuntimeMetrics  # noqa: E402
+from cyberwife.infrastructure.asset_store import AssetStore  # noqa: E402
+from cyberwife.infrastructure.structured_logger import StructuredLogger  # noqa: E402
 
 
 # ADR-006 修订后默认资产根（Windows 端）
@@ -122,9 +125,10 @@ def main() -> None:
     memory_service = MemoryService(repo, memory_repository, embedding)
     retention_service = RetentionService(repo, data_root=data_root)
     launcher_service = LauncherService(repo_root)
+    asset_store = AssetStore(assets_root)
     avatar_asset_service = AvatarAssetService(
         repo,
-        assets_root=assets_root,
+        asset_store=asset_store,
         avatar_root=data_root / "avatar" / "avatars",
     )
     llm = LlamaCppAdapter(
@@ -249,6 +253,8 @@ def main() -> None:
         warm_response_cache=warm_cache,
         warm_context_provider=warm_context_provider,
         memory_provider=memory_service.prompt_memories,
+        runtime_metrics=RuntimeMetrics(),
+        logger=StructuredLogger(name="cyberwife.turn_pipeline"),
     )
 
     def preview_tts(text: str) -> bytes:
@@ -277,6 +283,7 @@ def main() -> None:
         aggregator,
         repository=repo,
         assets_root=assets_root,
+        asset_store=asset_store,
         orchestrator=orchestrator,
         turn_pipeline=pipeline,
         memory_service=memory_service,

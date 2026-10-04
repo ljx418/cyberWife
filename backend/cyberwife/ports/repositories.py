@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from datetime import datetime
-from typing import Optional
+from typing import Any, Optional, Protocol
 
 from cyberwife.domain.conversation import Session, Turn
 from cyberwife.domain.profile import Profile, Consent, AssetVersion, ConsentScope
@@ -116,3 +116,14 @@ class RetentionServicePort(ABC):
 
     @abstractmethod
     def next_scan_at(self) -> datetime: ...
+
+
+class ApplicationRepositoryPort(Protocol):
+    """Combined local repository contract without connection/lock leakage."""
+
+    def create_session(self, recording_policy: str = "standard") -> int: ...
+    def end_session(self, session_id: int, ended_at: datetime) -> bool: ...
+    def create_turn(self, turn: Turn, *, persist_text: bool = True) -> int: ...
+    def update_turn(self, turn: Turn, *, persist_text: bool = True) -> None: ...
+    def list_audit_events(self, *, entity: str = "", action: str = "", limit: int = 200) -> list[dict[str, Any]]: ...
+    def __getattr__(self, name: str) -> Any: ...

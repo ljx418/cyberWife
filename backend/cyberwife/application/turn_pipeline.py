@@ -24,8 +24,13 @@ from cyberwife.application.sentence_scheduler import playable_prefix
 from cyberwife.application.interruption_controller import InterruptionController
 from cyberwife.domain.cancellation import CancellationToken, TurnCancelled
 from cyberwife.domain.conversation import SessionState
-from cyberwife.infrastructure.structured_logger import StructuredLogger
-from cyberwife.infrastructure.runtime_metrics import RuntimeMetrics
+from cyberwife.application.runtime_metrics import RuntimeMetrics
+from cyberwife.ports.observability import RuntimeMetricsPort, StructuredLoggerPort
+
+
+class _NullStructuredLogger:
+    def emit(self, event: str, component: str, **fields: Any) -> dict:
+        return {"event": event, "component": component, **fields}
 
 
 class TurnPipeline:
@@ -44,7 +49,8 @@ class TurnPipeline:
         asr_deadline_s: float = 120.0,
         llm_deadline_s: float = 60.0,
         llm_queue_size: int = 32,
-        runtime_metrics: RuntimeMetrics | None = None,
+        runtime_metrics: RuntimeMetricsPort | None = None,
+        logger: StructuredLoggerPort | None = None,
         first_playable_min_chars: int = 10,
         warm_response_cache=None,
         warm_context_provider: Callable[[], Any] | None = None,
@@ -69,7 +75,7 @@ class TurnPipeline:
         self._warm_response_cache = warm_response_cache
         self._warm_context_provider = warm_context_provider
         self._memory_provider = memory_provider
-        self._logger = StructuredLogger(name="cyberwife.turn_pipeline")
+        self._logger = logger or _NullStructuredLogger()
         self._active_turns = 0
         self._llm_queue_depth = 0
         self._llm_queue_max_observed = 0

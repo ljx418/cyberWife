@@ -57,6 +57,27 @@ class SqliteRepository:
         with self._lock:
             self._conn.close()
 
+    def list_audit_events(
+        self, *, entity: str = "", action: str = "", limit: int = 200
+    ) -> list[dict]:
+        """Return bounded audit rows without leaking SQLite into application code."""
+        query = (
+            "SELECT action, entity_type, entity_id_hash, result, deleted_row_count, "
+            "error_code, created_at FROM audit_events WHERE 1=1"
+        )
+        params: list[object] = []
+        if entity:
+            query += " AND entity_type=?"
+            params.append(entity)
+        if action:
+            query += " AND action=?"
+            params.append(action)
+        query += " ORDER BY id DESC LIMIT ?"
+        params.append(max(1, min(int(limit), 200)))
+        with self._lock:
+            rows = self._conn.execute(query, params).fetchall()
+        return [dict(row) for row in rows]
+
     def _apply_schema(self, schema_path: Path) -> None:
         if not schema_path.exists():
             return
