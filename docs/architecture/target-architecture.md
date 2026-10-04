@@ -2,7 +2,7 @@
 
 **版本**：2.5
 **日期**：2026-10-05
-**状态**：B0～B5、B2.5、UX4、UX5均已有目标机证据；独立60分钟复验触发Windows内存余量硬门，发布阻断；ARCH1已关闭应用层反向依赖
+**状态**：B0～B5、B2.5、UX4、UX5均已有目标机证据；ARCH1已关闭应用层反向依赖，RES1已关闭Windows内存余量红项；AC-11/物理麦克风与干净机安装仍阻断全绿
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -44,7 +44,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | start/status/recover/stop、幂等和失败回退已实现 | 补干净机安装与首次启动复现 | 目标机通过/干净机待验 |
-| 验收 | 本轮快速回归348 passed；60分钟20完整+10打断均成功，但Windows最低余量1,840.566MiB<2GiB，exit 2 | 先定位/关闭资源红项，再关闭真实麦克风、完整读屏、A/V量化、干净安装与分层偏差 | 发布阻断 |
+| 验收 | ARCH1后端341 passed/4 skipped、Playwright 11 passed；RES1 60分钟20完整+10打断通过，Windows最低余量4,124.074MiB | 关闭真实麦克风、完整读屏任务与干净安装 | 条件阻断 |
 
 ## 3. 目标代码实体
 
@@ -252,7 +252,7 @@ Mock 测试只能让实体进入“合同通过”，不能进入“已验收”
 
 ## 13. 架构出门条件
 
-架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 [`backend-development-plan.md`](../backend-development-plan.md) B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1已关闭2026-10-04审计发现的Application反向依赖，341项后端测试、4项环境性skip与11项Playwright均无回退；Windows内存余量、完整AC-11/物理麦克风和干净机安装仍是独立出门项。
+架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 [`backend-development-plan.md`](../backend-development-plan.md) B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1已关闭反向依赖，RES1已用60分钟当前候选关闭Windows内存余量红项；完整AC-11/物理麦克风和干净机安装仍是独立出门项。
 
 ## 14. B2.5 优化扩展
 
