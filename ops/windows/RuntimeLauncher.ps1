@@ -16,7 +16,9 @@ param(
     [string]$ModelPath = 'C:\ComfyUI-aki-v2\ComfyUI\models\LLM\Qwen3-14B-Q4_K_M.gguf',
     [string]$AvatarModelWsl = '/mnt/c/ComfyUI-aki-v2/ComfyUI/models/Audio/wav2lip/wav2lip.pth',
     [string]$AvatarId = 'wav2lip256_avatar1',
-    [string]$AvatarPythonWsl = '/home/administrator/.cyberWife/venvs/avatar-v1-py312/bin/python',
+    [string]$WslHome = '',
+    [string]$DataRootWsl = '',
+    [string]$AvatarPythonWsl = '',
     [string]$ConfigWsl = 'config/runtime.local.toml',
     [ValidateSet('auto', 'dual', 'single')]
     [string]$LlamaSlotProfile = 'auto',
@@ -39,7 +41,7 @@ param(
     [switch]$TtsFallbackActive,
     [ValidateSet('all', 'llama', 'speech', 'avatar', 'gateway')]
     [string]$Component = 'all',
-    [string]$CosyVoicePythonWsl = '/home/administrator/.cyberWife/venvs/cosyvoice/bin/python',
+    [string]$CosyVoicePythonWsl = '',
     [ValidateRange(4, 18)]
     [int]$FirstPlayableMinChars = 10,
     [string]$PidDir = "$env:LOCALAPPDATA\cyberWife\pid",
@@ -49,6 +51,15 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+if ([string]::IsNullOrWhiteSpace($WslHome)) {
+    $WslHome = ((& wsl.exe sh -lc 'printf %s "$HOME"') | Out-String).Trim()
+}
+if ([string]::IsNullOrWhiteSpace($WslHome) -or -not $WslHome.StartsWith('/')) {
+    throw 'unable to resolve the WSL user home; pass -WslHome explicitly'
+}
+if ([string]::IsNullOrWhiteSpace($DataRootWsl)) { $DataRootWsl = "$WslHome/.cyberWife" }
+if ([string]::IsNullOrWhiteSpace($AvatarPythonWsl)) { $AvatarPythonWsl = "$DataRootWsl/venvs/avatar-v1-py312/bin/python" }
+if ([string]::IsNullOrWhiteSpace($CosyVoicePythonWsl)) { $CosyVoicePythonWsl = "$DataRootWsl/venvs/cosyvoice/bin/python" }
 if ($LlamaUbatchSize -gt $LlamaBatchSize) {
     throw 'LlamaUbatchSize must be less than or equal to LlamaBatchSize'
 }
@@ -168,7 +179,7 @@ function Start-ManagedComponent([string]$Name) {
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'avatar' {
-            $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', 'CW_AVATAR_DATA_ROOT=/home/administrator/.cyberWife/avatar/avatars', $AvatarPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'wav2lip', '--batch_size', '4', '--modelfile', $AvatarModelWsl, '--avatar_id', $AvatarId)
+            $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', "CW_AVATAR_DATA_ROOT=$DataRootWsl/avatar/avatars", $AvatarPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'wav2lip', '--batch_size', '4', '--modelfile', $AvatarModelWsl, '--avatar_id', $AvatarId)
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'gateway' {
@@ -176,7 +187,7 @@ function Start-ManagedComponent([string]$Name) {
             $ttsTrt = if ($TtsProfile -eq 'cosy-trt') { '1' } else { '0' }
             $gatewayPython = if ($TtsProfile -eq 'qwen') { 'python3' } else { $CosyVoicePythonWsl }
             $ttsFallback = if ($TtsFallbackActive) { '1' } else { '0' }
-            $shell = 'CW_LIBS=$(find /home/administrator/.local/lib/python3.12/site-packages/nvidia -mindepth 2 -maxdepth 2 -type d -name lib -print | paste -sd: -); export LD_LIBRARY_PATH="$CW_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" PYTHONPATH=backend:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MODELSCOPE_OFFLINE=1 CW_TTS_MODEL=' + $ttsModel + ' CW_TTS_FALLBACK_ACTIVE=' + $ttsFallback + ' CW_COSYVOICE_LOAD_TRT=' + $ttsTrt + ' CW_FIRST_PLAYABLE_MIN_CHARS=' + $FirstPlayableMinChars + '; exec ' + $gatewayPython + ' -m cyberwife.api.server --config ' + $ConfigWsl + ' --host 127.0.0.1 --port 7860'
+            $shell = 'CW_LIBS=$(find ' + $WslHome + '/.local/lib/python3.12/site-packages/nvidia -mindepth 2 -maxdepth 2 -type d -name lib -print 2>/dev/null | paste -sd: -); export LD_LIBRARY_PATH="$CW_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" CW_COSYVOICE_SOURCE_DIR=' + $DataRootWsl + '/src/CosyVoice PYTHONPATH=backend:. HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1 MODELSCOPE_OFFLINE=1 CW_TTS_MODEL=' + $ttsModel + ' CW_TTS_FALLBACK_ACTIVE=' + $ttsFallback + ' CW_COSYVOICE_LOAD_TRT=' + $ttsTrt + ' CW_FIRST_PLAYABLE_MIN_CHARS=' + $FirstPlayableMinChars + '; exec ' + $gatewayPython + ' -m cyberwife.api.server --config ' + $ConfigWsl + ' --host 127.0.0.1 --port 7860'
             $args = @('--cd', $WorkspaceWsl, 'bash', '-lc', $shell)
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }

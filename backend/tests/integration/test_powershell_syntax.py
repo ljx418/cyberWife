@@ -13,6 +13,7 @@ PS_SCRIPTS = [
     REPO_ROOT / "ops" / "windows" / "RuntimeLauncher.ps1",
     REPO_ROOT / "ops" / "windows" / "StartLlamaCpp.ps1",
     REPO_ROOT / "ops" / "windows" / "ResolveWindowsHost.ps1",
+    REPO_ROOT / "ops" / "windows" / "Install-CyberWife.ps1",
 ]
 
 
@@ -42,6 +43,30 @@ def test_o2_launcher_profiles_are_bounded_and_explicit():
     assert "primary TTS gateway failed; starting one-way Qwen fallback" in source
     assert "FirstPlayableMinChars" in source
     assert "ValidateRange(4, 18)" in source
+
+
+def test_install_entrypoint_is_portable_safe_and_offline():
+    source = (REPO_ROOT / "ops" / "windows" / "Install-CyberWife.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+    assert "ValidateSet('audit', 'prepare', 'verify')" in source
+    assert 'printf %s \"$HOME\"' in source
+    assert "SupportsShouldProcess" in source
+    assert "runtime.local.toml" in source
+    assert "Invoke-WebRequest" not in source
+    assert "Start-BitsTransfer" not in source
+    assert "winget install" not in source
+    assert "netsh advfirewall" not in source
+    assert "Administrator/.cyberWife" not in source
+
+
+def test_production_runtime_paths_do_not_pin_the_administrator_user():
+    sources = [
+        REPO_ROOT / "ops" / "windows" / "RuntimeLauncher.ps1",
+        REPO_ROOT / "backend" / "cyberwife" / "api" / "server.py",
+    ]
+    for path in sources:
+        assert "/home/administrator" not in path.read_text(encoding="utf-8-sig"), path
 
 
 @pytest.fixture(scope="module")

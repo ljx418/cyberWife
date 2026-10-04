@@ -1,6 +1,6 @@
 # cyberWife V1 后端目标架构
 
-**版本**：2.5
+**版本**：2.6
 **日期**：2026-10-05
 **状态**：B0～B5、B2.5、UX4、UX5均已有目标机证据；ARCH1已关闭应用层反向依赖，RES1已关闭Windows内存余量红项；AC-11/物理麦克风与干净机安装仍阻断全绿
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
@@ -43,8 +43,8 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 人物生成 | Qwen Image正面化→Wan Idle→10秒闭环→双预览→人工确认→Wav2Lip数据构建；文件任务状态可恢复 | 逐素材人工身份/自然度签署 | 已开发/人工门持续执行 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
-| 启动 | start/status/recover/stop、幂等和失败回退已实现 | 补干净机安装与首次启动复现 | 目标机通过/干净机待验 |
-| 验收 | ARCH1后端341 passed/4 skipped、Playwright 11 passed；RES1 60分钟20完整+10打断通过，Windows最低余量4,124.074MiB | 关闭真实麦克风、完整读屏任务与干净安装 | 条件阻断 |
+| 启动 | audit/prepare/verify与start/status/recover/stop已实现；路径不固定WSL用户名 | 补干净机安装与首次启动独立复现 | 目标机通过/干净机待验 |
+| 验收 | 后端343 passed/5 skipped、Playwright 14/14；RES1 60分钟20完整+10打断通过，Windows最低余量4,124.074MiB | 关闭真实麦克风、真实NVDA与干净安装 | 条件阻断 |
 
 ## 3. 目标代码实体
 
@@ -264,5 +264,5 @@ B2.5 不改变本架构的依赖方向。新增 `WarmResponsePolicy`、`WarmResp
 
 - B3（已实现）：Gateway 已切换全双工 session runtime，并通过统一取消与 generation fence 验收。
 - B4（已实现）：记忆、隐私、保留和 sqlite-vec 真实往返已落地；运行时不以 FTS-only 或内存 fallback 冒充 ready。
-- B5（已实现、审计黄项待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；完整读屏/真实麦克风/口型同步量化、干净机安装与架构分层仍需补证或修正。
+- B5（已实现、外部门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层和资源红项已关闭，真实NVDA/物理麦克风与干净机独立复现仍需补证。
 - 详细计划和真实门槛见 `stages/B3～B5`；可编辑总图为 `cyberWife-b3-b5-delivery-gap.drawio`。

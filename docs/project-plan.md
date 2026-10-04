@@ -10,7 +10,7 @@
 
 前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
 
-V1核心功能已完成开发并取得目标硬件真实证据。B2在Chrome复验否决WebRTC后，以本机H.264 WebSocket/WebCodecs完成三周期真实故障恢复；B3/B4/B5随后完成打断、记忆隐私、组合回归和发布冻结。2026-10-04独立60分钟复验的20完整+10打断全部成功，但Windows最低可用内存1,840.566MiB低于2GiB硬门，AC-14/G4失败；架构分层、完整AC-11、真实麦克风/口型量化和干净机安装证据也仍待关闭。商业发布继续被Wav2Lip ResearchOnly阻断。
+V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。后续UX5/ARCH1/RES1已关闭口型量化、架构分层和AC-14资源红项；ACC1完成三视口15/15键盘任务，INST1完成便携安装入口和目标机verify。真实NVDA、物理麦克风与干净Windows+WSL独立复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
 
 ## 2. 固定边界
 

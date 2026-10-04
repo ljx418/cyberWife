@@ -23,7 +23,7 @@
 | FR-14 30天清理 | RetentionService、injectable clock | B4 | AC-10 | 已实现并验收：可注入时钟、转录到期清理且长期记忆保留PASS |
 | FR-15 单服务恢复 | HealthAggregator、RuntimeLauncher、adapters | B0/B2/B2.5/B5 | AC-12 | 已实现并验收：四组件×3恢复、同页继续及Avatar单项恢复PASS |
 | FR-16 响应式/无障碍 | 已批准前端 + 后端真实状态事件 | B5/ACC1 | AC-11 | 部分通过：三尺寸15/15键盘任务、axe、焦点圈闭、aria-live、reduced-motion通过；真实NVDA未安装/未执行 |
-| FR-17 一键生命周期 | RuntimeLauncher.ps1、server.py | B0/B5 | AC-14/G6 | start×2与stop×2/PID端口归零通过；本轮soak硬门失败后按设计跳过recover，AC-14未通过；干净机安装亦未验收 |
+| FR-17 一键生命周期 | Install-CyberWife.ps1、RuntimeLauncher.ps1、server.py | B0/B5/INST1 | AC-14/G6 | RES1资源门PASS；INST1目标机verify、start/recover/stop×2通过；干净Windows+WSL独立复现未验收 |
 | FR-18 本机边界/无公网依赖 | Launcher、Gateway、所有 adapters | B0/B2/B2.5/B5 | AC-13/OX-10 | 已实现并验收：仅loopback/本机桥接、出站白盒与连续连接采样PASS；物理断网按用户决议不执行 |
 | FR-19 HostBridge | browser HostBridge | B5 | 合同回归 | 已实现并验收：浏览器安全unsupported空操作，无本机越权PASS |
 | FR-20 严格问候预热 | WarmResponsePolicy、WarmResponseCache、RuntimeMetrics | B2.5 | AC-04A/OX-03～05 | 已开发并签署；真实命中P95=56ms、30条负例错误命中=0 |
@@ -34,11 +34,11 @@
 |---|---|---|---|---|
 | NFR-01 首响/打断 | TurnPipeline、InterruptionController、RuntimeMetrics | B2/B2.5/B3 | AC-04/04A/05 | 已验收：普通P95 6.175s；缓存P95 14ms；打断P95 2.6ms |
 | NFR-02 FPS/资源 | Scheduler、AvatarAdapter、RuntimeMetrics | B2/B2.5/B5 | AC-04/06/14 | **本轮FAIL**：双FPS历史通过；60分钟RAM 13,637.863MiB、GPU 12.479GiB、WSL余量达门，但Windows最低1,840.566MiB<2GiB |
-| NFR-03 稳定性 | 有界队列、Launcher、Health | B3/B5 | AC-03/12/14 | 部分通过：60分钟20完整+10打断、无崩溃/OOM、趋势达门；因资源硬门失败，AC-14整体不通过 |
+| NFR-03 稳定性 | 有界队列、Launcher、Health | B3/B5/RES1 | AC-03/12/14 | 已验收：60分钟20完整+10打断、资源与趋势门、恢复、stop×2均PASS |
 | NFR-04 本机隐私 | persistence policy、loopback、privacy scan | B4/B5 | AC-09/13 | 已验收：原始音频/允许集外连接/敏感日志命中均0 |
 | NFR-05 删除一致性 | MemoryService、SQLite transaction | B4 | AC-08 | 已验收：源记录、FTS、向量与召回原子归零PASS |
 | NFR-06 可观测/脱敏 | StructuredLogger、RuntimeMetrics | B1/B2.5/B5 | AC-04/12/13 | 已验收：trace/generation/分段计量完整，日志脱敏PASS |
-| NFR-07 分层/替换 | ports/adapters、contract tests | B0～B5 | 架构审查 | 部分通过：模型保持adapter/config边界；Application仍直接导入Infrastructure，未达到目标依赖方向 |
+| NFR-07 分层/替换 | ports/adapters、contract tests | B0～B5/ARCH1 | 架构审查 | 已验收：Application反向导入=0并有AST门禁；具体实现仅由组合根注入 |
 | NFR-08 可访问性 | 已批准前端、真实 aria-live 事件 | B5/ACC1 | AC-11 | 自动化通过：三视口15/15完整键盘任务与Playwright 14/14；真实NVDA完整用户任务待验 |
 | NFR-09 磁盘 | HealthAggregator、RetentionService | B0/B4 | AC-10/12 | 已验收：低水位禁止缓存、保留清理和数据生命周期PASS |
 | NFR-10 许可证 | ModelRegistry、release manifest | B0/B5 | 发布审查 | 已验收：7模型hash/来源/许可证冻结；商业用途因Wav2Lip为No-Go |

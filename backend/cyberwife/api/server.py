@@ -55,7 +55,8 @@ from cyberwife.infrastructure.structured_logger import StructuredLogger  # noqa:
 
 
 # ADR-006 修订后默认资产根（Windows 端）
-DEFAULT_ASSETS_ROOT = Path("/home/administrator/.cyberWife/assets")
+DEFAULT_DATA_ROOT = Path.home() / ".cyberWife"
+DEFAULT_ASSETS_ROOT = DEFAULT_DATA_ROOT / "assets"
 
 
 def _probe_tts(tts, logical_id: str, reference_audio: str, reference_text: str) -> dict:
@@ -92,7 +93,7 @@ def main() -> None:
     repo_root = _REPO_ROOT
     runtime = load_runtime_config(repo_root, Path(normalize_local_path(args.config)))
     paths = runtime.get("paths", {})
-    data_root = Path(paths.get("data_root", "/home/administrator/.cyberWife"))
+    data_root = Path(paths.get("data_root", DEFAULT_DATA_ROOT))
     assets_root = Path(args.assets_root or paths.get("assets_root", DEFAULT_ASSETS_ROOT))
     configured_db = runtime.get("db", {}).get("path")
     if configured_db == "/mnt/cw-data/cyberwife.db" and str(data_root) != "/mnt/cw-data":
@@ -145,9 +146,13 @@ def main() -> None:
     if tts_entry is None:
         raise SystemExit(f"TTS registry entry is required: {configured_tts}")
     if configured_tts == "cosyvoice2-0.5b":
+        cosyvoice_source = os.environ.get(
+            "CW_COSYVOICE_SOURCE_DIR",
+            paths.get("cosyvoice_source", str(DEFAULT_DATA_ROOT / "src" / "CosyVoice")),
+        )
         tts = CosyVoiceTtsAdapter(
             tts_entry.absolute_path,
-            source_dir="/home/administrator/.cyberWife/src/CosyVoice",
+            source_dir=cosyvoice_source,
             fp16=True,
             stream=True,
             load_trt=cosyvoice_load_trt,
