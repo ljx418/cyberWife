@@ -39,7 +39,7 @@
 | NFR-05 删除一致性 | MemoryService、SQLite transaction | B4 | AC-08 | 已验收：源记录、FTS、向量与召回原子归零PASS |
 | NFR-06 可观测/脱敏 | StructuredLogger、RuntimeMetrics、audit_v1_completion | B1/B2.5/B5/V1FINAL | AC-04/12/13/VF-AC09 | trace/generation/分段计量与日志脱敏PASS；最终总门逐文件复算发布SHA，只输出状态码，不复制私人报告正文 |
 | NFR-07 分层/替换 | ports/adapters、contract tests | B0～B5/ARCH1 | 架构审查 | 已验收：Application反向导入=0并有AST门禁；具体实现仅由组合根注入 |
-| NFR-08 可访问性 | 已批准前端、真实 aria-live 事件 | B5/ACC1 | AC-11 | 自动化通过：三视口15/15完整键盘任务与Playwright 15/15；真实Narrator完整用户任务待验 |
+| NFR-08 可访问性 | 已批准前端、真实 aria-live 事件 | B5/ACC1 | AC-11 | 自动化通过：三视口15/15完整键盘任务与当前Playwright 16/16；真实Narrator完整用户任务待验 |
 | NFR-09 磁盘 | HealthAggregator、RetentionService | B0/B4 | AC-10/12 | 已验收：低水位禁止缓存、保留清理和数据生命周期PASS |
 | NFR-10 许可证 | ModelRegistry、release manifest | B0/B5/UX4 | 发布审查 | 7个实时模型hash/来源/许可证冻结；10个离线形象模型纳入ComfyUI保留索引与安装前检；商业用途因Wav2Lip为No-Go |
 

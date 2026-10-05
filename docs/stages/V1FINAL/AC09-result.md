@@ -11,4 +11,4 @@
 - 已验收`prototype/dist`纳入Git发布，干净clone离线安装不再依赖npm registry或预热缓存。
 - 四组总门合同测试：全PASS、缺报告PENDING、源码/revision过期FAIL、恶意字段失败关闭。
 
-当前自动化回归全绿。当前正式总门预期只能是PENDING，因为`human-gate.json`与独立新环境`INST1-AC06.json`尚未同时存在；这两个外部事实不会由聚合器伪造。
+当前自动化回归全绿（Backend 361/5 skipped、根31、Avatar13、Playwright16、现场核心3）。当前正式总门预期只能是PENDING，因为`human-gate.json`与独立新环境`INST1-AC06.json`尚未同时存在；这两个外部事实不会由聚合器伪造。

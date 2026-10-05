@@ -25,7 +25,7 @@
 | UX8 | MACHINE PASS / WAIT USER RETEST | 保守普通话词形归一、全文/segment一致、中文空格清理、900ms句中停顿；真实ASR 3/3、四进程E2E 3/3、Playwright 16/16 | 用户用物理麦克风复验普通话字幕与自然停顿；不得由fixture代签 |
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
-| ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；Playwright 15/15；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
+| ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；当前Playwright 16/16；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
 | INST1 | CONDITIONAL | 便携安装入口、隔离venv与7.5GB wheelhouse通过；AC06R消除开发机模型路径/私有音色/缺省Avatar隐式依赖，本地制品准备、当前机迁移、真实启动/Avatar恢复/双停PASS；执行器含双身份拒绝和五项干净前置 | 全新Windows用户+干净WSL+GPU驱动+离线制品清单上执行正式accept |
 | V1FINAL | DEVELOPED / WAIT LIVE RUN | headed Chrome取证器绑定当前Git revision；AC09最终总门逐文件复核完整发布源码、现场门和干净机门，缺报告只返回PENDING且不能冒签 | 需用户在窗口可被占用时执行一次现场门；干净机仍独立 |
 

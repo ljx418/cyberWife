@@ -11,7 +11,8 @@
 - 人工仅判断Narrator五任务、口型同步、嘴部自然、Idle自然及停止后体验；自然度低于4/5直接失败。
 - 报告只记录路由元数据、计数和布尔/评分，不保存原始音频、字幕或回答正文。
 - Windows Node与WSL Node核心单测均3/3通过；AC06R后安装合同11/11、制品准备器3/3、焦点保护、Node语法和PowerShell AST通过。
-- AC06R后全量不抢焦点回归：后端358 passed/5 skipped；根27 passed；Avatar13 passed；前端build、Playwright15 passed；取证核心3/3。
+- UX8后当前全量不抢焦点回归：后端361 passed/5 skipped；根31 passed；Avatar13 passed；前端build、Playwright16 passed；取证核心3/3。
+- UX8真实四进程授权PCM 3/3通过，普通话词形归一与900ms句中停顿机器门通过；物理麦克风主观复验并入本阶段现场门，不由fixture代签。
 - AC09新增最终总门：现场报告绑定Git revision，发布冻结补齐Workers/Migrations/现场核心并只收跟踪文件；总门重新核验三门细项而非只信顶层PASS。AC09后根回归31 passed。
 - PRD、架构、计划、验收、追踪矩阵、命令清单、全局状态和8页Draw.io已同步当前事实。
 

@@ -12,6 +12,6 @@ AC06初版执行器在外部审查前的深层白盒复核中暴露三项真实�
 - Gateway/RuntimeLauncher：bootstrap参考音频与Avatar恢复；旧仓库私有音频硬编码已删除。
 - 当前开发机：依据已有同意记录做私有迁移，真实启动四组件、Avatar恢复、双停和端口归零通过。
 
-自动化证据：后端358 passed/5 skipped；根27 passed；Avatar13 passed；前端生产构建与Playwright15 passed；V1FINAL核心3 passed；PowerShell AST与XML/差异检查通过。
+当前候选自动化证据：后端361 passed/5 skipped；根31 passed；Avatar13 passed；前端生产构建与Playwright16 passed；V1FINAL核心3 passed；PowerShell AST与XML/差异检查通过。
 
 唯一未完成项仍是外部事实：需要新的Windows SID、新WSL machine-id、初始无数据根/venv/runtime config/本机注册表的环境，使用离线wheelhouse和私有制品清单执行正式accept。
