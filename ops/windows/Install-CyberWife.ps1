@@ -179,6 +179,9 @@ tts = "cosyvoice2-0.5b"
     }
     $frontendIndex = Join-Path $WorkspaceWin 'prototype\dist\index.html'
     if (-not $SkipFrontendBuild -and -not (Test-Path -LiteralPath $frontendIndex)) {
+        if ($DependencyMode -ne 'online' -or -not $AllowNetworkInstall) {
+            throw 'production frontend is missing; offline prepare never runs npm ci (restore the tracked prototype/dist release)'
+        }
         $npm = Get-Command npm.cmd -ErrorAction SilentlyContinue
         if (-not $npm) { throw 'npm.cmd is required to build the missing frontend release' }
         if ($PSCmdlet.ShouldProcess((Join-Path $WorkspaceWin 'prototype'), 'build production frontend')) {

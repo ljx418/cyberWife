@@ -6,6 +6,12 @@ export type InputAudioSnapshot = {
   activeTracks: number;
   contextState: AudioContextState | "closed";
   lastError: string | null;
+  boundary: {
+    capturing: boolean;
+    voicedFrames: number;
+    silentFrames: number;
+    hangoverMs: number;
+  };
 };
 
 export type InputAudioCallbacks = {
@@ -14,6 +20,48 @@ export type InputAudioCallbacks = {
   onUtteranceEnd: () => void;
   onError: (error: Error) => void;
 };
+
+export const INPUT_VOICE_RMS_THRESHOLD = 0.012;
+export const INPUT_ONSET_FRAMES = 3; // 60 ms at the 20 ms PCM contract.
+export const INPUT_HANGOVER_FRAMES = 45; // 900 ms: preserve natural clause pauses.
+
+export class UtteranceBoundaryDetector {
+  private capturing = false;
+  private voicedFrames = 0;
+  private silentFrames = 0;
+
+  observe(voiced: boolean, acceptStart: () => boolean): "start" | "end" | null {
+    if (!this.capturing) {
+      this.voicedFrames = voiced ? this.voicedFrames + 1 : 0;
+      if (this.voicedFrames < INPUT_ONSET_FRAMES) return null;
+      this.voicedFrames = 0;
+      if (!acceptStart()) return null;
+      this.capturing = true;
+      this.silentFrames = 0;
+      return "start";
+    }
+    this.silentFrames = voiced ? 0 : this.silentFrames + 1;
+    if (this.silentFrames < INPUT_HANGOVER_FRAMES) return null;
+    this.capturing = false;
+    this.silentFrames = 0;
+    return "end";
+  }
+
+  snapshot() {
+    return {
+      capturing: this.capturing,
+      voicedFrames: this.voicedFrames,
+      silentFrames: this.silentFrames,
+      hangoverMs: INPUT_HANGOVER_FRAMES * 20,
+    };
+  }
+
+  reset(): void {
+    this.capturing = false;
+    this.voicedFrames = 0;
+    this.silentFrames = 0;
+  }
+}
 
 const WORKLET_SOURCE = `
 class CyberWifePcmInput extends AudioWorkletProcessor {
@@ -62,9 +110,7 @@ export class InputAudioSessionController {
   private silentGain: GainNode | null = null;
   private callbacks: InputAudioCallbacks | null = null;
   private preroll: ArrayBuffer[] = [];
-  private capturing = false;
-  private voicedFrames = 0;
-  private silentFrames = 0;
+  private boundary = new UtteranceBoundaryDetector();
   private emittedFrames = 0;
   private lastError: string | null = null;
   private state: InputAudioSnapshot["state"] = "stopped";
@@ -113,30 +159,26 @@ export class InputAudioSessionController {
   }
 
   private consumeFrame(pcm: ArrayBuffer, rms: number): void {
-    // Roughly 200 ms pre-roll, 60 ms onset and 600 ms hangover. The backend
+    // Roughly 200 ms pre-roll, 60 ms onset and 900 ms hangover. The backend
     // remains the authoritative ASR/VAD; this detector only creates utterance boundaries.
-    const voiced = rms >= 0.012;
-    if (!this.capturing) {
+    const voiced = rms >= INPUT_VOICE_RMS_THRESHOLD;
+    const wasCapturing = this.boundary.snapshot().capturing;
+    if (!wasCapturing) {
       this.preroll.push(pcm.slice(0));
       if (this.preroll.length > 10) this.preroll.shift();
-      this.voicedFrames = voiced ? this.voicedFrames + 1 : 0;
-      if (this.voicedFrames >= 3) {
-        const accepted = this.callbacks?.onUtteranceStart(this.preroll.map((frame) => frame.slice(0))) ?? false;
-        if (accepted) {
-          this.capturing = true;
-          this.state = "capturing";
-          for (const frame of this.preroll) this.emitFrame(frame);
-        }
+      const event = this.boundary.observe(
+        voiced,
+        () => this.callbacks?.onUtteranceStart(this.preroll.map((frame) => frame.slice(0))) ?? false,
+      );
+      if (event === "start") {
+        this.state = "capturing";
+        for (const frame of this.preroll) this.emitFrame(frame);
         this.preroll = [];
-        this.voicedFrames = 0;
       }
       return;
     }
     this.emitFrame(pcm);
-    this.silentFrames = voiced ? 0 : this.silentFrames + 1;
-    if (this.silentFrames >= 30) {
-      this.capturing = false;
-      this.silentFrames = 0;
+    if (this.boundary.observe(voiced, () => false) === "end") {
       this.state = "listening";
       this.callbacks?.onUtteranceEnd();
     }
@@ -160,6 +202,7 @@ export class InputAudioSessionController {
       activeTracks: this.stream?.getTracks().filter((track) => track.readyState === "live").length ?? 0,
       contextState: this.context?.state ?? "closed",
       lastError: this.lastError,
+      boundary: this.boundary.snapshot(),
     };
   }
 
@@ -169,10 +212,8 @@ export class InputAudioSessionController {
     this.stream = null;
     this.context = null;
     this.callbacks = null;
-    this.capturing = false;
+    this.boundary.reset();
     this.preroll = [];
-    this.voicedFrames = 0;
-    this.silentFrames = 0;
     this.worklet?.disconnect();
     this.silentGain?.disconnect();
     this.worklet = null;

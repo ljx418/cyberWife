@@ -37,7 +37,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
-| VAD/ASR | SpeechRuntime真实进程与20轮final合同通过 | 保持流式输入与不落盘 | 已开发/已验收（B1） |
+| VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发/机器验收；物理麦克风复验待签 |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
 | Avatar | H.264/WebCodecs全链、打断清队列、降级/恢复与长稳态通过；UX5 A/V量化及用户视觉批准已完成 | 保持动态形象逐素材人工确认门 | 已开发/已验收 |
@@ -45,7 +45,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
-| 验收 | 当前回归：后端358 passed/5 skipped、根27/27、Avatar13/13、Playwright15/15、V1FINAL核心3/3；AC06R本机真实四组件启动、Avatar恢复、双停归零通过；V1RC1 60分钟20完整+10打断通过 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator；另机关闭干净安装 | 条件阻断 |
+| 验收 | V1FINAL现场报告绑定Git revision；AC09总门复算完整Backend/Prototype/Workers/Migrations/Ops/Docs/Config源码、依赖、前端和证据SHA，并校验现场/干净机报告同提交 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator；另机关闭干净安装 | 聚合器已开发/两份外部报告待生成 |
 
 ## 3. 目标代码实体
 

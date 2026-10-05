@@ -22,6 +22,10 @@ if (-not $node) { throw 'Windows node.exe is required for the Playwright evidenc
 $repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $collector = Join-Path $repoRoot 'prototype\tests\acc1_human_gate.mjs'
 if (-not (Test-Path -LiteralPath $collector -PathType Leaf)) { throw "Collector missing: $collector" }
+$workspaceRevision = ((& git.exe -C $repoRoot rev-parse HEAD 2>$null) | Out-String).Trim().ToLowerInvariant()
+if ($LASTEXITCODE -ne 0 -or $workspaceRevision -notmatch '^[a-f0-9]{40,64}$') { throw 'current Git revision is unavailable' }
+$trackedChanges = ((& git.exe -C $repoRoot status --porcelain --untracked-files=no 2>$null) | Out-String).Trim()
+if ($LASTEXITCODE -ne 0 -or $trackedChanges) { throw 'tracked workspace files must be clean before the live gate' }
 
 $healthUris = @(
     'http://127.0.0.1:8090/health',
@@ -54,6 +58,7 @@ try {
     & $node $collector `
         --no-fake-media `
         --operator $Operator `
+        --workspace-revision $workspaceRevision `
         --url "$($Url.TrimEnd('/'))/?preview=1" `
         --chrome-path $ChromePath `
         --output $ReportPath

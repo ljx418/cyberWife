@@ -298,3 +298,31 @@ test('Avatar 停止或降级后透明画布让写真立即恢复而非黑屏', a
   expect(result.degraded).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'static_fallback' })
   expect(result.stopped).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'stopped' })
 })
+
+test('麦克风端点保留九百毫秒以内的自然句中停顿', async ({ page }) => {
+  await page.goto('/?preview=1')
+  const result = await page.evaluate(async () => {
+    const {
+      INPUT_HANGOVER_FRAMES,
+      UtteranceBoundaryDetector,
+    } = await import('/src/services/InputAudioSession.ts')
+    const detector = new UtteranceBoundaryDetector()
+    const events: Array<string | null> = []
+    for (let index = 0; index < 3; index += 1) {
+      events.push(detector.observe(true, () => true))
+    }
+    for (let index = 0; index < INPUT_HANGOVER_FRAMES - 1; index += 1) {
+      events.push(detector.observe(false, () => true))
+    }
+    const beforeBoundary = detector.snapshot()
+    const boundaryEvent = detector.observe(false, () => true)
+    return { events, beforeBoundary, boundaryEvent, hangover: INPUT_HANGOVER_FRAMES }
+  })
+
+  expect(result.hangover).toBe(45)
+  expect(result.events.filter((event) => event === 'start')).toHaveLength(1)
+  expect(result.events).not.toContain('end')
+  expect(result.beforeBoundary.capturing).toBe(true)
+  expect(result.beforeBoundary.silentFrames).toBe(44)
+  expect(result.boundaryEvent).toBe('end')
+})

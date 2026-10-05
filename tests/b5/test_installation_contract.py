@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 
@@ -21,6 +22,14 @@ def test_installer_requires_explicit_network_consent_and_checks_avatar_workflows
     assert "comfy.avatar_pipeline" in script
     assert "comfy_avatar_frontalize_api.json" in script
     assert "comfy_avatar_idle_api.json" in script
+    assert (ROOT / "prototype/dist/index.html").is_file()
+    assert "prototype/dist/" not in (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert subprocess.run(
+        ["git", "-C", str(ROOT), "ls-files", "--error-unmatch", "prototype/dist/index.html"],
+        capture_output=True,
+    ).returncode == 0
+    assert "offline prepare never runs npm ci" in script
+    assert "$DependencyMode -ne 'online' -or -not $AllowNetworkInstall" in script
 
 
 def test_runtime_uses_controlled_speech_python():
@@ -116,6 +125,10 @@ def test_acc1_machine_collector_proves_real_turns_without_storing_content():
     assert "text_final" not in source
     assert "text_delta" not in source
     assert "audio_chunk_b64" not in source
+    wrapper = (ROOT / "ops/acceptance/Invoke-ACC1HumanGate.ps1").read_text(encoding="utf-8")
+    assert "workspace-revision" in wrapper
+    assert "status --porcelain --untracked-files=no" in wrapper
+    assert "workspace_revision" in source
 
 
 def test_inst1_clean_machine_gate_rejects_development_identity_and_requires_offline_lifecycle():

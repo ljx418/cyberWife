@@ -96,6 +96,16 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 
 身份任一相同、数据根/venv/config/本机注册表任一预存在、Git跟踪文件不干净、离线清单/本地制品清单或源码revision不可用时均在安装/启动前失败。正式报告必须绑定workspace revision、wheelhouse manifest SHA256、本地制品清单SHA256和CosyVoice revision，并通过start×2/status/recover/stop×2；当前机负例不能关闭AC06。
 
-## 8. 实现前检查
+## 8. V1FINAL-AC09最终总门
+
+现场门与独立干净机门均执行后，在产生干净机报告的Windows用户中运行：
+
+```powershell
+.\ops\acceptance\Invoke-V1CompletionAudit.ps1
+```
+
+工具逐文件复算当前发布冻结的源码、依赖、前端工件与既有证据，并要求现场/干净机报告的workspace revision等于当前HEAD。缺报告返回`PENDING`/退出2，哈希、字段或revision不符返回`FAIL`/退出1，只有三门全PASS返回0。聚合报告不保存操作者、身份哈希、对话/音频或私有路径。
+
+## 9. 实现前检查
 
 进入每个子阶段前，负责 Agent 必须先创建本阶段 runner 的合同测试与证据 schema，再实现产品功能。若实际环境无法提供本清单中的采样源，只能返回计划阶段修订，不能删减证据项或降低硬门。

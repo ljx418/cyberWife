@@ -18,6 +18,12 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path]:
         _write(tmp_path / name, "locked\n")
     _write(tmp_path / "prototype/dist/index.html", "<main>release</main>\n")
     _write(tmp_path / "backend/app.py", "VERSION = 1\n")
+    _write(tmp_path / "workers/avatar/runtime.py", "AVATAR = 1\n")
+    _write(tmp_path / "workers/speech_worker/runtime.py", "SPEECH = 1\n")
+    _write(tmp_path / "prototype/acceptance-tests/final.mjs", "export const gate = true\n")
+    _write(tmp_path / "migrations/0001.sql", "select 1;\n")
+    _write(tmp_path / ".gitignore", "assets/\n")
+    _write(tmp_path / "config/runtime.local.toml", 'private = "/home/private"\n')
     _write(tmp_path / "config/model-registry.local.yaml", yaml.safe_dump({
         "models": [{
             "logical_id": logical_id,
@@ -50,6 +56,15 @@ def test_manifest_is_deterministic_and_does_not_expose_private_paths(tmp_path: P
     assert first == second
     assert first["result"] == "PASS"
     assert len(first["models"]) == 7
+    frozen = {item["path"] for item in first["sources"]}
+    assert {
+        "workers/avatar/runtime.py",
+        "workers/speech_worker/runtime.py",
+        "prototype/acceptance-tests/final.mjs",
+        "migrations/0001.sql",
+        ".gitignore",
+    }.issubset(frozen)
+    assert "config/runtime.local.toml" not in frozen
     serialized = json.dumps(first)
     assert "C:\\\\private" not in serialized
     assert str(tmp_path) not in serialized

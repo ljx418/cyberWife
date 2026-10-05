@@ -19,6 +19,7 @@ function parseArgs(argv) {
 const args = parseArgs(process.argv.slice(2))
 if (!args.noFakeMedia) throw new Error('--no-fake-media is required for the physical microphone gate')
 if (!args.operator?.trim()) throw new Error('--operator is required')
+if (!/^[a-f0-9]{40,64}$/.test(args['workspace-revision'] || '')) throw new Error('--workspace-revision is required')
 if (!args.output) throw new Error('--output is required')
 
 const pageUrl = args.url || 'http://127.0.0.1:7860/?preview=1'
@@ -188,6 +189,7 @@ try {
     started_at: startedAt,
     completed_at: new Date().toISOString(),
     operator: args.operator.trim(),
+    workspace_revision: args['workspace-revision'],
     browser: { product: 'installed Google Chrome', version: await context.browser()?.version() },
     page_origin: new URL(pageUrl).origin,
     screen_reader: 'Windows Narrator',
@@ -225,6 +227,7 @@ try {
     started_at: startedAt,
     completed_at: new Date().toISOString(),
     operator: args.operator?.trim() || '',
+    workspace_revision: args['workspace-revision'] || '',
     stores_raw_audio: false,
     stores_transcript_or_reply_content: false,
     result: 'ERROR',

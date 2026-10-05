@@ -3,7 +3,7 @@
 
 # ── prototype 脚手架产物 ─────────────────────────────────
 prototype/node_modules/
-prototype/dist/
+# V1离线安装必须携带已验收的生产前端；prototype/dist为发布工件，纳入Git。
 prototype/*.tsbuildinfo
 prototype/test-results/
 prototype/playwright-report/

@@ -28,6 +28,8 @@
 - 前端：production build PASS，Playwright 15 passed。
 - PowerShell AST、Draw.io 8页XML、diff whitespace检查：PASS。
 
+后续AC09补强冻结器覆盖范围为全部受管`backend/`、`prototype/`、`workers/`、`ops/`、`tests/`、`docs/`、`config/`、`migrations/`及根启动/停止/README/.gitignore；Git忽略的本机注册表、runtime配置和私有制品清单不会进入冻结。历史计数保留为RC1当时证据，当前回归以V1FINAL结果为准。
+
 ## V1FINAL接续
 
 V1RC1之后已建立`docs/stages/V1FINAL/`。Narrator、结构化物理麦克风和UX6当前Crop V2感知统一由headed Chrome现场验收器处理：机器自动绑定PCM、三轮、打断、接续、active avatar和Idle，人类只签读屏/口型自然度，且报告不保存正文或音频。干净Windows+WSL整机安装仍是独立开放门；没有现场/新环境证据不得冒签。

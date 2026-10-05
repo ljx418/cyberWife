@@ -37,6 +37,8 @@ cd C:\workSpace\cyberWife
 
 默认`-DependencyMode none`，不发生依赖下载。在线模式没有`-AllowNetworkInstall`会立即失败；离线模式只从指定wheelhouse解析。两种模式都执行`pip check`。
 
+V1发布仓库直接携带已验收的`prototype/dist`。离线prepare发现该目录缺失或损坏时立即失败并要求恢复Git工件，绝不会静默执行`npm ci`；只有显式`DependencyMode=online + AllowNetworkInstall`才允许重建缺失前端。
+
 ### 独立干净环境总验收
 
 先在开发机只读获取两个拒绝哈希（不要把输出提交到Git）：
@@ -102,3 +104,19 @@ python3 ops/data_lifecycle.py clear-data --help
 ## 7. 验收边界
 
 当前目标机`verify`13/13、真实start/status/Avatar recover/stop×2均通过。真正的“干净机安装PASS”还必须在新的Windows用户或干净VM+WSL执行本页全流程；当前机器的成功不能替代该证据。
+
+在四组件健康、用户已知悉Chrome/Narrator将抢占焦点时，从Windows PowerShell执行现场门：
+
+```powershell
+.\ops\acceptance\Invoke-ACC1HumanGate.ps1 -AcceptFocusChange -Operator "验收人姓名"
+```
+
+缺少焦点授权时必须在打开窗口前失败。现场报告绑定当前干净Git revision，不保存音频、字幕或回答正文。
+
+现场门与独立干净机门均完成后，在生成干净机报告的Windows用户中执行：
+
+```powershell
+.\ops\acceptance\Invoke-V1CompletionAudit.ps1
+```
+
+该只读总门要求发布冻结、现场报告和干净机报告属于同一Git revision，并逐文件复算受管源码、依赖、前端和证据SHA。退出0才代表个人/研究用途V1全绿；退出2表示外部报告仍缺失，退出1表示报告失败、过期或与当前代码不一致。

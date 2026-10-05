@@ -39,10 +39,10 @@ AVATAR_WORKFLOW_MODELS = {
 }
 WORKFLOW_MODELS = ACTIVE_MODELS | AVATAR_WORKFLOW_MODELS
 
-SOURCE_ROOTS = ("backend", "prototype/src", "prototype/tests", "ops", "tests", "docs", "config")
+SOURCE_ROOTS = ("backend", "prototype", "workers", "ops", "tests", "docs", "config", "migrations")
 SOURCE_SUFFIXES = {
     ".cmd", ".css", ".drawio", ".html", ".js", ".json", ".md", ".mjs",
-    ".ps1", ".py", ".svg", ".toml", ".ts", ".tsx", ".yaml", ".yml",
+    ".ps1", ".py", ".sql", ".svg", ".toml", ".ts", ".tsx", ".yaml", ".yml",
 }
 EXCLUDED_PARTS = {
     ".git", ".pytest_cache", "__pycache__", "audit", "assets", "dist",
@@ -57,7 +57,11 @@ DEPENDENCY_FILES = (
     "workers/avatar/requirements-cyberwife-v1.txt",
     "workers/avatar/requirements-runtime-cu128.txt",
 )
-ROOT_SOURCE_FILES = ("Start-cyberWife.cmd", "Stop-cyberWife.cmd", "README.md")
+ROOT_SOURCE_FILES = ("Start-cyberWife.cmd", "Stop-cyberWife.cmd", "README.md", ".gitignore")
+LOCAL_SOURCE_NAMES = {
+    "model-registry.local.yaml", "runtime.local.toml",
+    "local-artifacts.local.json", "local-artifacts.private.json",
+}
 EVIDENCE_FILES = (
     "audit/v1/INST1/isolated-runtime-result.json",
     "audit/v1/INST1/offline-install-result.json",
@@ -99,18 +103,30 @@ def record(path: Path, workspace: Path) -> dict[str, Any]:
 
 def collect_sources(workspace: Path) -> list[dict[str, Any]]:
     files: set[Path] = set()
-    for root_name in SOURCE_ROOTS:
-        root = workspace / root_name
-        if not root.exists():
-            continue
-        for path in root.rglob("*"):
-            if (
-                path.is_file()
-                and path.suffix.lower() in SOURCE_SUFFIXES
-                and not EXCLUDED_PARTS.intersection(path.relative_to(workspace).parts)
-                and path.name != "model-registry.local.yaml"
-            ):
-                files.add(path)
+    tracked: list[Path] | None = None
+    if (workspace / ".git").exists():
+        result = subprocess.run(
+            ["git", "-C", str(workspace), "ls-files", "-z"],
+            capture_output=True,
+        )
+        if result.returncode == 0:
+            tracked = [workspace / value.decode("utf-8") for value in result.stdout.split(b"\0") if value]
+    candidates = tracked if tracked is not None else [
+        path for root_name in SOURCE_ROOTS
+        if (workspace / root_name).exists()
+        for path in (workspace / root_name).rglob("*")
+    ]
+    for path in candidates:
+        relative = path.relative_to(workspace)
+        in_source_root = any(relative.parts and relative.parts[0] == root for root in SOURCE_ROOTS)
+        if (
+            in_source_root
+            and path.is_file()
+            and path.suffix.lower() in SOURCE_SUFFIXES
+            and not EXCLUDED_PARTS.intersection(relative.parts)
+            and path.name not in LOCAL_SOURCE_NAMES
+        ):
+            files.add(path)
     for name in ROOT_SOURCE_FILES:
         path = workspace / name
         if path.is_file():

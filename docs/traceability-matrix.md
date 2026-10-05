@@ -14,7 +14,7 @@
 | FR-05 声音资产/试听 | AssetStore、CosyVoiceAdapter、QwenTtsAdapter | B0/B2 | AC-02 | 已实现并验收：授权声音真实Cosy试听、版本切换、Qwen显式回退PASS |
 | FR-06 人设持久化 | Profile domain、SqliteRepository、PromptCompiler | B0/B1 | AC-01/11 | 已实现并验收：完整字段、乐观并发409、历史快照和重启一致PASS |
 | FR-07 六态状态机 | ConversationOrchestrator、TurnPipeline | B1/B3 | AC-03/11 | 已实现并验收：真实事件链、状态播报与打断状态转换PASS |
-| FR-08 连续对话 | ApiGateway、SpeechRuntime、TurnPipeline、各 adapter | B1/B2/B2.5/B3 | AC-03/04 | 已实现并验收：20/20连续链、普通链30/30及60分钟组合PASS |
+| FR-08 连续对话 | ApiGateway、SpeechRuntime、TurnPipeline、MandarinTranscriptNormalizer、UtteranceBoundaryDetector、各 adapter | B1/B2/B2.5/B3/UX8 | AC-03/04/UX8-AC01～07 | 主链已验收：20/20连续链、普通链30/30及60分钟组合PASS；UX8普通话归一/900ms句中停顿机器PASS，物理麦克风复验待签 |
 | FR-09 插话取消 | InterruptionController、CancellationToken | B3 | AC-05 | 已实现并验收：早/中/晚30/30，旧generation零泄漏PASS |
 | FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、AvatarSession | B2/UX5/UX6/V1FINAL | AC-06/VF-AC05/06 | 功能/性能通过：Chrome媒体25fps、三轮降级≤0.54秒、音频继续、原页恢复、A/V机器量化与Crop V2激活通过；当前人物自然度现场评分待签 |
 | FR-11 设置持久化 | Gateway application services、repositories | B0/B4/B5 | AC-01/02/08 | 已实现并验收：六页签真实API与跨重启持久化PASS |
@@ -37,7 +37,7 @@
 | NFR-03 稳定性 | 有界队列、Launcher、Health | B3/B5/RES1 | AC-03/12/14 | 已验收：60分钟20完整+10打断、资源与趋势门、恢复、stop×2均PASS |
 | NFR-04 本机隐私 | persistence policy、loopback、privacy scan | B4/B5 | AC-09/13 | 已验收：原始音频/允许集外连接/敏感日志命中均0 |
 | NFR-05 删除一致性 | MemoryService、SQLite transaction | B4 | AC-08 | 已验收：源记录、FTS、向量与召回原子归零PASS |
-| NFR-06 可观测/脱敏 | StructuredLogger、RuntimeMetrics | B1/B2.5/B5 | AC-04/12/13 | 已验收：trace/generation/分段计量完整，日志脱敏PASS |
+| NFR-06 可观测/脱敏 | StructuredLogger、RuntimeMetrics、audit_v1_completion | B1/B2.5/B5/V1FINAL | AC-04/12/13/VF-AC09 | trace/generation/分段计量与日志脱敏PASS；最终总门逐文件复算发布SHA，只输出状态码，不复制私人报告正文 |
 | NFR-07 分层/替换 | ports/adapters、contract tests | B0～B5/ARCH1 | 架构审查 | 已验收：Application反向导入=0并有AST门禁；具体实现仅由组合根注入 |
 | NFR-08 可访问性 | 已批准前端、真实 aria-live 事件 | B5/ACC1 | AC-11 | 自动化通过：三视口15/15完整键盘任务与Playwright 15/15；真实Narrator完整用户任务待验 |
 | NFR-09 磁盘 | HealthAggregator、RetentionService | B0/B4 | AC-10/12 | 已验收：低水位禁止缓存、保留清理和数据生命周期PASS |

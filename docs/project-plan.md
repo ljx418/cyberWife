@@ -3,7 +3,7 @@
 **版本**：3.2
 **日期**：2026-10-06
 
-**状态**：B0～B5、B2.5、ARCH1、RES1及V1RC1自动化门完成；V1FINAL正在关闭Narrator、物理麦克风与UX6人审，干净机安装仍为独立外部门
+**状态**：B0～B5、B2.5、ARCH1、RES1及V1RC1自动化门完成；UX8普通话字幕/自然停顿机器门通过；V1FINAL正在关闭Narrator、物理麦克风与UX6/UX8人审，干净机安装仍为独立外部门
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
 ## 1. 项目现状
@@ -49,7 +49,8 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | B4 | 记忆可查改删且支持不记录 | MemoryService、RetentionService、Repository | B3 Pass | 删除0召回；不记录0写入 |
 | B5 | 本机边界、一键、故障恢复后形成候选版 | 所有后端实体、验收工具 | B3+B4 Pass | AC-01～14 全 Pass；P0/P1=0 |
 | UX4 | 用户在引导内把照片稳定生成并启用为动态人物 | AvatarAssetService、avatar_idle_pipeline、Onboarding | 三张工作流样片获人工批准 | UX4-AC01～08 Pass；未确认不替换；四服务恢复 |
-| V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据 | Invoke-ACC1HumanGate、Playwright事件取证器 | V1RC1自动化PASS | VF-AC01～07；INST1-AC06仍须独立新环境 |
+| UX8 | 普通话字幕不再保留粤语特有词形，句中自然停顿不被过早截断 | MandarinTranscriptNormalizer、UtteranceBoundaryDetector | 用户真实交互反馈 | UX8-AC01～06机器PASS；AC07物理麦克风待签 |
+| V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据；AC09拒绝跨版本或缺门报告 | Invoke-ACC1HumanGate、Playwright事件取证器、audit_v1_completion | V1RC1自动化PASS | VF-AC01～09；INST1-AC06R仍须独立新环境 |
 
 ## 5. 每阶段交付包
 
