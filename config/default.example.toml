@@ -25,6 +25,9 @@ wal           = true
 cache_size_kb = 2048
 synchronous   = "NORMAL"
 
+[bootstrap]
+manifest      = "/mnt/cw-data/bootstrap/manifest.json"
+
 [models]
 vad           = "silero-vad-v5"
 asr           = "faster-whisper-large-v3-turbo"

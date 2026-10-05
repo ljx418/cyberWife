@@ -15,6 +15,7 @@ param(
     [string]$LlamaModelPath = 'C:\ComfyUI-aki-v2\ComfyUI\models\LLM\Qwen3-14B-Q4_K_M.gguf',
     [string]$AvatarModelWsl = '/mnt/c/ComfyUI-aki-v2/ComfyUI/models/Audio/wav2lip/wav2lip.pth',
     [string]$ComfyRootWsl = '/mnt/c/ComfyUI-aki-v2/ComfyUI',
+    [string]$ArtifactManifestWsl = '',
     [switch]$SkipFrontendBuild,
     [string]$ReportPath = ''
 )
@@ -135,6 +136,9 @@ logs_root = "$dataRoot/logs"
 salt_file = "$dataRoot/audit/.salt"
 cosyvoice_source = "$dataRoot/src/CosyVoice"
 
+[bootstrap]
+manifest = "$dataRoot/bootstrap/manifest.json"
+
 [db]
 path = "$dataRoot/cyberwife.db"
 wal = true
@@ -161,6 +165,17 @@ tts = "cosyvoice2-0.5b"
         }
         Install-WslRuntime $coreVenv $coreRequirements 'core'
         Install-WslRuntime $avatarVenv $avatarRequirements 'avatar'
+    }
+    if ($ArtifactManifestWsl -and $PSCmdlet.ShouldProcess($dataRoot, 'validate and publish offline local artifacts')) {
+        if (-not (Test-WslPath $ArtifactManifestWsl 'f')) { throw 'ArtifactManifestWsl does not exist' }
+        $artifactPython = if (Test-WslPath "$coreVenv/bin/python" 'x') { "$coreVenv/bin/python" } else { $PythonWsl }
+        Invoke-Wsl @(
+            $artifactPython, "$WorkspaceWsl/ops/acceptance/prepare_local_artifacts.py", 'prepare',
+            '--manifest', $ArtifactManifestWsl,
+            '--repo-root', $WorkspaceWsl,
+            '--data-root', $dataRoot,
+            '--report', "$dataRoot/audit/local-artifacts.json"
+        )
     }
     $frontendIndex = Join-Path $WorkspaceWin 'prototype\dist\index.html'
     if (-not $SkipFrontendBuild -and -not (Test-Path -LiteralPath $frontendIndex)) {
@@ -190,6 +205,15 @@ if ($wslCommand -and $WslHome) {
     Add-Check 'wsl.avatar_model' (Test-WslPath $AvatarModelWsl 'f') $AvatarModelWsl
     Add-Check 'release.frontend' (Test-WslPath "$WorkspaceWsl/prototype/dist/index.html" 'f') "$WorkspaceWsl/prototype/dist/index.html"
     Add-Check 'release.model_registry' (Test-WslPath "$WorkspaceWsl/config/model-registry.local.yaml" 'f') "$WorkspaceWsl/config/model-registry.local.yaml"
+    if ($ArtifactManifestWsl) {
+        $artifactPython = if (Test-WslPath "$coreVenv/bin/python" 'x') { "$coreVenv/bin/python" } else { $PythonWsl }
+        $savedPreference = $ErrorActionPreference
+        $ErrorActionPreference = 'Continue'
+        & wsl.exe -- $artifactPython "$WorkspaceWsl/ops/acceptance/prepare_local_artifacts.py" verify --repo-root $WorkspaceWsl --data-root $dataRoot --report "$dataRoot/audit/local-artifacts.json" 2>$null
+        $artifactExit = $LASTEXITCODE
+        $ErrorActionPreference = $savedPreference
+        Add-Check 'release.local_artifacts' ($artifactExit -eq 0) "$dataRoot/bootstrap/manifest.json"
+    }
     Add-Check 'release.avatar_workflows' ((Test-WslPath "$WorkspaceWsl/ops/comfy_avatar_frontalize_api.json" 'f') -and (Test-WslPath "$WorkspaceWsl/ops/comfy_avatar_idle_api.json" 'f')) 'frontal + idle API workflows'
     $comfyFiles = @(
         'main.py',

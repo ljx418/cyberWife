@@ -10,7 +10,7 @@
 
 前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
 
-V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。UX5/ARCH1/RES1已关闭A/V机器量化、架构分层和AC-14资源红项；V1RC1又以当前代码重跑普通链、打断与60分钟组合。V1FINAL把原纯人工签字脚本升级为不保存正文/音频的headed Chrome机器取证器，人工只处理Narrator与口型/Idle感知。全新Windows用户+干净WSL+驱动/工件整机复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
+V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。UX5/ARCH1/RES1已关闭A/V机器量化、架构分层和AC-14资源红项；V1RC1又以当前代码重跑普通链、打断与60分钟组合。V1FINAL把原纯人工签字脚本升级为不保存正文/音频的headed Chrome机器取证器；INST1-AC06R以经授权的本地离线制品清单替代开发机硬编码模型、音色和Avatar依赖，当前机迁移及真实生命周期已通过。两者仍分别需要用户现场和真实新环境运行；商业发布继续被Wav2Lip ResearchOnly阻断。
 
 ## 2. 固定边界
 

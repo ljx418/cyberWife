@@ -10,8 +10,8 @@
 - 三轮、打断、取消后接续、PCM活动轨道、当前人物、live Canvas、Idle恢复和健康前后均由机器判断。
 - 人工仅判断Narrator五任务、口型同步、嘴部自然、Idle自然及停止后体验；自然度低于4/5直接失败。
 - 报告只记录路由元数据、计数和布尔/评分，不保存原始音频、字幕或回答正文。
-- Windows Node与WSL Node核心单测均3/3通过；安装合同9/9、焦点保护、Node语法和PowerShell AST通过。
-- 全量不抢焦点回归：后端356 passed/5 skipped；根22 passed；Avatar13 passed；前端build、Playwright15 passed。
+- Windows Node与WSL Node核心单测均3/3通过；AC06R后安装合同11/11、制品准备器3/3、焦点保护、Node语法和PowerShell AST通过。
+- AC06R后全量不抢焦点回归：后端358 passed/5 skipped；根27 passed；Avatar13 passed；前端build、Playwright15 passed；取证核心3/3。
 - PRD、架构、计划、验收、追踪矩阵、命令清单、全局状态和8页Draw.io已同步当前事实。
 
 ## 尚未执行

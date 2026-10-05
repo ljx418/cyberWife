@@ -1,7 +1,7 @@
 # INST1 阶段结果
 
 **日期**：2026-10-05
-**结论**：CONDITIONAL；INST1.1～INST1.3实现、目标机验证、全新隔离Python运行时及离线wheelhouse复现PASS，干净Windows/WSL外部环境复现未执行。
+**结论**：CONDITIONAL；INST1.1～INST1.3实现、目标机验证、全新隔离Python运行时及离线wheelhouse复现PASS；INST1-AC06R已修复可移植制品缺口并通过当前机迁移/真实运行，正式干净Windows/WSL复现尚未执行。
 
 ## 已完成
 
@@ -19,9 +19,10 @@
 - INST1.2在`/tmp`私有根从零创建Core与Avatar两个Python 3.12环境，均明确`include-system-site-packages = false`；实际在线安装完成，两个`pip check`均为零冲突。首次解析真实暴露`diffusers 0.40`与Cosy所需Transformers/Hugging Face Hub约束冲突，已固定为`diffusers 0.29.0 + huggingface-hub 0.36.2`后重跑通过。
 - 当前Ubuntu缺失`python3.12-venv/ensurepip`，安装器真实走通`uv --seed --python /usr/bin/python3`回退；不需要也不会自动执行`sudo apt`。机器可读证据为`audit/v1/INST1/isolated-runtime-result.json`，覆盖Python版本、venv隔离、依赖一致性、核心三方模块以及Gateway/Speech/CosyVoice/LiveTalking/Wav2Lip项目源码导入。
 - INST1.3生成Core/Avatar分仓离线wheelhouse：261个wheel、73个同盘硬链接去重、实际7.5GB，清单SHA256全量复算PASS。两个新的Python 3.12 venv只通过`--no-index --find-links`安装，安装器`ready=true`、两套`pip check`无冲突、运行时/项目源码检查10/10 PASS；不传联网授权的构建负例在写目录前返回1。脱敏汇总证据为`audit/v1/INST1/offline-install-result.json`。
+- INST1-AC06R独立执行器：分别拒绝开发机Windows SID哈希和WSL machine-id哈希，要求数据根/venv/config/本机注册表执行前均不存在；只允许离线wheelhouse和显式许可/同意的本地制品清单，并自动执行prepare、verify、start×2、status、Avatar recover、stop×2。初版暴露的开发机绝对路径、私有音频硬编码和缺省Avatar缺失均已修复；当前机私有迁移、真实四组件启动/Avatar恢复/双停归零通过。
 
 ## 未完成
 
-没有第二个全新Windows 11用户或干净VM+WSL可用，因此INST1-AC06未执行。INST1-AC10/11已经关闭Python依赖在线与离线从零安装风险；目标机verify证明工件完整和参数迁移有效，但仍不能证明Windows用户、WSL发行版、GPU驱动与全部模型工件在另一台机器上的组合复现。
+没有第二个全新Windows 11用户或干净VM+WSL可用，因此INST1-AC06正式accept仍未执行。执行器开发和当前机拒绝负例不能证明Windows用户、WSL发行版、GPU驱动与全部模型工件在另一环境的组合复现。
 
-开放P1：`INST1-P1-01 干净Windows+WSL独立复现待执行`。不得签INST1或V1全绿。
+开放P1：`INST1-P1-01 干净Windows+WSL独立复现待执行`。AC06R工具已就绪，但没有新环境PASS报告前不得签INST1或V1全绿。

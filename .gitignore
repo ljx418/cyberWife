@@ -44,6 +44,8 @@ models/
 # 私有绝对路径、本机密码、HSM 盐值
 config/model-registry.local.yaml
 config/runtime.local.toml
+config/local-artifacts.local.json
+config/local-artifacts.private.json
 config/.salt
 config/.salt.bak
 

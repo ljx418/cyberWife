@@ -81,6 +81,21 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 
 缺少`-AcceptFocusChange`必须在启动任何窗口前失败。取证器使用安装版headed Chrome和默认物理输入，自动验证PCM帧、至少三轮完整事件链、一次打断、取消后接续、当前active avatar和停止后Idle推进；人工只签Narrator五任务及三项自然度评分。`audit/v1/ACC1/human-gate.json`不得包含音频、字幕或回答正文，只有总结果为`PASS`且退出码为0才能关闭ACC1/UX6现场门。
 
-## 7. 实现前检查
+## 7. INST1-AC06独立干净环境门
+
+开发机先运行只读`fingerprint`；新Windows用户+干净默认WSL以开发机两个哈希作为拒绝值，再执行正式`accept`：
+
+```powershell
+.\ops\acceptance\Invoke-INST1CleanMachineAcceptance.ps1 -Action fingerprint
+.\ops\acceptance\Invoke-INST1CleanMachineAcceptance.ps1 `
+  -Action accept -AcceptCleanEnvironment `
+  -RejectWindowsSidHash "<开发机hash>" -RejectWslMachineIdHash "<开发机hash>" `
+  -WheelhouseWsl "/path/to/wheelhouse" `
+  -ArtifactManifestWsl "/path/to/local-artifacts.private.json"
+```
+
+身份任一相同、数据根/venv/config/本机注册表任一预存在、Git跟踪文件不干净、离线清单/本地制品清单或源码revision不可用时均在安装/启动前失败。正式报告必须绑定workspace revision、wheelhouse manifest SHA256、本地制品清单SHA256和CosyVoice revision，并通过start×2/status/recover/stop×2；当前机负例不能关闭AC06。
+
+## 8. 实现前检查
 
 进入每个子阶段前，负责 Agent 必须先创建本阶段 runner 的合同测试与证据 schema，再实现产品功能。若实际环境无法提供本清单中的采样源，只能返回计划阶段修订，不能删减证据项或降低硬门。

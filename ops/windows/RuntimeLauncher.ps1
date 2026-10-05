@@ -74,7 +74,17 @@ if ([string]::IsNullOrWhiteSpace($AvatarId)) {
     if ($resolvedAvatarId -match '^[A-Za-z0-9_-]{1,80}$') {
         $AvatarId = $resolvedAvatarId
     } else {
-        $AvatarId = 'wav2lip256_avatar1'
+        $bootstrapAvatarId = ''
+        try {
+            $bootstrapAvatarId = ((& wsl.exe cat "$DataRootWsl/bootstrap/avatar-id" 2>$null) | Out-String).Trim()
+        } catch {
+            $bootstrapAvatarId = ''
+        }
+        if ($bootstrapAvatarId -match '^[A-Za-z0-9_-]{1,80}$') {
+            $AvatarId = $bootstrapAvatarId
+        } else {
+            $AvatarId = 'wav2lip256_avatar1'
+        }
     }
 }
 if ($LlamaUbatchSize -gt $LlamaBatchSize) {

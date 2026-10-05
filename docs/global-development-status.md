@@ -25,7 +25,7 @@
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；Playwright 15/15；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
-| INST1 | CONDITIONAL | 便携安装入口、目标机17/17 verify、受控Speech venv真实启停PASS；在线及7.5GB离线wheelhouse两条路径均以两个全新Python 3.12 venv安装，`pip check`与项目源码导入10/10 PASS；缺失`python3.12-venv`时`uv --seed`回退已实测 | 全新Windows用户+干净WSL+GPU驱动+本地模型工件的整机组合复现待验 |
+| INST1 | CONDITIONAL | 便携安装入口、隔离venv与7.5GB wheelhouse通过；AC06R消除开发机模型路径/私有音色/缺省Avatar隐式依赖，本地制品准备、当前机迁移、真实启动/Avatar恢复/双停PASS；执行器含双身份拒绝和五项干净前置 | 全新Windows用户+干净WSL+GPU驱动+离线制品清单上执行正式accept |
 | V1FINAL | DEVELOPED / WAIT LIVE RUN | headed Chrome机器取证器已实现：PCM帧、三轮、打断、接续、active avatar、Idle与健康均自动判定；不保存正文/音频；焦点保护通过 | 需用户在窗口可被占用时执行一次现场门；干净机仍独立 |
 
 ## 3. 已完成依赖链
@@ -44,4 +44,4 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6已经关闭Idle未接主舞台、停止黑屏、16:9裁切和旧工件缓存四项实现缺陷；用户批准的当前人物Crop V2现已激活。V1FINAL验收器已把完整实时交互评分、Narrator和物理麦克风的机器证据绑定为一次现场流程，但本轮未抢占用户焦点，尚未实际执行。INST1仍缺全新Windows用户、干净WSL、GPU驱动和本地模型工件的整机组合复现。V1仍未全绿。
+已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6已经关闭Idle未接主舞台、停止黑屏、16:9裁切和旧工件缓存四项实现缺陷；用户批准的当前人物Crop V2现已激活。V1FINAL现场取证器已通过无人值守测试；INST1-AC06R已修复干净安装执行器审计中发现的三项可移植性缺陷，并在当前机完成私有数据迁移与真实运行回归。前者尚需用户现场操作，后者尚需环境管理员提供全新Windows用户和干净WSL。V1仍未全绿。

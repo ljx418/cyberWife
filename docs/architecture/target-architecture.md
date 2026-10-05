@@ -1,6 +1,6 @@
 # cyberWife V1 后端目标架构
 
-**版本**：2.7
+**版本**：2.8
 **日期**：2026-10-06
 **状态**：B0～B5、B2.5、UX4、UX5、ARCH1、RES1与V1RC1自动化门已有目标机证据；V1FINAL现场取证和干净机安装仍阻断全绿
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
@@ -44,8 +44,8 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 人物生成 | Qwen Image正面化→Wan Idle→10秒闭环→双预览→人工确认→Wav2Lip数据构建；文件任务状态可恢复 | 逐素材人工身份/自然度签署 | 已开发/人工门持续执行 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
-| 启动 | audit/prepare/verify与start/status/recover/stop已实现；路径不固定WSL用户名；17/17工件/import前检通过；Speech只使用受控venv且ready解析JSON语义 | 补干净机安装与首次启动独立复现 | 目标机通过/干净机待验 |
-| 验收 | 当前回归：后端356 passed/5 skipped、根22/22、Avatar13/13、Playwright15/15、V1FINAL核心3/3；V1RC1 60分钟20完整+10打断通过，Windows最低余量6,181.547MiB | 现场关闭UX6主观、结构化物理麦克风、人工Narrator；另机关闭干净安装 | 条件阻断 |
+| 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
+| 验收 | 当前回归：后端358 passed/5 skipped、根27/27、Avatar13/13、Playwright15/15、V1FINAL核心3/3；AC06R本机真实四组件启动、Avatar恢复、双停归零通过；V1RC1 60分钟20完整+10打断通过 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator；另机关闭干净安装 | 条件阻断 |
 
 ## 3. 目标代码实体
 

@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 
@@ -115,3 +116,39 @@ def test_acc1_machine_collector_proves_real_turns_without_storing_content():
     assert "text_final" not in source
     assert "text_delta" not in source
     assert "audio_chunk_b64" not in source
+
+
+def test_inst1_clean_machine_gate_rejects_development_identity_and_requires_offline_lifecycle():
+    source = (ROOT / "ops/acceptance/Invoke-INST1CleanMachineAcceptance.ps1").read_text(encoding="utf-8")
+    assert "RejectWindowsSidHash" in source
+    assert "RejectWslMachineIdHash" in source
+    assert "AcceptCleanEnvironment" in source
+    assert "'-DependencyMode', 'wheelhouse'" in source
+    assert "-OfflineStrict" in source
+    assert "Invoke-ManagedLifecycle 'start-1'" in source
+    assert "Invoke-ManagedLifecycle 'start-2'" in source
+    assert "Invoke-ManagedLifecycle 'status'" in source
+    assert "Invoke-ManagedLifecycle 'recover-avatar'" in source
+    assert source.count("Invoke-ManagedLifecycle 'stop-") >= 2
+    assert "windows_sid_hash" in source and "wsl_machine_id_hash" in source
+    assert "windows_sid =" not in source
+    assert "wsl_machine_id =" not in source
+
+
+def test_clean_install_is_driven_by_a_portable_private_artifact_manifest():
+    installer = (ROOT / "ops/windows/Install-CyberWife.ps1").read_text(encoding="utf-8")
+    gate = (ROOT / "ops/acceptance/Invoke-INST1CleanMachineAcceptance.ps1").read_text(encoding="utf-8")
+    server = (ROOT / "backend/cyberwife/api/server.py").read_text(encoding="utf-8")
+    launcher = (ROOT / "ops/windows/RuntimeLauncher.ps1").read_text(encoding="utf-8")
+    assert "ArtifactManifestWsl" in installer and "prepare_local_artifacts.py" in installer
+    assert "bootstrap/manifest.json" in installer
+    assert "ArtifactManifestWsl" in gate and "artifact_manifest_sha256" in gate
+    assert "assets/voice/user_clip_v2.wav" not in server
+    assert "voice_reference_audio" in server and "bootstrap" in server
+    assert "$DataRootWsl/bootstrap/avatar-id" in launcher
+    example = json.loads((ROOT / "config/local-artifacts.example.json").read_text(encoding="utf-8"))
+    assert example["format"] == "cyberwife-local-artifacts"
+    assert all(example["models"][logical_id]["license_accepted"] is False for logical_id in example["models"])
+    ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
+    assert "config/local-artifacts.local.json" in ignored
+    assert "config/local-artifacts.private.json" in ignored

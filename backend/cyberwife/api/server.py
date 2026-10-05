@@ -16,6 +16,7 @@ import os
 import sys
 import time
 import wave
+import json
 from pathlib import Path
 
 import uvicorn
@@ -57,6 +58,28 @@ from cyberwife.infrastructure.structured_logger import StructuredLogger  # noqa:
 # ADR-006 修订后默认资产根（Windows 端）
 DEFAULT_DATA_ROOT = Path.home() / ".cyberWife"
 DEFAULT_ASSETS_ROOT = DEFAULT_DATA_ROOT / "assets"
+
+
+def _load_bootstrap_voice(runtime: dict, data_root: Path) -> tuple[str, str] | None:
+    configured = runtime.get("bootstrap", {}).get("manifest")
+    if configured == "/mnt/cw-data/bootstrap/manifest.json" and data_root != Path("/mnt/cw-data"):
+        configured = None
+    manifest_path = Path(normalize_local_path(str(configured))) if configured else data_root / "bootstrap" / "manifest.json"
+    if not manifest_path.is_file():
+        return None
+    private_root = (data_root / "bootstrap").resolve()
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        candidate = Path(normalize_local_path(str(manifest.get("voice_reference_audio", "")))).resolve()
+        transcript = str(manifest.get("voice_reference_text", "")).strip()
+        expected_hash = str(manifest.get("voice_sha256", "")).lower()
+        if not candidate.is_relative_to(private_root) or not candidate.is_file() or not transcript:
+            return None
+        if expected_hash and hashlib.sha256(candidate.read_bytes()).hexdigest() != expected_hash:
+            return None
+        return str(candidate), transcript
+    except (OSError, ValueError, TypeError, json.JSONDecodeError):
+        return None
 
 
 def _probe_tts(tts, logical_id: str, reference_audio: str, reference_text: str) -> dict:
@@ -177,8 +200,7 @@ def main() -> None:
 
     compiler = PromptCompiler()
     sanitizer = OutputSanitizer()
-    fallback_reference_audio = str(repo_root / "assets" / "voice" / "user_clip_v2.wav")
-    fallback_reference_text = "早上好，宝贝，快起床了，起来陪我玩"
+    bootstrap_voice = _load_bootstrap_voice(runtime, data_root)
 
     def voice_reference_provider() -> tuple[str, str]:
         """Resolve the active, consented local voice for every new TTS job."""
@@ -186,11 +208,13 @@ def main() -> None:
         draft = repo.get_onboarding_draft()
         transcript = str(draft.settings_json.get("voice_transcript", "")).strip()
         if active is not None:
-            candidate = (repo_root / "assets" / str(active["relative_path"])).resolve()
-            assets_root = (repo_root / "assets").resolve()
-            if candidate.is_relative_to(assets_root) and candidate.is_file() and transcript:
+            private_assets_root = assets_root.resolve()
+            candidate = (private_assets_root / str(active["relative_path"])).resolve()
+            if candidate.is_relative_to(private_assets_root) and candidate.is_file() and transcript:
                 return str(candidate), transcript
-        return fallback_reference_audio, fallback_reference_text
+        if bootstrap_voice is not None:
+            return bootstrap_voice
+        raise RuntimeError("no consented active voice or validated bootstrap voice is available")
 
     # Readiness means the expensive models are warm, not merely imported.
     # This moves the one-time cold cost into one-click startup rather than the

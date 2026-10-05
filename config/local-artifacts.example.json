@@ -1,0 +1,61 @@
+{
+  "schema_version": 1,
+  "format": "cyberwife-local-artifacts",
+  "models": {
+    "qwen3-14b-instruct-q4_k_m": {
+      "path": "/mnt/c/local-artifacts/models/Qwen3-14B-Q4_K_M.gguf",
+      "kind": "file",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license_accepted": false
+    },
+    "faster-whisper-large-v3-turbo": {
+      "path": "/mnt/c/local-artifacts/models/faster-whisper-large-v3-turbo",
+      "kind": "directory",
+      "license_accepted": false
+    },
+    "qwen3-tts-12hz-1.7b-base": {
+      "path": "/mnt/c/local-artifacts/models/Qwen3-TTS-12Hz-1.7B-Base",
+      "kind": "directory",
+      "license_accepted": false
+    },
+    "cosyvoice2-0.5b": {
+      "path": "/mnt/c/local-artifacts/models/CosyVoice2-0.5B",
+      "kind": "directory",
+      "license_accepted": false
+    },
+    "livetalking-wav2lip256": {
+      "path": "/mnt/c/local-artifacts/models/wav2lip.pth",
+      "kind": "file",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license_accepted": false
+    },
+    "silero-vad-v5": {
+      "path": "/mnt/c/local-artifacts/models/silero_vad.jit",
+      "kind": "file",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "license_accepted": false
+    },
+    "bge-small-zh-v1.5": {
+      "path": "/mnt/c/local-artifacts/models/bge-small-zh-v1.5",
+      "kind": "directory",
+      "license_accepted": false
+    }
+  },
+  "cosyvoice_source": {
+    "path": "/mnt/c/local-artifacts/src/CosyVoice",
+    "license_accepted": false
+  },
+  "bootstrap": {
+    "voice": {
+      "path": "/mnt/c/local-artifacts/private/reference.wav",
+      "transcript": "填写与参考音频完全一致的普通话文本",
+      "sha256": "REPLACE_WITH_64_HEX_SHA256",
+      "consent": false
+    },
+    "avatar": {
+      "path": "/mnt/c/local-artifacts/private/wav2lip256_bootstrap",
+      "avatar_id": "wav2lip256_bootstrap",
+      "consent": false
+    }
+  }
+}

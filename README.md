@@ -11,6 +11,8 @@
 
 启动器只管理自己记录且命令行标记匹配的进程；若端口被其它程序占用会拒绝启动，不会结束外部进程。全部服务只监听 loopback。首次发布前端构建已包含在 `prototype/dist`；修改前端源码后需重新执行 `npm --prefix prototype run build`。
 
+全新机器首次安装须先按[安装手册](docs/installation-runbook.md)准备离线wheelhouse与仓库外私有制品清单。`config/local-artifacts.example.json`只是一份默认拒绝授权的模板；项目不会下载模型，也不会把参考音频、Avatar或本机绝对路径提交到Git。
+
 ### 从照片生成动态人物
 
 首次设置进入“人物形象”，或已完成设置后打开“设置 → 人物”：
@@ -31,6 +33,7 @@
 - [验收计划与出门门槛](docs/acceptance-plan.md)
 - [需求追踪矩阵](docs/traceability-matrix.md)
 - [模型清单与核验合同](docs/model-manifest.md)
+- [安装、干净机验收、备份与卸载手册](docs/installation-runbook.md)
 - [8 页架构与 Gap 图（Draw.io）](docs/cyberWife-architecture-gap.drawio)
 - [架构决策记录 ADR](docs/architecture/adr/README.md)
 

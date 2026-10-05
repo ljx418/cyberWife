@@ -26,7 +26,7 @@
 ## 第三轮：可执行性、架构与文档语义
 
 - Windows Node实际运行核心单测3/3；PowerShell AST和Node语法通过。
-- 全量回归为后端356 passed/5 skipped、根22 passed、Avatar13 passed、前端build及Playwright15 passed。
+- AC06R后全量回归为后端358 passed/5 skipped、根27 passed、Avatar13 passed、前端build及Playwright15 passed，V1FINAL核心3/3；当前机本地制品迁移与真实四组件启动/Avatar恢复/双停归零通过。
 - PRD、架构、计划、验收、追踪矩阵、命令清单、状态文档及8页Draw.io对当前候选与开放门描述一致；本地Markdown链接全部存在。
 - `audit/v1/ACC1/human-gate.json`受`.gitignore`覆盖；服务端口在回归后均未监听。
 - 产品代码和数据库schema没有变化，验收器仍通过既有公开REST/WS/DOM合同取证，未制造测试专用后门。
