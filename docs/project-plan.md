@@ -72,7 +72,7 @@ Qwen3-TTS 已有固定样本 CER=0% 的内容正确性证据，按 ADR-008 保�
 
 ### CosyVoice 候选轨
 
-CosyVoice2 已用正确参考逐字稿完成30条复测：CER=0.71%、独立TTS首包P50/P95=2.55/3.43s。O3R在ASR迁入ext4并增加完成轮次临时内存回收后，真实Edge普通链30/30、P50/P95=5.567/6.392秒，满足用户批准的P95≤7秒门；ADR-008将非TensorRT CosyVoice切为默认，Qwen保留显式回退，授权盲听仍留O6人类门。
+CosyVoice2 已用正确参考逐字稿完成30条复测：CER=0.71%。V1RC1修复冻结上游流式hop窗口跨请求增长并加入系统余量/Gateway RSS双回收门后，Windows Chrome普通链30/30、P50/P95=4.102/4.708秒；同候选60分钟RAM/VRAM/趋势全部达门。ADR-008默认非TensorRT CosyVoice不变，Qwen保留显式回退。
 
 ### B2.5 优化轨
 

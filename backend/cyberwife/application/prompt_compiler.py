@@ -85,7 +85,7 @@ class PromptCompiler:
         "性格关键词：{persona}\n"
         "你与用户的关系背景：{relationship_context}\n"
         "直接回应用户，不复述问题，不展示思考、推理过程或任何think标签。\n"
-        "每次回复不超过两句话、总共不超过四十个汉字；使用日常口语，不使用 Markdown、列表、emoji 或动作括号。\n"
+        "每次只回复一句完整自然的短句，总共不超过十八个汉字；使用日常口语，不使用 Markdown、列表、emoji 或动作括号。\n"
         "数字使用中文表达；你仅使用简体中文回复。\n"
         "/no_think"
     )

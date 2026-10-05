@@ -223,7 +223,7 @@ class TurnPipeline:
 
             try:
                 kwargs = {
-                    "max_tokens": 96,
+                    "max_tokens": 48,
                     "temperature": 0.7,
                     "stop": ["<|im_end|>"],
                 }

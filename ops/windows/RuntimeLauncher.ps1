@@ -15,7 +15,7 @@ param(
     [string]$LlamaCppPath = 'C:\tools\llama.cpp\llama-server.exe',
     [string]$ModelPath = 'C:\ComfyUI-aki-v2\ComfyUI\models\LLM\Qwen3-14B-Q4_K_M.gguf',
     [string]$AvatarModelWsl = '/mnt/c/ComfyUI-aki-v2/ComfyUI/models/Audio/wav2lip/wav2lip.pth',
-    [string]$AvatarId = 'wav2lip256_avatar1',
+    [string]$AvatarId = '',
     [string]$WslHome = '',
     [string]$DataRootWsl = '',
     [string]$AvatarPythonWsl = '',
@@ -62,6 +62,21 @@ if ([string]::IsNullOrWhiteSpace($DataRootWsl)) { $DataRootWsl = "$WslHome/.cybe
 if ([string]::IsNullOrWhiteSpace($AvatarPythonWsl)) { $AvatarPythonWsl = "$DataRootWsl/venvs/avatar-v1-py312/bin/python" }
 if ([string]::IsNullOrWhiteSpace($CosyVoicePythonWsl)) { $CosyVoicePythonWsl = "$DataRootWsl/venvs/cosyvoice/bin/python" }
 if ([string]::IsNullOrWhiteSpace($SpeechPythonWsl)) { $SpeechPythonWsl = $CosyVoicePythonWsl }
+if ([string]::IsNullOrWhiteSpace($AvatarId)) {
+    $avatarDatabase = "$DataRootWsl/cyberwife.db"
+    $avatarQuery = 'SELECT d.avatar_id FROM active_avatar_derivative a JOIN avatar_derivatives d ON d.id=a.derivative_id WHERE a.singleton=1 AND d.status=''active'' LIMIT 1;'
+    $resolvedAvatarId = ''
+    try {
+        $resolvedAvatarId = ((& wsl.exe sqlite3 $avatarDatabase $avatarQuery 2>$null) | Out-String).Trim()
+    } catch {
+        $resolvedAvatarId = ''
+    }
+    if ($resolvedAvatarId -match '^[A-Za-z0-9_-]{1,80}$') {
+        $AvatarId = $resolvedAvatarId
+    } else {
+        $AvatarId = 'wav2lip256_avatar1'
+    }
+}
 if ($LlamaUbatchSize -gt $LlamaBatchSize) {
     throw 'LlamaUbatchSize must be less than or equal to LlamaBatchSize'
 }

@@ -20,6 +20,8 @@ class TestPromptCompiler:
         )
         assert "小芸" in p.system
         assert "温柔" in p.system
+        assert "一句完整自然的短句" in p.system
+        assert "不超过十八个汉字" in p.system
         assert p.user_input == "今天过得怎么样？"
         assert p.total_tokens() < 4096
 

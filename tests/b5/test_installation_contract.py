@@ -32,6 +32,15 @@ def test_runtime_uses_controlled_speech_python():
     assert "ConvertFrom-Json" in script
 
 
+def test_runtime_restores_the_persisted_active_avatar_by_default():
+    script = (ROOT / "ops/windows/RuntimeLauncher.ps1").read_text(encoding="utf-8")
+    assert "[string]$AvatarId = ''" in script
+    assert "active_avatar_derivative" in script
+    assert "d.status=''active''" in script
+    assert "$resolvedAvatarId -match '^[A-Za-z0-9_-]{1,80}$'" in script
+    assert "$AvatarId = 'wav2lip256_avatar1'" in script
+
+
 def test_runtime_requirement_files_are_release_inputs():
     freezer = (ROOT / "ops/release_freeze.py").read_text(encoding="utf-8")
     for relative in (

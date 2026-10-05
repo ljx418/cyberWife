@@ -11,7 +11,7 @@
 | ASR | Faster-Whisper `large-v3-turbo` | WSL / GPU FP16；OOM 时 int8_float16 | CTranslate2 dir | B0 独立真实加载/静音推理通过；组合验收待 B1/B2 | 中文转录、显存、加载时间、离线 |
 | LLM | Qwen3-14B-Instruct `Q4_K_M` | Windows llama.cpp / GPU | GGUF | B0 build 11118 `/health` + completion 通过；组合验收待 B1 | llama-server 加载、8K context、流式/取消 |
 | TTS（显式回退） | Qwen3-TTS-12Hz-1.7B-Base | WSL / GPU FP16 | Hugging Face directory | 受保护回退；不与Cosy双常驻 | `HealthAggregator`按§5触发；B5重跑内容正确、资源、显式profile回退 |
-| TTS（V1默认） | CosyVoice2-0.5B | WSL / GPU FP16，非TensorRT | HF revision `eec1ae6...` | `verified`；正确逐字稿30条CER=0.71%；真实Chrome普通链30/30，P50/P95=5.567/6.392s；资源达门；授权盲听5/5 | ADR-008默认；TensorRT拒绝；B5组合复核 |
+| TTS（V1默认） | CosyVoice2-0.5B | WSL / GPU FP16，非TensorRT | HF revision `eec1ae6...` | `verified`；正确逐字稿30条CER=0.71%；V1RC1真实Chrome普通链30/30，P50/P95=4.102/4.708s；60分钟资源达门；授权盲听5/5 | ADR-008默认；每轮复位流式hop初值；系统余量/RSS双回收门；TensorRT拒绝 |
 | Avatar | LiveTalking + Wav2Lip256（`license_id=Wav2Lip-ResearchOnly`，见 https://github.com/Rudrabha/Wav2Lip/blob/master/LICENSE，`license_review=approved`，商业化前重新评审） | WSL / GPU | code + checkpoint | runtime_verified；fallback静态图降级 | checkpoint shape、25FPS、loopback H.264 WS、读LICENSE原文 |
 | Embedding | BAAI/bge-small-zh-v1.5（输出维度 **512**，固化写入 `memory_vectors.embedding vec_f32(512)`；V1 不自动切换维度） | WSL Gateway / CPU | HF/safetensors | B0 独立真实编码 + sqlite-vec 512维往返通过 | 中文向量、维度、sqlite-vec 写入、许可证、离线镜像 |
 

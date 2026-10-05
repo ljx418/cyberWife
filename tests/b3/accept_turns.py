@@ -12,6 +12,7 @@ import struct
 import time
 import wave
 from pathlib import Path
+from urllib.parse import quote
 
 import httpx
 import websockets
@@ -29,9 +30,11 @@ def read_pcm(path: Path) -> bytes:
     return value + b"\0" * ((-len(value)) % 640)
 
 
-async def avatar_transport(stats: dict, ready: asyncio.Event, stop: asyncio.Event) -> None:
+async def avatar_transport(
+    stats: dict, ready: asyncio.Event, stop: asyncio.Event, avatar_id: str
+) -> None:
     async with websockets.connect(
-        "ws://127.0.0.1:8010/ws/v1/avatar",
+        f"ws://127.0.0.1:8010/ws/v1/avatar?avatar_id={quote(avatar_id, safe='')}",
         origin="http://127.0.0.1:4173",
         max_size=8 * 1024 * 1024,
     ) as socket:
@@ -42,8 +45,9 @@ async def avatar_transport(stats: dict, ready: asyncio.Event, stop: asyncio.Even
                 continue
             if isinstance(message, str):
                 config = json.loads(message)
-                stats["session_id"] = config.get("session_id")
-                stats["protocol_version"] = config.get("version")
+                if config.get("type") == "video.config":
+                    stats["session_id"] = config.get("session_id")
+                    stats["protocol_version"] = config.get("version")
             else:
                 stats["frames"] += 1
                 if len(message) >= 18:
@@ -57,9 +61,20 @@ async def run(args) -> tuple[dict, list[dict], dict]:
     response = client.post(f"{args.http_base}/api/v1/sessions", json={"recording_policy": "standard"})
     response.raise_for_status()
     session_id = int(response.json()["id"])
-    avatar_stats = {"frames": 0, "generations": set(), "session_id": None, "protocol_version": None}
+    active_avatar = client.get(f"{args.http_base}/api/v1/avatar/active")
+    active_avatar.raise_for_status()
+    avatar_id = str(active_avatar.json()["avatar_id"])
+    avatar_stats = {
+        "frames": 0,
+        "generations": set(),
+        "session_id": None,
+        "protocol_version": None,
+        "avatar_id": avatar_id,
+    }
     avatar_ready, avatar_stop = asyncio.Event(), asyncio.Event()
-    avatar_task = asyncio.create_task(avatar_transport(avatar_stats, avatar_ready, avatar_stop))
+    avatar_task = asyncio.create_task(
+        avatar_transport(avatar_stats, avatar_ready, avatar_stop, avatar_id)
+    )
     rows: list[dict] = []
     all_sequences: list[int] = []
     client_seq = 0

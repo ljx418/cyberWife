@@ -6,6 +6,7 @@ import asyncio
 import csv
 import json
 import os
+import re
 import shlex
 import statistics
 import struct
@@ -19,6 +20,18 @@ import httpx
 import websockets
 
 from tests.b3.accept_turns import avatar_transport
+
+
+_SAFE_AVATAR_ID = re.compile(r"^[A-Za-z0-9_-]{1,80}$")
+
+
+def resolve_active_avatar_id(client: httpx.Client, base: str) -> str:
+    response = client.get(base + "/api/v1/avatar/active")
+    response.raise_for_status()
+    avatar_id = str(response.json().get("avatar_id", ""))
+    if not _SAFE_AVATAR_ID.fullmatch(avatar_id):
+        raise ValueError("active avatar id is missing or unsafe")
+    return avatar_id
 
 
 def read_pcm(path: Path) -> bytes:
@@ -278,9 +291,15 @@ async def run(args) -> tuple[dict, list[dict], list[dict], list[str]]:
 
     client = httpx.Client(timeout=10, trust_env=False)
     session_id = int(client.post(args.http_base + "/api/v1/sessions", json={}).json()["id"])
-    avatar_stats = {"frames": 0, "generations": set(), "session_id": None, "protocol_version": None}
+    avatar_id = resolve_active_avatar_id(client, args.http_base)
+    avatar_stats = {
+        "frames": 0, "generations": set(), "session_id": None,
+        "protocol_version": None, "avatar_id": avatar_id,
+    }
     avatar_ready, avatar_stop = asyncio.Event(), asyncio.Event()
-    avatar_task = asyncio.create_task(avatar_transport(avatar_stats, avatar_ready, avatar_stop))
+    avatar_task = asyncio.create_task(
+        avatar_transport(avatar_stats, avatar_ready, avatar_stop, avatar_id)
+    )
     sampler_task = asyncio.create_task(sampler())
     client_seq = 0
     try:
@@ -348,6 +367,10 @@ async def run(args) -> tuple[dict, list[dict], list[dict], list[str]]:
         client.delete(f"{args.http_base}/api/v1/sessions/{session_id}"); client.close()
 
     summary = evaluate(samples, actions, args)
+    summary["avatar"] = {
+        **avatar_stats,
+        "generations": sorted(avatar_stats["generations"]),
+    }
     return summary, samples, actions, raw_gpu
 
 

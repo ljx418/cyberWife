@@ -56,6 +56,7 @@ class _Speech:
 class _Llm:
     def generate_stream(self, prompt, **kwargs):
         assert "今天天气不错" in prompt
+        assert kwargs["max_tokens"] == 48
         yield "**是呀**，"
         yield "很适合聊聊天。"
 

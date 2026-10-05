@@ -1,7 +1,7 @@
 # cyberWife V1 需求追踪矩阵
 
-**版本**：3.0　**日期**：2026-10-04  
-用途：确保已批准体验、实现实体与 AC-01～14/AC-04A 不发生偏移。最终出门结论以 `review/2026-10-04-stage-audit.md` 为准；B5.6文档仅保留历史签署语境。
+**版本**：3.1　**日期**：2026-10-06
+用途：确保已批准体验、实现实体与 AC-01～14/AC-04A 不发生偏移。当前候选结论以 `review/2026-10-06-rc1-stage-audit.md` 为准；历史审计保留当时语境。
 
 ## 功能需求
 
@@ -32,14 +32,14 @@
 
 | 需求 | 实现实体 | 里程碑 | 验收 | 当前状态 |
 |---|---|---|---|---|
-| NFR-01 首响/打断 | TurnPipeline、InterruptionController、RuntimeMetrics | B2/B2.5/B3 | AC-04/04A/05 | 已验收：普通P95 6.175s；缓存P95 14ms；打断P95 2.6ms |
-| NFR-02 FPS/资源 | Scheduler、AvatarAdapter、RuntimeMetrics | B2/B2.5/B5 | AC-04/06/14 | **本轮FAIL**：双FPS历史通过；60分钟RAM 13,637.863MiB、GPU 12.479GiB、WSL余量达门，但Windows最低1,840.566MiB<2GiB |
+| NFR-01 首响/打断 | TurnPipeline、InterruptionController、RuntimeMetrics | B2/B2.5/B3/V1RC1 | AC-04/04A/05 | 当前候选已验收：普通30轮P50/P95=4.102/4.708s；缓存历史P95=14ms；打断30轮P95=1.9ms |
+| NFR-02 FPS/资源 | Scheduler、AvatarAdapter、RuntimeMetrics | B2/B2.5/B5/V1RC1 | AC-04/06/14 | 当前候选PASS：60分钟RAM峰值13,775.637MiB、GPU 11.219GiB、Windows/WSL最低6,181.547/8,989.289MiB；Avatar协议v2、89,981帧 |
 | NFR-03 稳定性 | 有界队列、Launcher、Health | B3/B5/RES1 | AC-03/12/14 | 已验收：60分钟20完整+10打断、资源与趋势门、恢复、stop×2均PASS |
 | NFR-04 本机隐私 | persistence policy、loopback、privacy scan | B4/B5 | AC-09/13 | 已验收：原始音频/允许集外连接/敏感日志命中均0 |
 | NFR-05 删除一致性 | MemoryService、SQLite transaction | B4 | AC-08 | 已验收：源记录、FTS、向量与召回原子归零PASS |
 | NFR-06 可观测/脱敏 | StructuredLogger、RuntimeMetrics | B1/B2.5/B5 | AC-04/12/13 | 已验收：trace/generation/分段计量完整，日志脱敏PASS |
 | NFR-07 分层/替换 | ports/adapters、contract tests | B0～B5/ARCH1 | 架构审查 | 已验收：Application反向导入=0并有AST门禁；具体实现仅由组合根注入 |
-| NFR-08 可访问性 | 已批准前端、真实 aria-live 事件 | B5/ACC1 | AC-11 | 自动化通过：三视口15/15完整键盘任务与Playwright 14/14；真实NVDA完整用户任务待验 |
+| NFR-08 可访问性 | 已批准前端、真实 aria-live 事件 | B5/ACC1 | AC-11 | 自动化通过：三视口15/15完整键盘任务与Playwright 15/15；真实Narrator完整用户任务待验 |
 | NFR-09 磁盘 | HealthAggregator、RetentionService | B0/B4 | AC-10/12 | 已验收：低水位禁止缓存、保留清理和数据生命周期PASS |
 | NFR-10 许可证 | ModelRegistry、release manifest | B0/B5/UX4 | 发布审查 | 7个实时模型hash/来源/许可证冻结；10个离线形象模型纳入ComfyUI保留索引与安装前检；商业用途因Wav2Lip为No-Go |
 

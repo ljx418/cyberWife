@@ -45,7 +45,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；路径不固定WSL用户名；17/17工件/import前检通过；Speech只使用受控venv且ready解析JSON语义 | 补干净机安装与首次启动独立复现 | 目标机通过/干净机待验 |
-| 验收 | 后端344 passed/5 skipped、工具12/12、Playwright 14/14；RES1 60分钟20完整+10打断通过，Windows最低余量4,124.074MiB | 关闭物理麦克风、人工Narrator与干净安装 | 条件阻断 |
+| 验收 | 最终冻结回归：后端356 passed/5 skipped、根21/21、Avatar13/13、Playwright15/15；V1RC1 60分钟20完整+10打断通过，Windows最低余量6,181.547MiB | 关闭UX6完整主观、结构化物理麦克风、人工Narrator与干净安装 | 条件阻断 |
 
 ## 3. 目标代码实体
 
@@ -219,7 +219,7 @@ PID、端口监听或模型文件存在都不能单独构成 ready。
 
 - VRAM≤22GB、项目private bytes+RSS≤14GB；在约16GB可用预算内宿主/WSL均保留≥2GB。
 - SpeechRuntime 只允许一个 GPU TTS 生成任务并设置队列上限；ASR 与 TTS 组合驻留在目标机实测后固定 profile。
-- ADR-008 已将非 TensorRT CosyVoice2 切为默认：真实 Edge 普通链30/30、P50/P95=5.567/6.392秒；Qwen仅作为显式回退保留，不与Cosy双常驻。授权盲听仍是阶段出门的人类门。
+- ADR-008 已将非 TensorRT CosyVoice2 切为默认；V1RC1当前候选以Windows Chrome普通链30/30得到P50/P95=4.102/4.708秒。适配器复位冻结上游跨请求增长的流式hop窗口，并以系统余量3GiB/Gateway RSS4GiB双门回收arena；Qwen仅作为显式回退保留，不与Cosy双常驻。
 - 首响定义为 `asr.final occurred_at` 到浏览器实际播放首个非静音样本，不用服务端“生成完成”替代。
 - Avatar FPS 同时记录模型推理 `inferfps` 和浏览器实际渲染 `finalfps`。
 

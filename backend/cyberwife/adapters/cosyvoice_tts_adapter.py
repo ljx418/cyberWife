@@ -25,6 +25,30 @@ from cyberwife.ports.tts import TtsPort
 
 
 FRAME_BYTES = 640  # 20 ms * 16 kHz * int16
+MALLOC_TRIM_PRESSURE_MIB = 3072
+MALLOC_TRIM_PROCESS_RSS_MIB = 4096
+
+
+def _linux_mem_available_mib() -> float | None:
+    """Return Linux MemAvailable without adding a runtime dependency."""
+    try:
+        for line in Path("/proc/meminfo").read_text(encoding="ascii").splitlines():
+            if line.startswith("MemAvailable:"):
+                return int(line.split()[1]) / 1024
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
+
+
+def _linux_process_rss_mib() -> float | None:
+    """Return this worker's resident set from procfs."""
+    try:
+        for line in Path("/proc/self/status").read_text(encoding="ascii").splitlines():
+            if line.startswith("VmRSS:"):
+                return int(line.split()[1]) / 1024
+    except (OSError, ValueError, IndexError):
+        return None
+    return None
 
 
 class CosyVoiceTensorRtProfile:
@@ -115,6 +139,7 @@ class CosyVoiceTtsAdapter(TtsPort):
     _model_key: tuple[str, bool] | None = None
     _load_lock = threading.Lock()
     _speaker_cache_lock = threading.Lock()
+    _stream_initial_hop_len: int | None = None
 
     def __init__(
         self,
@@ -202,6 +227,11 @@ class CosyVoiceTtsAdapter(TtsPort):
                 load_vllm=False,
                 fp16=self._fp16,
             )
+            runtime_model = CosyVoiceTtsAdapter._model.model
+            initial_hop_len = getattr(runtime_model, "token_hop_len", None)
+            CosyVoiceTtsAdapter._stream_initial_hop_len = (
+                int(initial_hop_len) if isinstance(initial_hop_len, int) and initial_hop_len > 0 else None
+            )
             _install_cancellable_llm_inference(
                 CosyVoiceTtsAdapter._model,
                 self._cancel_event,
@@ -274,6 +304,7 @@ class CosyVoiceTtsAdapter(TtsPort):
         output_bytes = 0
 
         try:
+            self._reset_stream_hop_window(model)
             outputs = model.inference_zero_shot(
                 text,
                 reference_transcript,
@@ -324,6 +355,21 @@ class CosyVoiceTtsAdapter(TtsPort):
                 duration_ms=int(wall_s * 1000),
                 text_length=len(text),
             )
+
+    @classmethod
+    def _reset_stream_hop_window(cls, model) -> None:
+        """Undo CosyVoice2's accidental cross-request hop-window growth.
+
+        The pinned upstream mutates ``model.token_hop_len`` from 25 to 100
+        while streaming and does not restore it.  Our single TTS worker calls
+        this immediately before each inference, preserving the intended
+        within-request growth while restoring first-packet latency next turn.
+        """
+        initial = cls._stream_initial_hop_len
+        runtime_model = getattr(model, "model", None)
+        if initial is not None and hasattr(runtime_model, "token_hop_len"):
+            runtime_model.token_hop_len = initial
+
     def cancel(self, request_id: str) -> bool:
         """Cancel the single in-flight synthesis owned by the speech worker."""
         del request_id  # TtsPort does not yet pass a request id into synthesize_stream.
@@ -341,16 +387,28 @@ class CosyVoiceTtsAdapter(TtsPort):
                     model.frontend.spk2info.pop(key, None)
 
     def release_transient_memory(self) -> None:
-        """Return completed-turn CPU temporaries without unloading the model.
+        """Collect completed-turn objects and trim arenas only under pressure.
 
         CosyVoice creates sizeable NumPy/Torch host buffers while streaming.
-        CPython releases the objects after a turn, but glibc may retain their
-        arenas indefinitely.  Collection plus ``malloc_trim`` is a Linux-only,
-        fail-safe cleanup performed after playback has completed; it never
-        changes model residency, precision, or generated audio.
+        Retaining freed glibc arenas while memory is healthy keeps the next
+        inference warm.  Under pressure (or when pressure cannot be measured),
+        ``malloc_trim`` returns them to Linux without unloading model weights.
         """
         gc.collect()
         if sys.platform.startswith("linux"):
+            available_mib = _linux_mem_available_mib()
+            process_rss_mib = _linux_process_rss_mib()
+            system_pressure = available_mib is None or available_mib < MALLOC_TRIM_PRESSURE_MIB
+            process_pressure = process_rss_mib is None or process_rss_mib > MALLOC_TRIM_PROCESS_RSS_MIB
+            should_trim = system_pressure or process_pressure
+            self.last_metrics["cleanup"] = "trim" if should_trim else "warm"
+            self.last_metrics["mem_available_mib"] = round(available_mib, 1) if available_mib is not None else -1
+            self.last_metrics["process_rss_mib"] = round(process_rss_mib, 1) if process_rss_mib is not None else -1
+            self.last_metrics["cleanup_reason"] = (
+                "system_pressure" if system_pressure else "process_rss" if process_pressure else "healthy"
+            )
+            if not should_trim:
+                return
             try:
                 import ctypes
 

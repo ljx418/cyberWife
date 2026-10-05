@@ -19,7 +19,7 @@ V1 的核心不是“能调用若干模型”，而是本地一键启动后直�
 | 实时链路 | 已实现可取消全双工接管、30次打断与Avatar恢复 | 授权WAV覆盖充分；真实物理麦克风和A/V偏移量仍待测 |
 | 启动 | 目标机start/status/recover/stop与双击入口已通过 | 干净机安装尚未验收 |
 | 自动化 | 后端326 passed/4 WSL跳过；Avatar9、根验收4、Playwright9通过 | 测试套件仍需统一根入口；自动化子集不替代真实读屏 |
-| TTS | 固定正确逐字稿30条：Qwen CER 2.14%、CosyVoice CER 0.71%；O3R 真实 Edge 普通链30/30，在每轮释放可回收阶段对象的 profile 下首响 P50/P95=5.567/6.392s；索引见 `stages/B2.5/O3R-acceptance-report.md` | CosyVoice2 已按 ADR-008 成为默认非 TRT FP16 流式方案，Qwen 保留回退；旧76.92%/10,043ms是已失效历史样本 |
+| TTS | 固定正确逐字稿30条：Qwen CER 2.14%、CosyVoice CER 0.71%；V1RC1 Windows Chrome普通链30/30，首响P50/P95=4.102/4.708s；60分钟RAM/VRAM/趋势达门 | CosyVoice2按ADR-008保持默认非TRT FP16；R3复位跨请求hop窗口，AC05-R2以系统余量/RSS双门回收；Qwen保留回退 |
 
 基线截图与真实音频均保存在 `docs/review/assets/`，来源记录见 `docs/review/assets/source-manifest.json`。
 

@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from unittest.mock import patch
 
 from cyberwife.adapters.cosyvoice_tts_adapter import (
     CosyVoiceTtsAdapter,
@@ -111,3 +112,77 @@ def test_gateway_has_explicit_cosy_trt_runtime_switch():
     assert '"CW_TTS_MODEL",' in source
     assert 'os.environ.get("CW_COSYVOICE_LOAD_TRT", "0") == "1"' in source
     assert "load_trt=cosyvoice_load_trt" in source
+
+
+def test_transient_cleanup_keeps_allocator_warm_when_memory_is_healthy(tmp_path: Path):
+    adapter = CosyVoiceTtsAdapter(str(tmp_path), source_dir=str(tmp_path))
+    with patch(
+        "cyberwife.adapters.cosyvoice_tts_adapter._linux_mem_available_mib",
+        return_value=8192,
+    ), patch(
+        "cyberwife.adapters.cosyvoice_tts_adapter._linux_process_rss_mib",
+        return_value=2048,
+    ), patch("ctypes.CDLL") as cdll:
+        adapter.release_transient_memory()
+    cdll.assert_not_called()
+    assert adapter.last_metrics["cleanup"] == "warm"
+
+
+@pytest.mark.parametrize("available_mib", [1024, None])
+def test_transient_cleanup_trims_under_pressure_or_unknown(tmp_path: Path, available_mib):
+    adapter = CosyVoiceTtsAdapter(str(tmp_path), source_dir=str(tmp_path))
+    with patch(
+        "cyberwife.adapters.cosyvoice_tts_adapter._linux_mem_available_mib",
+        return_value=available_mib,
+    ), patch(
+        "cyberwife.adapters.cosyvoice_tts_adapter._linux_process_rss_mib",
+        return_value=2048,
+    ), patch("ctypes.CDLL") as cdll:
+        adapter.release_transient_memory()
+    cdll.return_value.malloc_trim.assert_called_once_with(0)
+    assert adapter.last_metrics["cleanup"] == "trim"
+
+
+def test_transient_cleanup_trims_when_worker_exceeds_project_rss_budget(tmp_path: Path):
+    adapter = CosyVoiceTtsAdapter(str(tmp_path), source_dir=str(tmp_path))
+    with patch(
+        "cyberwife.adapters.cosyvoice_tts_adapter._linux_mem_available_mib",
+        return_value=8192,
+    ), patch(
+        "cyberwife.adapters.cosyvoice_tts_adapter._linux_process_rss_mib",
+        return_value=5120,
+    ), patch("ctypes.CDLL") as cdll:
+        adapter.release_transient_memory()
+    cdll.return_value.malloc_trim.assert_called_once_with(0)
+    assert adapter.last_metrics["cleanup_reason"] == "process_rss"
+
+
+def test_stream_hop_window_is_reset_for_every_request():
+    class RuntimeModel:
+        token_hop_len = 100
+
+    class Model:
+        model = RuntimeModel()
+
+    previous = CosyVoiceTtsAdapter._stream_initial_hop_len
+    try:
+        CosyVoiceTtsAdapter._stream_initial_hop_len = 25
+        CosyVoiceTtsAdapter._reset_stream_hop_window(Model())
+        assert Model.model.token_hop_len == 25
+        Model.model.token_hop_len = 100
+        CosyVoiceTtsAdapter._reset_stream_hop_window(Model())
+        assert Model.model.token_hop_len == 25
+    finally:
+        CosyVoiceTtsAdapter._stream_initial_hop_len = previous
+
+
+def test_stream_hop_window_reset_is_compatible_when_upstream_field_is_absent():
+    class Model:
+        model = object()
+
+    previous = CosyVoiceTtsAdapter._stream_initial_hop_len
+    try:
+        CosyVoiceTtsAdapter._stream_initial_hop_len = 25
+        CosyVoiceTtsAdapter._reset_stream_hop_window(Model())
+    finally:
+        CosyVoiceTtsAdapter._stream_initial_hop_len = previous
