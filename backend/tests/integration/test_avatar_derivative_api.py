@@ -173,6 +173,7 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
     assert approved.status_code == 200
     assert approved.json()["status"] == "active"
     assert approved.json()["avatar_id"].startswith("wav2lip256_idle_p_")
+    assert approved.json()["avatar_id"].endswith("_cropv2")
     assert client.get(
         f"/api/v1/avatar-builds/{derivative_id}/idle-generation"
     ).json()["status"] == "active"

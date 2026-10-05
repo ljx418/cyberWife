@@ -19,6 +19,13 @@ except ModuleNotFoundError:
     from scrfd_detector import detect_faces
 
 
+# The bundled model is the project's high-resolution ``wav2lip_v2`` network.
+# Its encoder/decoder topology and checkpoint require 256px face tensors (the
+# original 96px Wav2Lip default is not compatible with this runtime).
+WAV2LIP_FACE_SIZE = 256
+AVATAR_BUILD_REVISION = "cropv2"
+
+
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as stream:
@@ -43,6 +50,28 @@ def _smooth(boxes: np.ndarray, radius: int = 2) -> np.ndarray:
         lo, hi = max(0, index - radius), min(len(boxes), index + radius + 1)
         result[index] = np.median(boxes[lo:hi], axis=0)
     return np.rint(result).astype(np.int32)
+
+
+def _wav2lip_box(
+    face: tuple[float, float, float, float],
+    *,
+    frame_width: int = 512,
+    frame_height: int = 768,
+) -> list[int]:
+    """Return the crop convention used by the bundled Wav2Lip generator.
+
+    The detected crop remains rectangular: it is resized to 256px for model
+    input and restored to the detected rectangle afterwards.  Keep the
+    detector's sides/top and add only 10px of chin context, matching
+    ``avatars/wav2lip/genavatar.py``'s ``pads=[0, 10, 0, 0]`` contract.
+    """
+    x1, y1, x2, y2 = map(float, face)
+    return [
+        max(0, round(y1)),
+        min(frame_height, round(y2) + 10),
+        max(0, round(x1)),
+        min(frame_width, round(x2)),
+    ]
 
 
 def _mae(left: np.ndarray, right: np.ndarray) -> float:
@@ -86,11 +115,7 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
         if len(faces) != 1:
             raise RuntimeError(f"frame {len(frames)} expected one face, found {len(faces)}")
         x1, y1, x2, y2, _ = faces[0]
-        width, height = x2 - x1, y2 - y1
-        raw_boxes.append([
-            max(0, int(y1 - height * 0.20)), min(768, int(y2 + height * 0.32)),
-            max(0, int(x1 - width * 0.18)), min(512, int(x2 + width * 0.18)),
-        ])
+        raw_boxes.append(_wav2lip_box((x1, y1, x2, y2)))
         frames.append(canvas)
     capture.release()
     duration = len(frames) / source_fps if source_fps else 0
@@ -120,22 +145,29 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
             crop = frame[y1:y2, x1:x2]
             if crop.size == 0:
                 raise RuntimeError(f"empty face crop at frame {index}")
-            face = cv2.resize(crop, (256, 256), interpolation=cv2.INTER_AREA)
+            face = cv2.resize(
+                crop,
+                (WAV2LIP_FACE_SIZE, WAV2LIP_FACE_SIZE),
+                interpolation=cv2.INTER_AREA,
+            )
             if not cv2.imwrite(str(full_dir / f"{index:08d}.png"), frame):
                 raise RuntimeError("failed to write full frame")
             if not cv2.imwrite(str(face_dir / f"{index:08d}.png"), face):
                 raise RuntimeError("failed to write face frame")
             coords.append((y1, y2, x1, x2))
+        if len(coords) != len(frames):
+            raise RuntimeError("avatar frame/coordinate count mismatch")
         with (temporary / "coords.pkl").open("wb") as stream:
             pickle.dump(coords, stream)
         median_box = np.median(boxes, axis=0).astype(int).tolist()
         manifest = {
             "schema": 2,
+            "build_revision": AVATAR_BUILD_REVISION,
             "avatar_id": avatar_id,
             "source_sha256": _sha256(source_portrait),
             "idle_video_sha256": _sha256(idle_video),
             "frame_size": [512, 768],
-            "face_size": [256, 256],
+            "face_size": [WAV2LIP_FACE_SIZE, WAV2LIP_FACE_SIZE],
             "coordinates": median_box,
             "frame_count": len(frames),
             "source_fps": round(source_fps, 3),

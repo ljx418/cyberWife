@@ -98,7 +98,9 @@ function App() {
   const [assetCounts, setAssetCounts] = useState({ portrait: 0, voice: 0 })
   const [activePortraitRevision, setActivePortraitRevision] = useState<number | null>(null)
   const [activeAvatarId, setActiveAvatarId] = useState('wav2lip256_avatar1')
+  const [activeAvatarDerivativeId, setActiveAvatarDerivativeId] = useState<number | null>(null)
   const [idleJob, setIdleJob] = useState<IdleGenerationJob | null>(null)
+  const [idleVideoReady, setIdleVideoReady] = useState(false)
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [runtimeRows, setRuntimeRows] = useState<RuntimeService[]>(runtimeServices)
   const [onboardingStatus, setOnboardingStatus] = useState('正在读取本机设置…')
@@ -190,12 +192,13 @@ function App() {
       if (active) setActivePortraitRevision(Number(active.id) || Date.now())
       if (avatar.avatar_id) setActiveAvatarId(avatar.avatar_id)
       if (avatar.id) {
+        setActiveAvatarDerivativeId(avatar.id)
         void ConversationClient.getIdleGeneration(avatar.id)
           .then(async (job) => {
             const resumed = job.status === 'queued' || job.status === 'generating'
               ? await ConversationClient.startIdleGeneration(avatar.id!)
               : job
-            setIdleJob((current) => current ?? resumed)
+            setIdleJob(resumed)
           })
           .catch(() => {})
       }
@@ -492,6 +495,9 @@ function App() {
         if (!build.id) throw new Error('人物数据缺少本机标识')
         const active = await ConversationClient.activateAvatarBuild(build.id)
         setActiveAvatarId(active.avatar_id)
+        setActiveAvatarDerivativeId(active.id ?? build.id)
+        setIdleJob(null)
+        setIdleVideoReady(false)
         if (active.face_box && active.frame_size) {
           const [y1, y2, x1, x2] = active.face_box
           const [width, height] = active.frame_size
@@ -540,6 +546,8 @@ function App() {
       setOnboardingStatus('正在构建实时口型数据并切换形象…')
       const active = await ConversationClient.approveIdleGeneration(derivativeId)
       setActiveAvatarId(active.avatar_id)
+      setActiveAvatarDerivativeId(active.id ?? derivativeId)
+      setIdleVideoReady(false)
       setIdleJob((current) => current ? { ...current, status: 'active', phase: 'complete', progress: 100 } : current)
       setOnboardingStatus('动态形象已启用；待机循环与实时口型均使用本次素材')
     } catch (error) {
@@ -671,7 +679,16 @@ function App() {
       ? '本机加载中'
       : runtimeRows.some((row) => row.status === 'degraded')
         ? '本机降级运行'
-        : '本地在线'
+      : '本地在线'
+  const activePortraitUrl = activePortraitRevision
+    ? ConversationClient.activeAssetUrl('portrait', activePortraitRevision)
+    : null
+  const activeIdleVideoUrl = activeAvatarDerivativeId !== null
+    && idleJob?.derivative_id === activeAvatarDerivativeId
+    && idleJob.status === 'active'
+    && idleJob.has_video_preview
+      ? ConversationClient.idlePreviewUrl(activeAvatarDerivativeId, 'video', idleJob.updated_at)
+      : null
 
   return (
     <main
@@ -679,19 +696,42 @@ function App() {
       aria-label="cyberWife 交互原型"
     >
       <div
-        className="portrait"
-        role="img"
-        aria-label="本机人物形象"
-        style={activePortraitRevision ? {
-          backgroundImage: `url("${ConversationClient.activeAssetUrl('portrait', activePortraitRevision)}")`,
+        className="portrait portrait--backdrop"
+        aria-hidden="true"
+        style={activePortraitUrl ? {
+          backgroundImage: `url("${activePortraitUrl}")`,
           backgroundPosition: `${avatarFocus.x}% ${avatarFocus.y}%`,
         } : undefined}
       />
+      <div
+        className="portrait portrait--foreground"
+        role="img"
+        aria-label="本机人物形象"
+        style={activePortraitUrl ? { backgroundImage: `url("${activePortraitUrl}")` } : undefined}
+      />
+      {activeIdleVideoUrl && (
+        <video
+          key={activeIdleVideoUrl}
+          className={`idle-avatar-video ${idleVideoReady ? 'idle-avatar-video--ready' : ''}`}
+          data-testid="idle-avatar-video"
+          data-avatar-layer="idle"
+          src={activeIdleVideoUrl}
+          autoPlay
+          loop
+          muted
+          playsInline
+          preload="auto"
+          aria-label="本机人物动态待机画面"
+          onCanPlay={() => setIdleVideoReady(true)}
+          onPlaying={() => setIdleVideoReady(true)}
+          onError={() => setIdleVideoReady(false)}
+        />
+      )}
       <canvas
         ref={avatarCanvasRef}
         className="avatar-video"
         aria-label="本机实时人物画面"
-        style={{ objectPosition: `${avatarFocus.x}% ${avatarFocus.y}%` }}
+        style={{ objectPosition: 'right center' }}
       />
       <div className="portrait-shade" />
       <div className="ambient-grain" />
@@ -857,6 +897,14 @@ function App() {
           }}
           onPortraitRestored={(active) => {
             setActiveAvatarId(active.avatar_id)
+            setActiveAvatarDerivativeId(active.id ?? null)
+            setIdleJob(null)
+            setIdleVideoReady(false)
+            if (active.id) {
+              void ConversationClient.getIdleGeneration(active.id)
+                .then(setIdleJob)
+                .catch(() => {})
+            }
             if (active.asset_id) setActivePortraitRevision(active.asset_id)
             if (active.face_box && active.frame_size) {
               const [y1, y2, x1, x2] = active.face_box

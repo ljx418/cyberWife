@@ -1,6 +1,6 @@
 import numpy as np
 
-from ops.build_video_avatar import _letterbox, _loop_metrics, _smooth
+from ops.build_video_avatar import AVATAR_BUILD_REVISION, WAV2LIP_FACE_SIZE, _letterbox, _loop_metrics, _smooth, _wav2lip_box
 from ops.make_seamless_idle import palindrome_frames
 
 
@@ -15,6 +15,19 @@ def test_face_box_smoothing_rejects_single_frame_jitter_in_output():
     smoothed = _smooth(boxes, radius=2)
     assert smoothed[2, 0] < 170
     assert smoothed.dtype == np.int32
+
+
+def test_wav2lip_box_matches_bundled_generator_padding():
+    assert _wav2lip_box((163, 205, 374, 464)) == [205, 474, 163, 374]
+
+
+def test_wav2lip_box_is_bounded_at_frame_edge():
+    assert _wav2lip_box((-20, -30, 140, 190)) == [0, 200, 0, 140]
+
+
+def test_wav2lip_builder_matches_bundled_high_resolution_checkpoint():
+    assert WAV2LIP_FACE_SIZE == 256
+    assert AVATAR_BUILD_REVISION == "cropv2"
 
 
 def test_palindrome_loop_has_exact_seam_and_turnaround():

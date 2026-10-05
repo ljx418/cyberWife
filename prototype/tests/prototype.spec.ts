@@ -56,6 +56,42 @@ test('用户引导完成照片到动态形象的预览确认闭环', async ({ pa
   expect(approved).toBe(true)
 })
 
+test('主舞台使用当前 active avatar 的循环 Idle，静态图只作兜底', async ({ page }) => {
+  await page.route('http://127.0.0.1:7860/api/v1/**', async (route) => {
+    const request = route.request()
+    const path = new URL(request.url()).pathname
+    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+    if (path === '/api/v1/onboarding/draft') return json({ id: 1, consent_granted: true, step_completed: 4, asset_consent_at: null, profile_draft_json: {}, settings_json: { completed: true }, device_snapshot_json: {}, updated_at: '2026-10-05T00:00:00Z' })
+    if (path === '/api/v1/profile') return json({ detail: 'profile_not_found' }, 404)
+    if (path === '/api/v1/health') return json({ status: 'ready', components: {}, resources: {}, version: {} })
+    if (path === '/api/v1/assets/portrait') return json({ kind: 'portrait', items: [{ id: 22, is_active: true }] })
+    if (path === '/api/v1/avatar/active') return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-red', source_sha256: 'active-source', status: 'active', frame_size: [512, 768], face_box: [120, 560, 100, 420] })
+    if (path === '/api/v1/avatar-builds/12/idle-generation') return json({ derivative_id: 12, status: 'active', phase: 'complete', progress: 100, has_frontal_preview: true, has_video_preview: true, updated_at: 'ux6-r1' })
+    if (path.endsWith('/idle-generation/video')) return route.fulfill({ status: 200, contentType: 'video/mp4', body: '' })
+    return json({ ok: true })
+  })
+  await page.goto('/?preview=1')
+  const idle = page.getByTestId('idle-avatar-video')
+  await expect(idle).toHaveAttribute('src', /avatar-builds\/12\/idle-generation\/video/)
+  await expect(idle).toHaveAttribute('loop', '')
+  await expect(idle).toHaveAttribute('autoplay', '')
+  await expect(idle).toHaveJSProperty('muted', true)
+  await expect(idle).toHaveJSProperty('playsInline', true)
+  const layout = await page.evaluate(() => {
+    const foreground = document.querySelector('.portrait--foreground') as HTMLElement
+    const canvas = document.querySelector('.avatar-video') as HTMLElement
+    return {
+      foregroundSize: getComputedStyle(foreground).backgroundSize,
+      canvasFit: getComputedStyle(canvas).objectFit,
+      foregroundWidth: foreground.getBoundingClientRect().width,
+      viewportWidth: innerWidth,
+    }
+  })
+  expect(layout.foregroundSize).toBe('contain')
+  expect(layout.canvasFit).toBe('contain')
+  expect(layout.foregroundWidth).toBeLessThanOrEqual(layout.viewportWidth * 0.69)
+})
+
 test('设置、记忆删除确认和主题切换可用', async ({ page }) => {
   await page.route('http://127.0.0.1:7860/api/v1/memories*', async (route) => {
     if (route.request().method() === 'DELETE') {

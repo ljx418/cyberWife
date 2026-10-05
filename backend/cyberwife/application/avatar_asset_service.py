@@ -94,10 +94,12 @@ class AvatarAssetService:
             raise KeyError(derivative_id)
         source = self._store.resolve(str(row["relative_path"]))
         video_sha = hashlib.sha256(Path(idle_video).read_bytes()).hexdigest()
+        from ops.build_video_avatar import AVATAR_BUILD_REVISION, build
+
         avatar_id = (
-            f"wav2lip256_idle_p_{str(row['source_sha256'])[:16]}_{video_sha[:8]}"
+            f"wav2lip256_idle_p_{str(row['source_sha256'])[:16]}_"
+            f"{video_sha[:8]}_{AVATAR_BUILD_REVISION}"
         )
-        from ops.build_video_avatar import build
 
         target = self._avatar_root / avatar_id
         if target.is_dir() and (target / "manifest.json").is_file():

@@ -97,17 +97,42 @@ select:focus-visible {
 .portrait {
   position: absolute;
   inset: 0;
-  z-index: -4;
-  transform: scale(1.015);
   animation: arrive 1.4s cubic-bezier(0.2, 0.75, 0.2, 1) both;
 }
+.portrait--backdrop {
+  z-index: -6;
+  transform: scale(1.06);
+  filter: blur(22px) saturate(0.72) brightness(0.58);
+}
+.portrait--foreground,
+.idle-avatar-video,
 .avatar-video {
   position: absolute;
-  inset: 0;
-  z-index: -4;
-  width: 100%;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: auto;
+  width: min(68vw, calc(100dvh * 2 / 3));
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
+  object-position: right center;
+}
+.portrait--foreground {
+  z-index: -4;
+  background-size: contain;
+  background-position: right center;
+  background-repeat: no-repeat;
+}
+.idle-avatar-video {
+  z-index: -3;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.idle-avatar-video--ready {
+  opacity: 1;
+}
+.avatar-video {
+  z-index: -2;
   opacity: 0;
   transition: opacity 0.18s ease;
 }
@@ -447,7 +472,10 @@ select:focus-visible {
   width: 100%;
   margin-top: 8px;
 }
-.experience--quiet .portrait {
+.experience--quiet .portrait--backdrop,
+.experience--quiet .portrait--foreground,
+.experience--quiet .idle-avatar-video,
+.experience--quiet .avatar-video {
   filter: saturate(0.72) contrast(0.94);
 }
 .experience--quiet .portrait-shade {
@@ -469,7 +497,10 @@ select:focus-visible {
   --accent: #73a9a0;
   --accent2: #a4cec6;
 }
-.experience--signal .portrait {
+.experience--signal .portrait--backdrop,
+.experience--signal .portrait--foreground,
+.experience--signal .idle-avatar-video,
+.experience--signal .avatar-video {
   filter: saturate(0.62) contrast(1.07);
 }
 .signal-rail {
@@ -507,8 +538,12 @@ select:focus-visible {
 .experience--compact .conversation-copy h1 {
   font-size: 44px;
 }
-.experience--compact .portrait {
-  background-position: 62% center;
+.experience--compact .portrait--foreground,
+.experience--compact .idle-avatar-video,
+.experience--compact .avatar-video {
+  width: 100%;
+  object-fit: cover;
+  object-position: center center;
 }
 .experience--compact .portrait-shade {
   background:
@@ -1269,8 +1304,12 @@ button:disabled {
   .local-status {
     display: none;
   }
-  .portrait {
-    background-position: 61% center;
+  .portrait--foreground,
+  .idle-avatar-video,
+  .avatar-video {
+    width: 100%;
+    object-fit: cover;
+    object-position: center center;
   }
   .portrait-shade {
     background:
@@ -1279,7 +1318,8 @@ button:disabled {
   }
   .conversation-copy {
     left: 24px;
-    top: 34%;
+    top: auto;
+    bottom: 148px;
     width: calc(100% - 48px);
   }
   .conversation-copy h1 {
