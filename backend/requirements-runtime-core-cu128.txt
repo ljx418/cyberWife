@@ -20,6 +20,7 @@ numpy==2.4.4
 # Speech/VAD/embedding. sentence-transformers 3.4 supports the CosyVoice
 # transformers 4.51 line; v6 declares transformers>=5 and is not co-installable.
 faster-whisper==1.2.1
+opencc-python-reimplemented==0.1.7
 sentence-transformers==3.4.1
 silero-vad==6.2.2
 

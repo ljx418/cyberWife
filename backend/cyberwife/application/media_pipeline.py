@@ -10,9 +10,6 @@ from threading import Event, Lock
 
 from cyberwife.domain.cancellation import CancellationToken
 
-from cyberwife.application.sentence_scheduler import semantic_sentences
-
-
 class MediaPipeline:
     def __init__(self, tts, avatar=None, *, queue_size: int = 64) -> None:
         self._tts = tts
@@ -154,15 +151,18 @@ class MediaPipeline:
 
         def produce() -> None:
             try:
-                for sentence in semantic_sentences(text):
-                    for frame in self._tts.synthesize_stream(
-                        sentence, reference_audio_path, reference_transcript
+                # A V1 reply is already bounded by the prompt compiler.  Keep
+                # it in one CosyVoice inference so sentence boundaries share
+                # one prosody contour instead of restarting the voice for
+                # every 4–17 character fragment.
+                for frame in self._tts.synthesize_stream(
+                    text, reference_audio_path, reference_transcript
+                ):
+                    if producer_stop.is_set() or (
+                        cancellation_token is not None and cancellation_token.cancelled
                     ):
-                        if producer_stop.is_set() or (
-                            cancellation_token is not None and cancellation_token.cancelled
-                        ):
-                            return
-                        asyncio.run_coroutine_threadsafe(queue.put(("audio", frame)), loop).result()
+                        return
+                    asyncio.run_coroutine_threadsafe(queue.put(("audio", frame)), loop).result()
             except BaseException as exc:
                 asyncio.run_coroutine_threadsafe(queue.put(("error", exc)), loop).result()
             finally:

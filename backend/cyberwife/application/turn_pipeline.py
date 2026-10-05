@@ -52,6 +52,7 @@ class TurnPipeline:
         runtime_metrics: RuntimeMetricsPort | None = None,
         logger: StructuredLoggerPort | None = None,
         first_playable_min_chars: int = 10,
+        early_media_enabled: bool = False,
         warm_response_cache=None,
         warm_context_provider: Callable[[], Any] | None = None,
         memory_provider: Callable[[str], list[tuple[str, float]]] | None = None,
@@ -72,6 +73,10 @@ class TurnPipeline:
         if not 4 <= first_playable_min_chars <= 18:
             raise ValueError("first_playable_min_chars must be between 4 and 18")
         self._first_playable_min_chars = first_playable_min_chars
+        # CosyVoice voice cloning loses continuity when a reply is synthesized
+        # as an early prefix plus a remainder.  Default to final-reply synthesis;
+        # the old path remains an explicit, reversible latency experiment.
+        self._early_media_enabled = early_media_enabled
         self._warm_response_cache = warm_response_cache
         self._warm_context_provider = warm_context_provider
         self._memory_provider = memory_provider
@@ -572,7 +577,7 @@ class TurnPipeline:
                         )
                         if event:
                             yield event
-                if media_task is None and self._media is not None:
+                if self._early_media_enabled and media_task is None and self._media is not None:
                     # CosyVoice performs poorly on very short fragments.  Ten
                     # Chinese characters is the measured latency/quality floor;
                     # subsequent text generation continues concurrently.

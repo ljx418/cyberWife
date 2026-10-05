@@ -69,6 +69,33 @@ async def test_media_pipeline_tolerates_one_transient_avatar_frame_failure():
 
 
 @pytest.mark.asyncio
+async def test_media_pipeline_synthesizes_a_multi_sentence_reply_once():
+    class Tts:
+        last_metrics = {"rtf": 0.1}
+
+        def __init__(self):
+            self.calls = []
+
+        def synthesize_stream(self, text, *_args):
+            self.calls.append(text)
+            yield (np.ones(320, dtype=np.int16) * 100).tobytes()
+
+    tts = Tts()
+    pipeline = MediaPipeline(tts)
+    try:
+        events = [
+            event
+            async for event in pipeline.stream(
+                "我在认真听你说。你可以慢慢讲。", "ref.wav", "参考"
+            )
+        ]
+        assert tts.calls == ["我在认真听你说。你可以慢慢讲。"]
+        assert sum(event["type"] == "reply.audio.chunk" for event in events) == 1
+    finally:
+        pipeline.close()
+
+
+@pytest.mark.asyncio
 async def test_media_pipeline_degrades_after_three_consecutive_avatar_failures():
     class Tts:
         last_metrics = {"rtf": 0.1}

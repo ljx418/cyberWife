@@ -16,6 +16,9 @@ from cyberwife.ports.asr import AsrPort, AsrResult, AsrSegment
 from cyberwife.infrastructure.structured_logger import StructuredLogger
 
 
+MANDARIN_SIMPLIFIED_PROMPT = "以下是普通话简体中文对话"
+
+
 class FasterWhisperAdapter(AsrPort):
     """Faster-Whisper CTranslate2 适配器。"""
 
@@ -26,9 +29,12 @@ class FasterWhisperAdapter(AsrPort):
         device: str = "cpu",
         compute_type: str = "int8",
     ) -> None:
+        from opencc import OpenCC
+
         self._model_dir = model_dir
         self._device = device
         self._compute_type = compute_type
+        self._simplifier = OpenCC("t2s")
         self._model = None
         self._logger = StructuredLogger(name="cyberwife.asr")
         self._load()
@@ -64,12 +70,15 @@ class FasterWhisperAdapter(AsrPort):
         segs, info = self._model.transcribe(
             audio,
             language="zh",
+            task="transcribe",
             beam_size=1,
             vad_filter=False,
+            condition_on_previous_text=False,
+            initial_prompt=MANDARIN_SIMPLIFIED_PROMPT,
         )
         segs = list(segs)
         duration_ms = int((time.time() - t0) * 1000)
-        text = "".join(s.text for s in segs).strip()
+        text = self._simplifier.convert("".join(s.text for s in segs)).strip()
         # confidence 取所有 segment 的 avg_probability 均值
         probs = [getattr(s, "avg_logprob", 0.0) for s in segs if getattr(s, "avg_logprob", None) is not None]
         if probs:
@@ -86,7 +95,7 @@ class FasterWhisperAdapter(AsrPort):
             AsrSegment(
                 start_ms=max(0, round(float(s.start) * 1000)),
                 end_ms=max(0, round(float(s.end) * 1000)),
-                text=s.text.strip(),
+                text=self._simplifier.convert(s.text).strip(),
                 confidence=float(np.exp(getattr(s, "avg_logprob", 0.0))),
             )
             for s in segs

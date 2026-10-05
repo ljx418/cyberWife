@@ -250,6 +250,48 @@ async def test_short_reply_emits_every_generated_audio_frame():
 
 
 @pytest.mark.asyncio
+async def test_turn_pipeline_waits_for_final_text_and_synthesizes_whole_reply():
+    class ChunkedLlm:
+        def generate_stream(self, prompt, **kwargs):
+            yield "我在认真听你说。"
+            yield "你可以慢慢讲。"
+
+    class RecordingTts:
+        last_metrics = {}
+
+        def __init__(self):
+            self.calls = []
+
+        def synthesize_stream(self, text, *_args):
+            self.calls.append(text)
+            yield b"\x01\x00" * 320
+
+    from cyberwife.application.media_pipeline import MediaPipeline
+
+    tts = RecordingTts()
+    media = MediaPipeline(tts)
+    orchestrator = ConversationOrchestrator()
+    session = orchestrator.open_session()
+    orchestrator.transition(session.id, SessionState.LISTENING)
+    pipeline = TurnPipeline(
+        orchestrator,
+        _Speech(),
+        ChunkedLlm(),
+        PromptCompiler(),
+        OutputSanitizer(),
+        media_pipeline=media,
+        voice_reference_provider=lambda: ("ref.wav", "参考"),
+    )
+    try:
+        events = [event async for event in pipeline.run(session.id, 1, b"\x01\x00" * 320)]
+        assert tts.calls == ["我在认真听你说。你可以慢慢讲。"]
+        assert sum(event.type == "reply.audio.complete" for event in events) == 1
+    finally:
+        pipeline.close()
+        media.close()
+
+
+@pytest.mark.asyncio
 async def test_first_audio_does_not_wait_for_tts_stream_completion():
     release_tail = threading.Event()
 
