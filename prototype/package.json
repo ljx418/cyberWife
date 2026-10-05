@@ -7,7 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:acceptance-core": "node --test acceptance-tests/acc1_human_gate_core.test.mjs"
   },
   "dependencies": {
     "react": "19.3.0",

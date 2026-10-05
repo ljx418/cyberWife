@@ -90,5 +90,28 @@ def test_acc1_human_gate_requires_explicit_focus_consent_and_keeps_no_audio():
     script = (ROOT / "ops/acceptance/Invoke-ACC1HumanGate.ps1").read_text(encoding="utf-8")
     assert "-AcceptFocusChange" in script
     assert "stores_raw_audio = $false" in script
-    assert "physical_mic_three_turns" in script
-    assert "physical_mic_barge_in" in script
+    assert "acc1_human_gate.mjs" in script
+    assert "--no-fake-media" in script
+
+
+def test_acc1_machine_collector_proves_real_turns_without_storing_content():
+    source = "\n".join(
+        (ROOT / path).read_text(encoding="utf-8")
+        for path in (
+            "prototype/tests/acc1_human_gate.mjs",
+            "prototype/tests/acc1_human_gate_core.mjs",
+        )
+    )
+    assert "framereceived" in source and "framesent" in source
+    assert "transcript.final" in source
+    assert "reply.text.final" in source
+    assert "reply.audio.chunk" in source
+    assert "audio.playback.ended" in source
+    assert "turn.cancelled" in source
+    assert "barge_in.detected" in source
+    assert "completedTurns.length >= 3" in source
+    assert "postCancelCompleted" in source
+    assert "stores_raw_audio: false" in source
+    assert "text_final" not in source
+    assert "text_delta" not in source
+    assert "audio_chunk_b64" not in source

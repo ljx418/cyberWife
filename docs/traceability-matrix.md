@@ -16,13 +16,13 @@
 | FR-07 六态状态机 | ConversationOrchestrator、TurnPipeline | B1/B3 | AC-03/11 | 已实现并验收：真实事件链、状态播报与打断状态转换PASS |
 | FR-08 连续对话 | ApiGateway、SpeechRuntime、TurnPipeline、各 adapter | B1/B2/B2.5/B3 | AC-03/04 | 已实现并验收：20/20连续链、普通链30/30及60分钟组合PASS |
 | FR-09 插话取消 | InterruptionController、CancellationToken | B3 | AC-05 | 已实现并验收：早/中/晚30/30，旧generation零泄漏PASS |
-| FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、AvatarSession | B2 | AC-06 | 功能/性能通过：Chrome媒体25fps、三轮降级≤0.54秒、音频继续、原页恢复；A/V偏移或口型主观质量未量化 |
+| FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、AvatarSession | B2/UX5/UX6/V1FINAL | AC-06/VF-AC05/06 | 功能/性能通过：Chrome媒体25fps、三轮降级≤0.54秒、音频继续、原页恢复、A/V机器量化与Crop V2激活通过；当前人物自然度现场评分待签 |
 | FR-11 设置持久化 | Gateway application services、repositories | B0/B4/B5 | AC-01/02/08 | 已实现并验收：六页签真实API与跨重启持久化PASS |
 | FR-12 记忆 CRUD/来源 | MemoryService、SqliteRepository、VectorIndex | B4 | AC-07/08 | 已实现并验收：真实SQLite/sqlite-vec召回、编辑、删除、全清PASS |
 | FR-13 本次不记录 | TurnPipeline、persistence policy | B4 | AC-09 | 已实现并验收：会话中启用后整场业务写入0，原始音频0落盘PASS |
 | FR-14 30天清理 | RetentionService、injectable clock | B4 | AC-10 | 已实现并验收：可注入时钟、转录到期清理且长期记忆保留PASS |
 | FR-15 单服务恢复 | HealthAggregator、RuntimeLauncher、adapters | B0/B2/B2.5/B5 | AC-12 | 已实现并验收：四组件×3恢复、同页继续及Avatar单项恢复PASS |
-| FR-16 响应式/无障碍 | 已批准前端 + 后端真实状态事件 | B5/ACC1 | AC-11 | 部分通过：三尺寸15/15键盘任务、axe、焦点圈闭、aria-live、reduced-motion通过；真实NVDA未安装/未执行 |
+| FR-16 响应式/无障碍 | 已批准前端 + 后端真实状态事件 | B5/ACC1/V1FINAL | AC-11/VF-AC06 | 部分通过：三尺寸15/15键盘任务、axe、焦点圈闭、aria-live、reduced-motion通过；Windows Narrator已检出，五任务现场听感待签 |
 | FR-17 一键生命周期 | Install-CyberWife.ps1、RuntimeLauncher.ps1、server.py | B0/B5/INST1 | AC-14/G6 | RES1资源门PASS；INST1目标机verify、start/recover/stop×2通过；干净Windows+WSL独立复现未验收 |
 | FR-18 本机边界/无公网依赖 | Launcher、Gateway、所有 adapters | B0/B2/B2.5/B5 | AC-13/OX-10 | 已实现并验收：仅loopback/本机桥接、出站白盒与连续连接采样PASS；物理断网按用户决议不执行 |
 | FR-19 HostBridge | browser HostBridge | B5 | 合同回归 | 已实现并验收：浏览器安全unsupported空操作，无本机越权PASS |
@@ -51,7 +51,7 @@
 4. CosyVoice已由ADR-008切为默认非TensorRT profile；Qwen adapter与显式profile必须保留到V1总验收完成。
 5. 发布前所有行必须为“已实现并验收”，证据路径进入 V1 总报告。
 6. 按ADR-009顺序执行：B2.5首响/缓存→B2 Avatar恢复→B3打断→B4记忆隐私→B5完整组合回归；缓存命中不得混入普通首响统计。
-7. B3—B5 可执行命令、退出码和证据目录以 [`acceptance-command-manifest.md`](acceptance-command-manifest.md) v1.1 为准；当前独立审计基线为 2026-10-04。
+7. B3—B5 可执行命令、退出码和证据目录以 [`acceptance-command-manifest.md`](acceptance-command-manifest.md) v1.2 为准；当前工程候选基线为2026-10-06 V1RC1，外部门以V1FINAL为准。
 
 ## AC → FR 反向索引
 

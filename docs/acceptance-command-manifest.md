@@ -1,6 +1,6 @@
 # B3—B5 验收命令与证据清单
 
-**版本**：1.1　**日期**：2026-10-04　**状态**：IMPLEMENTED / AUDITED  
+**版本**：1.2　**日期**：2026-10-06　**状态**：IMPLEMENTED / AUDITED
 本清单定义已经实现的稳定命令接口。目标机证据已生成；诊断失败目录与最终通过目录必须并存，报告只能引用明确标记为正式候选的结果，禁止挑选性忽略失败历史。
 
 ## 1. 统一调用合同
@@ -22,6 +22,7 @@ PYTHONPATH=backend python -m pytest -q backend/tests
 PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/test_release_freeze.py
 (cd workers/avatar && PYTHONPATH=. <avatar-python> -m pytest -q tests)
 (cd prototype && npm run build && npm run test:e2e)
+(cd prototype && npm run test:acceptance-core)
 ```
 
 该限制属于验收工具P2：后续应提供统一根入口，避免执行者误把收集失败当成产品失败。
@@ -70,6 +71,16 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 - “无持续 swap-in”：`pswpin` 是宿主级4KiB页计数，采样器自身会产生零星换入；以连续3个一分钟桶均≥256页（即每分钟≥1MiB）定义为持续换入并判失败，同时保留总页数和分钟峰值。不得用单页变化冒充内存压力，也不得忽略达到该阈值的真实换入。
 - 验收工具自身按 PID 单独记录，不计入项目 14GB，但宿主/WSL 可用≥2GB 的系统硬门包含其影响。
 
-## 6. 实现前检查
+## 6. V1FINAL现场门
+
+在四组件健康、用户已知悉Chrome/Narrator将抢占焦点时，从Windows PowerShell执行：
+
+```powershell
+.\ops\acceptance\Invoke-ACC1HumanGate.ps1 -AcceptFocusChange -Operator "验收人姓名"
+```
+
+缺少`-AcceptFocusChange`必须在启动任何窗口前失败。取证器使用安装版headed Chrome和默认物理输入，自动验证PCM帧、至少三轮完整事件链、一次打断、取消后接续、当前active avatar和停止后Idle推进；人工只签Narrator五任务及三项自然度评分。`audit/v1/ACC1/human-gate.json`不得包含音频、字幕或回答正文，只有总结果为`PASS`且退出码为0才能关闭ACC1/UX6现场门。
+
+## 7. 实现前检查
 
 进入每个子阶段前，负责 Agent 必须先创建本阶段 runner 的合同测试与证据 schema，再实现产品功能。若实际环境无法提供本清单中的采样源，只能返回计划阶段修订，不能删减证据项或降低硬门。

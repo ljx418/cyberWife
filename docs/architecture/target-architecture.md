@@ -1,8 +1,8 @@
 # cyberWife V1 后端目标架构
 
-**版本**：2.6
-**日期**：2026-10-05
-**状态**：B0～B5、B2.5、UX4、UX5均已有目标机证据；ARCH1已关闭应用层反向依赖，RES1已关闭Windows内存余量红项；AC-11/物理麦克风与干净机安装仍阻断全绿
+**版本**：2.7
+**日期**：2026-10-06
+**状态**：B0～B5、B2.5、UX4、UX5、ARCH1、RES1与V1RC1自动化门已有目标机证据；V1FINAL现场取证和干净机安装仍阻断全绿
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -45,7 +45,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；路径不固定WSL用户名；17/17工件/import前检通过；Speech只使用受控venv且ready解析JSON语义 | 补干净机安装与首次启动独立复现 | 目标机通过/干净机待验 |
-| 验收 | 最终冻结回归：后端356 passed/5 skipped、根21/21、Avatar13/13、Playwright15/15；V1RC1 60分钟20完整+10打断通过，Windows最低余量6,181.547MiB | 关闭UX6完整主观、结构化物理麦克风、人工Narrator与干净安装 | 条件阻断 |
+| 验收 | 当前回归：后端356 passed/5 skipped、根22/22、Avatar13/13、Playwright15/15、V1FINAL核心3/3；V1RC1 60分钟20完整+10打断通过，Windows最低余量6,181.547MiB | 现场关闭UX6主观、结构化物理麦克风、人工Narrator；另机关闭干净安装 | 条件阻断 |
 
 ## 3. 目标代码实体
 

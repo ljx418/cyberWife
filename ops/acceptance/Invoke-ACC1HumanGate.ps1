@@ -1,4 +1,4 @@
-<# Guided, human-observed accessibility and physical-microphone acceptance. #>
+<# Guided human perception plus machine-bound physical-microphone acceptance. #>
 [CmdletBinding()]
 param(
     [switch]$AcceptFocusChange,
@@ -9,6 +9,7 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+$stores_raw_audio = $false
 if (-not $AcceptFocusChange) {
     throw 'This guided gate opens Chrome and Narrator and will take focus. Re-run with -AcceptFocusChange when ready.'
 }
@@ -16,6 +17,11 @@ if ([string]::IsNullOrWhiteSpace($Operator)) { throw '-Operator is required for 
 if (-not (Test-Path -LiteralPath $ChromePath -PathType Leaf)) { throw "Chrome missing: $ChromePath" }
 $narratorPath = Join-Path $env:WINDIR 'System32\Narrator.exe'
 if (-not (Test-Path -LiteralPath $narratorPath -PathType Leaf)) { throw "Narrator missing: $narratorPath" }
+$node = (Get-Command node.exe -ErrorAction SilentlyContinue).Source
+if (-not $node) { throw 'Windows node.exe is required for the Playwright evidence collector' }
+$repoRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
+$collector = Join-Path $repoRoot 'prototype\tests\acc1_human_gate.mjs'
+if (-not (Test-Path -LiteralPath $collector -PathType Leaf)) { throw "Collector missing: $collector" }
 
 $healthUris = @(
     'http://127.0.0.1:8090/health',
@@ -37,53 +43,23 @@ $audioEndpoints = @(
 )
 if ($audioEndpoints.Count -eq 0) { throw 'No enabled Windows audio endpoint was found' }
 
-function Read-Pass([string]$Prompt) {
-    do { $answer = (Read-Host "$Prompt [y/n]").Trim().ToLowerInvariant() } while ($answer -notin @('y', 'n'))
-    return ($answer -eq 'y')
-}
-
-$profile = Join-Path $env:TEMP ("cyberwife-acc1-" + [guid]::NewGuid().ToString('N'))
 $narratorWasRunning = $null -ne (Get-Process Narrator -ErrorAction SilentlyContinue)
 $startedNarrator = $false
-$answers = [ordered]@{}
+$exitCode = 2
 try {
     if (-not $narratorWasRunning) {
         Start-Process -FilePath $narratorPath | Out-Null
         $startedNarrator = $true
     }
-    New-Item -ItemType Directory -Path $profile | Out-Null
-    Start-Process -FilePath $ChromePath -ArgumentList @(
-        "--user-data-dir=$profile", '--new-window', '--no-first-run', $Url
-    ) | Out-Null
-    Write-Host 'Chrome/Narrator are open. Grant microphone permission only to the loopback page, then complete each task.'
-    $answers.screen_reader_settings = Read-Pass '读屏可独立打开设置并识别关闭按钮'
-    $answers.screen_reader_start = Read-Pass '读屏可启动对话并听到状态变化'
-    $answers.screen_reader_interrupt = Read-Pass '读屏可理解打断操作与恢复状态'
-    $answers.screen_reader_persona = Read-Pass '读屏可编辑并保存人设'
-    $answers.screen_reader_delete = Read-Pass '读屏可理解删除确认框并取消/确认'
-    $answers.physical_mic_three_turns = Read-Pass '实体麦克风连续3轮均有ASR final、可听回复和人物画面'
-    $answers.physical_mic_barge_in = Read-Pass '说话期间打断1次，旧轮音频/画面泄漏为0'
+    & $node $collector `
+        --no-fake-media `
+        --operator $Operator `
+        --url "$($Url.TrimEnd('/'))/?preview=1" `
+        --chrome-path $ChromePath `
+        --output $ReportPath
+    $exitCode = $LASTEXITCODE
 } finally {
-    Get-CimInstance Win32_Process -Filter "Name = 'chrome.exe'" -ErrorAction SilentlyContinue |
-        Where-Object { ($_.CommandLine -as [string]) -like "*$profile*" } |
-        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
     if ($startedNarrator) { Stop-Process -Name Narrator -Force -ErrorAction SilentlyContinue }
 }
-
-$passed = @($answers.Values | Where-Object { -not $_ }).Count -eq 0
-$result = [ordered]@{
-    schema_version = 1
-    gate = 'ACC1-human-screen-reader-physical-mic'
-    completed_at = (Get-Date -Format 'o')
-    operator = $Operator
-    screen_reader = 'Windows Narrator'
-    audio_endpoints = $audioEndpoints
-    stores_raw_audio = $false
-    answers = $answers
-    result = if ($passed) { 'PASS' } else { 'FAIL' }
-}
-$parent = Split-Path -Parent $ReportPath
-if ($parent) { New-Item -ItemType Directory -Force -Path $parent | Out-Null }
-$result | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ReportPath -Encoding UTF8
-$result | ConvertTo-Json -Depth 6
-if (-not $passed) { exit 2 }
+if ($stores_raw_audio) { throw 'ACC1 collector must never store raw audio' }
+exit $exitCode

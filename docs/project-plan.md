@@ -1,16 +1,16 @@
 # cyberWife V1 项目里程碑与交付计划
 
-**版本**：3.1  
-**日期**：2026-10-05
+**版本**：3.2
+**日期**：2026-10-06
 
-**状态**：B0～B5及B2.5工程阶段完成；RES1已关闭Windows内存余量硬门；V1仍因人工读屏、物理麦克风与干净机安装条件阻断
+**状态**：B0～B5、B2.5、ARCH1、RES1及V1RC1自动化门完成；V1FINAL正在关闭Narrator、物理麦克风与UX6人审，干净机安装仍为独立外部门
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
 ## 1. 项目现状
 
 前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
 
-V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。后续UX5/ARCH1/RES1已关闭口型量化、架构分层和AC-14资源红项；ACC1完成三视口15/15键盘任务并准备Narrator现场签字工具，INST1完成17/17目标机verify、受控Speech venv，以及Core/Avatar两个全新隔离Python 3.12环境的在线和离线真实安装与10/10验证。人工读屏听感、物理麦克风与全新Windows用户+干净WSL+驱动/工件整机复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
+V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。UX5/ARCH1/RES1已关闭A/V机器量化、架构分层和AC-14资源红项；V1RC1又以当前代码重跑普通链、打断与60分钟组合。V1FINAL把原纯人工签字脚本升级为不保存正文/音频的headed Chrome机器取证器，人工只处理Narrator与口型/Idle感知。全新Windows用户+干净WSL+驱动/工件整机复现仍待关闭；商业发布继续被Wav2Lip ResearchOnly阻断。
 
 ## 2. 固定边界
 
@@ -49,6 +49,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | B4 | 记忆可查改删且支持不记录 | MemoryService、RetentionService、Repository | B3 Pass | 删除0召回；不记录0写入 |
 | B5 | 本机边界、一键、故障恢复后形成候选版 | 所有后端实体、验收工具 | B3+B4 Pass | AC-01～14 全 Pass；P0/P1=0 |
 | UX4 | 用户在引导内把照片稳定生成并启用为动态人物 | AvatarAssetService、avatar_idle_pipeline、Onboarding | 三张工作流样片获人工批准 | UX4-AC01～08 Pass；未确认不替换；四服务恢复 |
+| V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据 | Invoke-ACC1HumanGate、Playwright事件取证器 | V1RC1自动化PASS | VF-AC01～07；INST1-AC06仍须独立新环境 |
 
 ## 5. 每阶段交付包
 
@@ -62,7 +63,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 6. 里程碑审计文档，逐条对照入口、任务和出门门槛；
 7. 更新后的需求追踪矩阵和已知限制。
 
-B3、B4、B5的计划、验收、审计与PRD复核分别位于`docs/stages/B3～B5/`；这些文件现均已追加实际结果，历史开发前状态不代表当前状态。
+B3、B4、B5及V1FINAL的计划、验收、审计与PRD复核分别位于`docs/stages/`；历史开发前状态不代表当前状态，当前候选以V1RC1冻结和V1FINAL结果为准。
 
 ## 6. 模型决策门
 
