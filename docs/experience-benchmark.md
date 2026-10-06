@@ -17,7 +17,7 @@ V1 的核心不是“能调用若干模型”，而是本地一键启动后直�
 | 前端入口 | `prototype/src/App.tsx` 已成为生产默认主舞台，Gateway在API/WS之后托管构建产物 | 已通过静态入口与API优先级回归 |
 | 移动端 | 420×720无横向溢出，设置抽屉可滚动 | 自动化覆盖布局/axe；完整任务与触控仍需人工复核 |
 | 实时链路 | 已实现可取消全双工接管、30次打断与Avatar恢复 | 授权WAV覆盖充分；真实物理麦克风和A/V偏移量仍待测 |
-| 启动 | 目标机start/status/recover/stop与双击入口已通过 | 干净机安装尚未验收 |
+| 启动 | 目标机start/status/recover/stop、双击入口与AC07单机隔离可移植性已通过 | AC06独立干净机仅为增强项 |
 | 自动化 | 后端326 passed/4 WSL跳过；Avatar9、根验收4、Playwright9通过 | 测试套件仍需统一根入口；自动化子集不替代真实读屏 |
 | TTS | 固定正确逐字稿30条：Qwen CER 2.14%、CosyVoice CER 0.71%；V1RC1 Windows Chrome普通链30/30，首响P50/P95=4.102/4.708s；60分钟RAM/VRAM/趋势达门 | CosyVoice2按ADR-008保持默认非TRT FP16；R3复位跨请求hop窗口，AC05-R2以系统余量/RSS双门回收；Qwen保留回退 |
 

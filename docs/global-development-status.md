@@ -19,15 +19,15 @@
 | B2.5 | PASS | Cosy普通链P95≤7s、严格缓存、授权盲听、回退 | 无 |
 | B3 | PASS（授权音频） | 30次真实打断、旧轮零泄漏、压力证据 | 真实物理麦克风自由对话未自动化覆盖 |
 | B4 | PASS | sqlite-vec、删除事务、no-record、30天保留 | 无 |
-| B5 / V1RC1 | CONDITIONAL（自动化门PASS） | 当前候选普通链30/30、打断30/30、60分钟、数据生命周期、一键启动、恢复和冻结均PASS | Narrator、结构化物理麦克风、UX6完整主观签署、干净机安装；商业化需换Avatar许可 |
+| B5 / V1RC1 | CONDITIONAL（自动化门PASS） | 当前候选普通链30/30、打断30/30、60分钟、数据生命周期、一键启动、恢复和冻结均PASS | Narrator、结构化物理麦克风、UX6完整主观签署；商业化需换Avatar许可 |
 | UX4 | PASS | 授权照片→正面化→10秒无缝Idle→双预览→人工确认→实时Avatar；196.187秒真实生产编排；四服务恢复 | 口型感知/A-V偏移仍归B2未闭环项，不由Idle视频替代 |
 | UX5 / UX6 | REOPENED / ACTIVATED, WAIT RETEST | 已完成主舞台Idle、四视口构图、停止后Idle恢复和Crop V2紧裁切；用户批准候选并已激活；浏览器确认实际请求新ID，传输/FPS通过 | 激活后需用户完成至少三轮真实对话并签署口型、嘴部与Idle自然度；相对运动诊断仍有一项边缘未过 |
 | UX8 | MACHINE PASS / WAIT USER RETEST | 保守普通话词形归一、全文/segment一致、中文空格清理、900ms句中停顿；真实ASR 3/3、四进程E2E 3/3、Playwright 16/16 | 用户用物理麦克风复验普通话字幕与自然停顿；不得由fixture代签 |
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；当前Playwright 16/16；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
-| INST1 | AC07 DEVELOPED / REAL RUN PENDING | 便携安装入口、隔离venv、7.5GB wheelhouse、替代数据根与当前机真实生命周期历史证据通过；AC07门禁/失败关闭合同已实现 | 当前宿主WSL互操作恢复后重跑AC07绑定当前revision；AC06独立机为增强项 |
-| V1FINAL | DEVELOPED / WAIT EVIDENCE | headed Chrome取证器绑定当前Git revision；AC09按显式部署策略复核完整发布、现场门和AC06/AC07之一 | 现场结构化报告与当前revision AC07报告 |
+| INST1 | PASS（AC07最低保证） | 隔离venv、7.5GB wheelhouse、替代数据根、便携工件、start×2/status/recover/stop×2共12/12步骤PASS，端口/PID归零 | AC06独立机仅为增强项 |
+| V1FINAL | AUTOMATION COMPLETE / WAIT HUMAN | headed Chrome取证器绑定当前Git revision；AC09发布门和AC07部署门PASS | 仅缺现场结构化人工总验收报告 |
 
 ## 3. 已完成依赖链
 
@@ -45,4 +45,4 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6四项实现缺陷已关闭，Crop V2已激活；UX8机器门完成。V1FINAL现场取证器已通过无人值守测试。ADR-012将最低部署保证改为AC07单机隔离可移植性，不再等待第二台电脑；当前仍需生成绑定最终revision的AC07报告和现场结构化报告，因此V1尚未全绿。
+已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6四项实现缺陷已关闭，Crop V2已激活；UX8机器门完成。V1FINAL现场取证器已通过无人值守测试。AC07当前revision报告已经12/12步骤PASS，最低部署保证闭环。自动化开发与验收已推进到人工总验收门前；V1尚未全绿的唯一原因是现场结构化人工报告尚未执行。

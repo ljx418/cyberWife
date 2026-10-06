@@ -11,6 +11,16 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+
+function Convert-WindowsPathToWsl([string]$Path) {
+    $portablePath = $Path.Replace('\', '/')
+    $converted = ((& wsl.exe -- wslpath -a -u $portablePath) | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $converted.StartsWith('/')) {
+        throw "failed to translate path to WSL: $Path"
+    }
+    return $converted
+}
+
 if ([string]::IsNullOrWhiteSpace($PythonWsl)) {
     $wslHome = ((& wsl.exe -- sh -lc 'printf %s "$HOME"') | Out-String).Trim()
     $PythonWsl = "$wslHome/.cyberWife/venvs/cosyvoice/bin/python"
@@ -23,9 +33,8 @@ if ([string]::IsNullOrWhiteSpace($DeploymentReport)) {
     $reportName = if ($DeploymentPolicy -eq 'clean-machine') { 'INST1-AC06.json' } else { 'INST1-AC07.json' }
     $DeploymentReport = Join-Path $env:LOCALAPPDATA "cyberWife\acceptance\$reportName"
 }
-$installWsl = ((& wsl.exe -- wslpath -a $DeploymentReport) | Out-String).Trim()
-$outputWsl = ((& wsl.exe -- wslpath -a $OutputPath) | Out-String).Trim()
-if (-not $installWsl.StartsWith('/') -or -not $outputWsl.StartsWith('/')) { throw 'failed to translate report paths to WSL' }
+$installWsl = Convert-WindowsPathToWsl $DeploymentReport
+$outputWsl = Convert-WindowsPathToWsl $OutputPath
 
 & wsl.exe --cd $WorkspaceWsl env 'PYTHONPATH=.:backend' $PythonWsl `
     ops/acceptance/audit_v1_completion.py `

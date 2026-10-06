@@ -11,6 +11,6 @@
 | 干净机规格复核 | PASS | 独立复核revision、身份隔离、五项clean-before、offline-only、绑定哈希和九个固定生命周期步骤 |
 | 失败关闭 | PASS | 缺报告=PENDING/2；字段、SHA或revision错误=FAIL/1；恶意类型输入不导致绕过或崩溃 |
 | 隐私 | PASS | 总报告只含三门状态、稳定错误码、revision和商业边界；不复制原报告内容 |
-| 自动化回归 | PASS | 后端358 passed/5 skipped；根31 passed；Avatar13；前端build+Playwright15；取证核心3；PowerShell AST通过 |
+| 自动化回归 | PASS | 后端361 passed/7 skipped；根37 passed；Avatar13；前端build+Playwright16；取证核心3；PowerShell AST 4文件通过 |
 
 开放Critical/P0=0、Major=0。未执行会抢焦点的现场门，也未创建系统用户或WSL。

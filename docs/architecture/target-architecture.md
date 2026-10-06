@@ -2,7 +2,7 @@
 
 **版本**：2.8
 **日期**：2026-10-06
-**状态**：B0～B5、B2.5、UX4、UX5、ARCH1、RES1与V1RC1自动化门已有目标机证据；V1FINAL现场报告与INST1-AC07当前revision报告待闭环
+**状态**：B0～B5、B2.5、UX4、UX5、ARCH1、RES1、V1RC1与INST1-AC07自动化门已有目标机证据；仅V1FINAL现场人工报告待闭环
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -45,7 +45,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
-| 验收 | V1FINAL现场报告绑定Git revision；AC09总门复算完整源码、依赖、前端和证据SHA，并校验现场/部署报告同提交；部署策略显式区分AC07同机隔离与AC06独立机 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator；同机生成AC07报告 | 聚合器与AC07执行器已开发/真实报告待生成 |
+| 验收 | V1FINAL现场报告绑定Git revision；AC09总门复算完整源码、依赖、前端和证据SHA，并校验现场/部署报告同提交；部署策略显式区分AC07同机隔离与AC06独立机 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator | AC07当前revision报告PASS；仅现场人工报告待生成 |
 
 ## 3. 目标代码实体
 
@@ -253,7 +253,7 @@ Mock 测试只能让实体进入“合同通过”，不能进入“已验收”
 
 ## 13. 架构出门条件
 
-架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1和RES1已关闭分层/资源红项；完整现场门与INST1-AC07单机隔离可移植性仍须绑定当前revision。INST1-AC06独立机复现为增强保证，不再是V1最低门。
+架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1、RES1与INST1-AC07当前revision报告已关闭分层、资源和最低部署红项；只剩完整现场人工门。INST1-AC06独立机复现为增强保证，不再是V1最低门。
 
 ## 14. B2.5 优化扩展
 
@@ -265,5 +265,5 @@ B2.5 不改变本架构的依赖方向。新增 `WarmResponsePolicy`、`WarmResp
 
 - B3（已实现）：Gateway 已切换全双工 session runtime，并通过统一取消与 generation fence 验收。
 - B4（已实现）：记忆、隐私、保留和 sqlite-vec 真实往返已落地；运行时不以 FTS-only 或内存 fallback 冒充 ready。
-- B5（已实现、外部门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层和资源红项已关闭，人工Narrator/物理麦克风与AC07当前revision报告仍需补证。
+- B5（已实现、人工门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层、资源和AC07最低部署红项已关闭，只需人工Narrator/物理麦克风与主观体验签署。
 - 详细计划和真实门槛见 `stages/B3～B5`；可编辑总图为 `cyberWife-b3-b5-delivery-gap.drawio`。

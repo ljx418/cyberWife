@@ -1,7 +1,7 @@
 # INST1 阶段结果
 
-**日期**：2026-10-05
-**结论**：CONDITIONAL；INST1.1～INST1.3、隔离Python运行时、离线wheelhouse和当前机真实生命周期已有PASS证据。ADR-012批准AC07作为V1最低部署门，门禁已实现，尚待宿主互操作恢复后生成绑定最终revision的正式报告；AC06干净Windows/WSL降为增强项。
+**日期**：2026-10-06
+**结论**：PASS（V1最低保证）；INST1.1～INST1.3、隔离Python运行时、离线wheelhouse、便携工件和AC07当前revision完整生命周期均有PASS证据。AC06干净Windows/WSL保留为增强项。
 
 ## 已完成
 
@@ -20,9 +20,10 @@
 - 当前Ubuntu缺失`python3.12-venv/ensurepip`，安装器真实走通`uv --seed --python /usr/bin/python3`回退；不需要也不会自动执行`sudo apt`。机器可读证据为`audit/v1/INST1/isolated-runtime-result.json`，覆盖Python版本、venv隔离、依赖一致性、核心三方模块以及Gateway/Speech/CosyVoice/LiveTalking/Wav2Lip项目源码导入。
 - INST1.3生成Core/Avatar分仓离线wheelhouse：261个wheel、73个同盘硬链接去重、实际7.5GB，清单SHA256全量复算PASS。两个新的Python 3.12 venv只通过`--no-index --find-links`安装，安装器`ready=true`、两套`pip check`无冲突、运行时/项目源码检查10/10 PASS；不传联网授权的构建负例在写目录前返回1。脱敏汇总证据为`audit/v1/INST1/offline-install-result.json`。
 - INST1-AC06R独立执行器：分别拒绝开发机Windows SID哈希和WSL machine-id哈希，要求数据根/venv/config/本机注册表执行前均不存在；只允许离线wheelhouse和显式许可/同意的本地制品清单，并自动执行prepare、verify、start×2、status、Avatar recover、stop×2。初版暴露的开发机绝对路径、私有音频硬编码和缺省Avatar缺失均已修复；当前机私有迁移、真实四组件启动/Avatar恢复/双停归零通过。
+- INST1-AC07在当前提交真实执行：隔离venv、no-index安装证据、替代数据根、便携工件、前端跟踪状态与路径参数化全部复核；start×2/status/Avatar recover/stop×2为12/12步骤PASS，最终端口/PID归零。
 
-## 未完成
+## 增强项与边界
 
 没有第二个全新Windows 11用户或干净VM+WSL可用，因此项目不声称跨Windows用户、WSL发行版或GPU驱动复现。AC07只在报告中签署同机隔离可移植性；未来仍可用AC06提升保证，无需迁移产品架构。
 
-开放P1：`INST1-P1-01 干净Windows+WSL独立复现待执行`。AC06R工具已就绪，但没有新环境PASS报告前不得签INST1或V1全绿。
+增强项`INST1-AC06 干净Windows+WSL独立复现`仍待未来有第二环境时执行。它不再是V1 P1或最低出门门槛；没有AC06报告时不得宣传跨Windows身份、跨WSL发行版或跨GPU驱动兼容。

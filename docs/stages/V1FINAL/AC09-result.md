@@ -1,6 +1,6 @@
 # V1FINAL-AC09 阶段结果
 
-**结论**：AUTOMATION PASS / EXTERNAL REPORTS PENDING
+**结论**：AUTOMATION PASS / HUMAN REPORT PENDING
 
 已交付：
 
@@ -11,4 +11,4 @@
 - 已验收`prototype/dist`纳入Git发布，干净clone离线安装不再依赖npm registry或预热缓存。
 - 八组总门合同测试：原四组及AC07显式策略PASS、AC06不可冒充AC07、缺隔离/限制字段失败关闭、release_id漂移失败关闭。
 
-当前历史全量回归全绿（Backend 361/5 skipped、根31、Avatar13、Playwright16、现场核心3）。当前正式总门在结构化现场报告与当前revision AC07报告齐备前保持PENDING；聚合器不会把用户口头签署或旧revision证据改写为机器PASS。
+当前全量回归全绿（Backend 361/7 skipped、根37、Avatar13、Playwright16、现场核心3），AC07当前revision报告12/12步骤PASS。正式总门现只因结构化现场报告缺失保持PENDING；部署门已PASS。聚合器不会把用户口头签署或旧revision证据改写为机器PASS。

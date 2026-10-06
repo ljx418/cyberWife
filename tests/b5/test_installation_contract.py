@@ -191,6 +191,8 @@ def test_single_machine_portability_gate_is_explicit_offline_and_fail_closed():
     assert '"status", "--porcelain", "--untracked-files=no"' in builder
     assert "single-machine-portability" in completion
     assert "clean-machine" in completion
+    assert "function Convert-WindowsPathToWsl" in completion
+    assert "wslpath -a -u $portablePath" in completion
 
 
 def test_single_machine_portability_gate_does_not_pipe_a_nested_powershell_launcher():
