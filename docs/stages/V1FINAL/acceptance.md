@@ -9,7 +9,7 @@
 | VF-AC05 | 当前人物绑定 | active avatar id 与浏览器 Avatar WebSocket 参数一致；实时 Canvas 曾进入 live，结束后 Idle 继续推进 |
 | VF-AC06 | 人工感知 | Narrator 五任务全部为是；口型同步、嘴部自然度、Idle自然度均≥4/5；结束后持续Idle为是 |
 | VF-AC07 | 文档一致性 | PRD、计划、架构、追踪矩阵和冻结文档对工程完成项、外部门与商业边界描述一致 |
-| VF-AC08 | 干净环境边界 | 当前机不得冒签 INST1-AC06；只有全新Windows用户+干净WSL+驱动+本地工件实证可关闭 |
-| VF-AC09 | 最终总门 | 发布冻结逐文件哈希、revision绑定现场报告、revision绑定干净机报告全部PASS；缺失=PENDING，过期/伪造=FAIL |
+| VF-AC08 | 部署可移植性边界 | V1至少通过INST1-AC07单机隔离门并显式记录同身份/内核/驱动限制；INST1-AC06独立干净机可作为更高保证替代 |
+| VF-AC09 | 最终总门 | 发布冻结逐文件哈希、revision绑定现场报告、显式策略对应的部署报告全部PASS；缺失=PENDING，过期/伪造=FAIL |
 
 现场门失败返回非零退出码并保留脱敏失败报告；失败不得改写为“基本通过”。

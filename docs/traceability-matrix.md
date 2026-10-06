@@ -23,7 +23,7 @@
 | FR-14 30天清理 | RetentionService、injectable clock | B4 | AC-10 | 已实现并验收：可注入时钟、转录到期清理且长期记忆保留PASS |
 | FR-15 单服务恢复 | HealthAggregator、RuntimeLauncher、adapters | B0/B2/B2.5/B5 | AC-12 | 已实现并验收：四组件×3恢复、同页继续及Avatar单项恢复PASS |
 | FR-16 响应式/无障碍 | 已批准前端 + 后端真实状态事件 | B5/ACC1/V1FINAL | AC-11/VF-AC06 | 部分通过：三尺寸15/15键盘任务、axe、焦点圈闭、aria-live、reduced-motion通过；Windows Narrator已检出，五任务现场听感待签 |
-| FR-17 一键生命周期 | Install-CyberWife.ps1、prepare_local_artifacts.py、RuntimeLauncher.ps1、Invoke-INST1CleanMachineAcceptance.ps1 | B0/B5/INST1 | AC-14/G6/INST1-AC06R | RES1资源门及目标机生命周期PASS；模型/音色/Avatar/Cosy源码由离线清单可移植发布，当前机迁移与真实启停PASS；新Windows+WSL正式accept待验 |
+| FR-17 一键生命周期 | Install-CyberWife.ps1、prepare_local_artifacts.py、RuntimeLauncher.ps1、Invoke-INST1SingleMachinePortability.ps1；AC06为增强项 | B0/B5/INST1 | AC-14/G6/INST1-AC07 | RES1与目标机生命周期PASS；AC07复核隔离venv、no-index wheelhouse、替代数据根、便携制品和真实生命周期，并披露同机限制 |
 | FR-18 本机边界/无公网依赖 | Launcher、Gateway、所有 adapters | B0/B2/B2.5/B5 | AC-13/OX-10 | 已实现并验收：仅loopback/本机桥接、出站白盒与连续连接采样PASS；物理断网按用户决议不执行 |
 | FR-19 HostBridge | browser HostBridge | B5 | 合同回归 | 已实现并验收：浏览器安全unsupported空操作，无本机越权PASS |
 | FR-20 严格问候预热 | WarmResponsePolicy、WarmResponseCache、RuntimeMetrics | B2.5 | AC-04A/OX-03～05 | 已开发并签署；真实命中P95=56ms、30条负例错误命中=0 |

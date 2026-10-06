@@ -81,7 +81,17 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 
 缺少`-AcceptFocusChange`必须在启动任何窗口前失败。取证器使用安装版headed Chrome和默认物理输入，自动验证PCM帧、至少三轮完整事件链、一次打断、取消后接续、当前active avatar和停止后Idle推进；人工只签Narrator五任务及三项自然度评分。`audit/v1/ACC1/human-gate.json`不得包含音频、字幕或回答正文，只有总结果为`PASS`且退出码为0才能关闭ACC1/UX6现场门。
 
-## 7. INST1-AC06独立干净环境门
+## 7. INST1部署门
+
+只有一台电脑时，V1默认运行AC07：
+
+```powershell
+.\ops\acceptance\Invoke-INST1SingleMachinePortability.ps1 -AcceptReducedAssurance
+```
+
+AC07要求release绑定、隔离venv、离线wheelhouse、替代数据根、便携制品、跟踪前端、参数化路径及start×2/status/recover/stop×2全部通过；报告固定披露同Windows身份、WSL machine-id和GPU驱动未交叉验证。缺少显式`-AcceptReducedAssurance`必须在启动前失败。
+
+更高保证的INST1-AC06独立干净环境门保留：
 
 开发机先运行只读`fingerprint`；新Windows用户+干净默认WSL以开发机两个哈希作为拒绝值，再执行正式`accept`：
 
@@ -98,13 +108,13 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 
 ## 8. V1FINAL-AC09最终总门
 
-现场门与独立干净机门均执行后，在产生干净机报告的Windows用户中运行：
+现场门与默认AC07执行后运行：
 
 ```powershell
 .\ops\acceptance\Invoke-V1CompletionAudit.ps1
 ```
 
-工具逐文件复算当前发布冻结的源码、依赖、前端工件与既有证据，并要求现场/干净机报告的workspace revision等于当前HEAD。缺报告返回`PENDING`/退出2，哈希、字段或revision不符返回`FAIL`/退出1，只有三门全PASS返回0。聚合报告不保存操作者、身份哈希、对话/音频或私有路径。
+使用AC06时显式传`-DeploymentPolicy clean-machine -DeploymentReport <路径>`。工具逐文件复算当前发布冻结，并要求现场/部署报告revision等于HEAD。两个部署schema不可互相冒充；缺报告返回`PENDING`/退出2，哈希、字段或revision不符返回`FAIL`/退出1，只有三门全PASS返回0。聚合报告不保存操作者、身份哈希、对话/音频或私有路径。
 
 ## 9. 实现前检查
 

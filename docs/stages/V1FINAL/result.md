@@ -13,12 +13,12 @@
 - Windows Node与WSL Node核心单测均3/3通过；AC06R后安装合同11/11、制品准备器3/3、焦点保护、Node语法和PowerShell AST通过。
 - UX8后当前全量不抢焦点回归：后端361 passed/5 skipped；根31 passed；Avatar13 passed；前端build、Playwright16 passed；取证核心3/3。
 - UX8真实四进程授权PCM 3/3通过，普通话词形归一与900ms句中停顿机器门通过；物理麦克风主观复验并入本阶段现场门，不由fixture代签。
-- AC09新增最终总门：现场报告绑定Git revision，发布冻结补齐Workers/Migrations/现场核心并只收跟踪文件；总门重新核验三门细项而非只信顶层PASS。AC09后根回归31 passed。
+- AC09最终总门按显式策略接收AC07单机隔离报告或AC06独立机报告；两个schema不可互换，报告公开保证等级。现场报告仍绑定Git revision，总门重新核验细项而非只信顶层PASS。
 - PRD、架构、计划、验收、追踪矩阵、命令清单、全局状态和8页Draw.io已同步当前事实。
 
 ## 尚未执行
 
-本轮没有擅自打开Chrome/Narrator或采集物理麦克风，因此现场报告尚不存在。执行前需明确通知用户电脑焦点将被占用。全新Windows用户+干净WSL整机复现继续属于另一个外部环境门，当前发行版或其克隆不能替代。
+本轮没有擅自打开Chrome/Narrator或采集物理麦克风，因此现场结构化报告仍须复核。执行前需明确通知用户电脑焦点将被占用。用户已批准AC07单机隔离可移植性作为V1最低部署门；全新Windows用户+干净WSL的AC06保留为增强项，AC07不会冒充它。
 
 ## 现场命令
 

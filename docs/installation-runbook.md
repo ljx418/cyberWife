@@ -39,7 +39,17 @@ cd C:\workSpace\cyberWife
 
 V1发布仓库直接携带已验收的`prototype/dist`。离线prepare发现该目录缺失或损坏时立即失败并要求恢复Git工件，绝不会静默执行`npm ci`；只有显式`DependencyMode=online + AllowNetworkInstall`才允许重建缺失前端。
 
-### 独立干净环境总验收
+### V1默认：单机隔离可移植性验收
+
+只有一台电脑时，在当前Windows PowerShell执行：
+
+```powershell
+.\ops\acceptance\Invoke-INST1SingleMachinePortability.ps1 -AcceptReducedAssurance
+```
+
+该命令不会把当前目录重复启动冒充干净机。它重新校验发布冻结、两个全新隔离venv的既有机器证据、`--no-index` wheelhouse全量哈希、`/tmp`替代数据根、便携本地制品、Git跟踪前端和路径参数化，并真实执行start×2/status/Avatar recover/stop×2。报告写入`%LOCALAPPDATA%\cyberWife\acceptance\INST1-AC07.json`，且明确同Windows身份、同WSL machine-id、同GPU驱动栈未被交叉验证。
+
+### 增强项：独立干净环境总验收
 
 先在开发机只读获取两个拒绝哈希（不要把输出提交到Git）：
 
@@ -103,7 +113,7 @@ python3 ops/data_lifecycle.py clear-data --help
 
 ## 7. 验收边界
 
-当前目标机`verify`13/13、真实start/status/Avatar recover/stop×2均通过。真正的“干净机安装PASS”还必须在新的Windows用户或干净VM+WSL执行本页全流程；当前机器的成功不能替代该证据。
+V1最低部署保证是INST1-AC07“单机隔离可移植性”，不是“独立干净机”。若要声称跨Windows身份/WSL/驱动的独立复现，仍必须在新的Windows用户或干净VM+WSL执行INST1-AC06；当前机器的成功不能替代该增强证据。
 
 在四组件健康、用户已知悉Chrome/Narrator将抢占焦点时，从Windows PowerShell执行现场门：
 
@@ -113,10 +123,10 @@ python3 ops/data_lifecycle.py clear-data --help
 
 缺少焦点授权时必须在打开窗口前失败。现场报告绑定当前干净Git revision，不保存音频、字幕或回答正文。
 
-现场门与独立干净机门均完成后，在生成干净机报告的Windows用户中执行：
+现场门与AC07均完成后执行默认总门：
 
 ```powershell
 .\ops\acceptance\Invoke-V1CompletionAudit.ps1
 ```
 
-该只读总门要求发布冻结、现场报告和干净机报告属于同一Git revision，并逐文件复算受管源码、依赖、前端和证据SHA。退出0才代表个人/研究用途V1全绿；退出2表示外部报告仍缺失，退出1表示报告失败、过期或与当前代码不一致。
+若另有独立机AC06报告，可改用`-DeploymentPolicy clean-machine -DeploymentReport <路径>`提升保证等级。总门要求发布冻结、现场报告和所选部署报告属于同一Git revision，并逐文件复算受管源码、依赖、前端和证据SHA。退出0才代表对应保证等级下的个人/研究用途V1全绿；退出2表示报告缺失，退出1表示失败、过期或与当前代码不一致。

@@ -23,6 +23,20 @@ INSTALL_STEPS = (
     "offline-prepare", "local-cosy-source", "installer-verify", "start-1",
     "start-2", "status", "recover-avatar", "stop-1", "stop-2",
 )
+PORTABILITY_STEPS = (
+    "release-bind", "isolated-runtimes", "offline-wheelhouse",
+    "portable-artifacts", "tracked-frontend", "portable-path-contract",
+    "start-1", "start-2", "status", "recover-avatar", "stop-1", "stop-2",
+)
+PORTABILITY_ISOLATION_KEYS = (
+    "fresh_core_venv", "fresh_avatar_venv", "no_system_site_packages",
+    "no_index_install", "alternate_data_root_exercised",
+    "portable_artifact_bundle_verified", "tracked_frontend",
+    "parameterized_runtime_paths",
+)
+PORTABILITY_LIMITATIONS = (
+    "same_windows_identity", "same_wsl_machine_id", "same_gpu_driver_stack",
+)
 
 
 def _sha256(path: Path) -> str:
@@ -164,7 +178,7 @@ def verify_human(path: Path, revision: str) -> dict[str, Any]:
 def verify_install(path: Path, revision: str) -> dict[str, Any]:
     document, errors = _load(path)
     if document is None:
-        return _gate("clean-environment", errors, missing_is_pending=True)
+        return _gate("deployment-portability", errors, missing_is_pending=True)
     if document.get("schema_version") != 1 or document.get("gate") != "INST1-AC06-clean-machine":
         errors.append("install_schema_invalid")
     if document.get("workspace_revision") != revision:
@@ -188,12 +202,78 @@ def verify_install(path: Path, revision: str) -> dict[str, Any]:
             errors.append("install_binding_invalid")
     if not REVISION.fullmatch(str(document.get("cosyvoice_revision", "")).lower()):
         errors.append("install_binding_invalid")
-    return _gate("clean-environment", errors)
+    gate = _gate("deployment-portability", errors)
+    gate["assurance_level"] = "independent-clean-machine"
+    return gate
 
 
-def audit_completion(workspace: Path, release: Path, human: Path, install: Path, revision: str) -> dict[str, Any]:
+def verify_portability(path: Path, revision: str, release_id: str = "") -> dict[str, Any]:
+    """Verify the explicitly reduced, same-machine isolated portability gate.
+
+    This is deliberately a different schema from the independent clean-machine
+    report.  It cannot be mistaken for proof of another Windows/WSL/driver stack.
+    """
+    document, errors = _load(path)
+    if document is None:
+        return _gate("deployment-portability", errors, missing_is_pending=True)
+    if document.get("schema_version") != 1 or document.get("gate") != "INST1-AC07-single-machine-portability":
+        errors.append("portability_schema_invalid")
+    if document.get("workspace_revision") != revision:
+        errors.append("revision_mismatch")
+    if release_id and document.get("release_id") != release_id:
+        errors.append("release_mismatch")
+    if (
+        document.get("result") != "PASS"
+        or document.get("assurance_level") != "single-machine-isolated-portability"
+        or document.get("same_machine") is not True
+        or document.get("cross_machine_driver_verified") is not False
+    ):
+        errors.append("portability_gate_not_pass")
+    if document.get("offline_only") is not True:
+        errors.append("portability_not_offline")
+    isolation = document.get("isolation", {})
+    if not isinstance(isolation, dict) or not all(isolation.get(key) is True for key in PORTABILITY_ISOLATION_KEYS):
+        errors.append("portability_isolation_incomplete")
+    steps = document.get("steps", [])
+    step_map = {
+        item.get("name"): item.get("pass") for item in steps
+        if isinstance(item, dict) and isinstance(item.get("name"), str)
+    } if isinstance(steps, list) else {}
+    if not all(step_map.get(name) is True for name in PORTABILITY_STEPS):
+        errors.append("portability_steps_incomplete")
+    limitations = document.get("limitations", [])
+    if not isinstance(limitations, list) or not all(value in limitations for value in PORTABILITY_LIMITATIONS):
+        errors.append("portability_limitations_missing")
+    for key in ("release_id", "wheelhouse_manifest_sha256", "artifact_manifest_sha256"):
+        if not HASH.fullmatch(str(document.get(key, "")).lower()):
+            errors.append("portability_binding_invalid")
+    if not REVISION.fullmatch(str(document.get("cosyvoice_revision", "")).lower()):
+        errors.append("portability_binding_invalid")
+    gate = _gate("deployment-portability", errors)
+    gate["assurance_level"] = "single-machine-isolated-portability"
+    gate["limitations"] = list(PORTABILITY_LIMITATIONS)
+    return gate
+
+
+def audit_completion(
+    workspace: Path,
+    release: Path,
+    human: Path,
+    deployment: Path,
+    revision: str,
+    deployment_policy: str = "clean-machine",
+) -> dict[str, Any]:
     revision = revision.lower()
-    gates = [verify_release(workspace, release), verify_human(human, revision), verify_install(install, revision)]
+    if deployment_policy not in {"clean-machine", "single-machine-portability"}:
+        raise ValueError("unsupported deployment policy")
+    release_document, _ = _load(release)
+    release_id = str(release_document.get("release_id", "")) if release_document else ""
+    deployment_gate = (
+        verify_install(deployment, revision)
+        if deployment_policy == "clean-machine"
+        else verify_portability(deployment, revision, release_id)
+    )
+    gates = [verify_release(workspace, release), verify_human(human, revision), deployment_gate]
     states = {gate["result"] for gate in gates}
     result = "FAIL" if "FAIL" in states else ("PENDING" if "PENDING" in states else "PASS")
     return {
@@ -202,6 +282,8 @@ def audit_completion(workspace: Path, release: Path, human: Path, install: Path,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "workspace_revision": revision,
         "scope": "personal-research-v1",
+        "deployment_policy": deployment_policy,
+        "deployment_assurance": deployment_gate.get("assurance_level", "unverified"),
         "commercial_use": "NO-GO: Wav2Lip-ResearchOnly",
         "gates": gates,
         "result": result,
@@ -224,14 +306,21 @@ def main() -> int:
     parser.add_argument("--workspace", type=Path, default=Path(__file__).resolve().parents[2])
     parser.add_argument("--release", type=Path)
     parser.add_argument("--human", type=Path)
-    parser.add_argument("--install", type=Path, required=True)
+    parser.add_argument("--deployment-report", "--install", dest="deployment", type=Path, required=True)
+    parser.add_argument(
+        "--deployment-policy",
+        choices=("clean-machine", "single-machine-portability"),
+        default="single-machine-portability",
+    )
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     workspace = args.workspace.resolve()
     release = args.release or workspace / "audit/v1/B5/B5.6-freeze/release-manifest.json"
     human = args.human or workspace / "audit/v1/ACC1/human-gate.json"
     output = args.output or workspace / "audit/v1/V1FINAL/completion.json"
-    result = audit_completion(workspace, release, human, args.install, _git_revision(workspace))
+    result = audit_completion(
+        workspace, release, human, args.deployment, _git_revision(workspace), args.deployment_policy,
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(result, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(result, ensure_ascii=False, indent=2))

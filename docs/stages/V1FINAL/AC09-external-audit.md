@@ -2,7 +2,7 @@
 
 **结论**：PASS FOR LIVE/INDEPENDENT EXECUTION；V1仍未签署。
 
-审查一：总门不只读取三个`result`。发布门逐文件复算SHA/size；现场门和干净机门重新检查原始结构化计数、布尔和阈值，降低手工编辑顶层PASS的风险。
+审查一：总门不只读取三个`result`。发布门逐文件复算SHA/size；现场门和部署门重新检查原始结构化计数、布尔和阈值。AC06/AC07采用不同schema和显式策略，降低手工编辑顶层PASS或保证等级混淆的风险。
 
 审查二：现场报告此前缺少代码版本归属，现已由PowerShell从干净跟踪工作树取得HEAD并传入Chrome取证器；AC06R原本已有workspace revision。跨提交报告必定FAIL。
 

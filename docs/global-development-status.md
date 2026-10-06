@@ -6,7 +6,7 @@
 
 ## 1. 结论
 
-原B0～B5六个开发阶段加B2.5共七个工程阶段门：**7/7已有实现与目标机证据**。V1RC1在UX7后重新签署当前候选：普通Chrome链30/30、P50/P95=4.102/4.708秒；打断30/30、静音P95=1.9ms；60分钟20完整+10打断全PASS，RAM峰值13,775.637MiB、Windows最低余量6,181.547MiB。V1FINAL已具备revision绑定现场取证与AC09失败关闭总门；当前仍须用户现场执行和独立干净Windows+WSL环境。商业用途因Wav2Lip ResearchOnly为NO-GO。
+原B0～B5六个开发阶段加B2.5共七个工程阶段门：**7/7已有实现与目标机证据**。V1RC1当前候选普通Chrome链30/30、P50/P95=4.102/4.708秒；打断30/30、静音P95=1.9ms；60分钟20完整+10打断全PASS。V1FINAL已有revision绑定现场取证与AC09失败关闭总门。用户已批准以INST1-AC07单机隔离可移植性替代第二台物理机硬门；AC06保留为增强项。商业用途因Wav2Lip ResearchOnly为NO-GO。
 
 ## 2. 分阶段状态
 
@@ -26,8 +26,8 @@
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；当前Playwright 16/16；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
-| INST1 | CONDITIONAL | 便携安装入口、隔离venv与7.5GB wheelhouse通过；AC06R消除开发机模型路径/私有音色/缺省Avatar隐式依赖，本地制品准备、当前机迁移、真实启动/Avatar恢复/双停PASS；执行器含双身份拒绝和五项干净前置 | 全新Windows用户+干净WSL+GPU驱动+离线制品清单上执行正式accept |
-| V1FINAL | DEVELOPED / WAIT LIVE RUN | headed Chrome取证器绑定当前Git revision；AC09最终总门逐文件复核完整发布源码、现场门和干净机门，缺报告只返回PENDING且不能冒签 | 需用户在窗口可被占用时执行一次现场门；干净机仍独立 |
+| INST1 | AC07 DEVELOPED / REAL RUN PENDING | 便携安装入口、隔离venv、7.5GB wheelhouse、替代数据根与当前机真实生命周期历史证据通过；AC07门禁/失败关闭合同已实现 | 当前宿主WSL互操作恢复后重跑AC07绑定当前revision；AC06独立机为增强项 |
+| V1FINAL | DEVELOPED / WAIT EVIDENCE | headed Chrome取证器绑定当前Git revision；AC09按显式部署策略复核完整发布、现场门和AC06/AC07之一 | 现场结构化报告与当前revision AC07报告 |
 
 ## 3. 已完成依赖链
 
@@ -45,4 +45,4 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6已经关闭Idle未接主舞台、停止黑屏、16:9裁切和旧工件缓存四项实现缺陷；用户批准的当前人物Crop V2现已激活。UX8已完成普通话字幕和自然停顿机器门，需用户物理麦克风复验。V1FINAL现场取证器已通过无人值守测试；INST1-AC06R已修复干净安装执行器审计中发现的三项可移植性缺陷，并在当前机完成私有数据迁移与真实运行回归。前者尚需用户现场操作，后者尚需环境管理员提供全新Windows用户和干净WSL。V1仍未全绿。
+已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6四项实现缺陷已关闭，Crop V2已激活；UX8机器门完成。V1FINAL现场取证器已通过无人值守测试。ADR-012将最低部署保证改为AC07单机隔离可移植性，不再等待第二台电脑；当前仍需生成绑定最终revision的AC07报告和现场结构化报告，因此V1尚未全绿。

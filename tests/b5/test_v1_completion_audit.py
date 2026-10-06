@@ -95,6 +95,39 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
     return release, human, install
 
 
+def _portability_fixture(tmp_path: Path) -> Path:
+    report = tmp_path / "portability.json"
+    report.write_text(json.dumps({
+        "schema_version": 1,
+        "gate": "INST1-AC07-single-machine-portability",
+        "workspace_revision": REVISION,
+        "release_id": "b" * 64,
+        "wheelhouse_manifest_sha256": "e" * 64,
+        "artifact_manifest_sha256": "f" * 64,
+        "cosyvoice_revision": "1" * 40,
+        "assurance_level": "single-machine-isolated-portability",
+        "same_machine": True,
+        "cross_machine_driver_verified": False,
+        "offline_only": True,
+        "isolation": {key: True for key in (
+            "fresh_core_venv", "fresh_avatar_venv", "no_system_site_packages",
+            "no_index_install", "alternate_data_root_exercised",
+            "portable_artifact_bundle_verified", "tracked_frontend",
+            "parameterized_runtime_paths",
+        )},
+        "limitations": [
+            "same_windows_identity", "same_wsl_machine_id", "same_gpu_driver_stack",
+        ],
+        "steps": [{"name": name, "pass": True} for name in (
+            "release-bind", "isolated-runtimes", "offline-wheelhouse",
+            "portable-artifacts", "tracked-frontend", "portable-path-contract",
+            "start-1", "start-2", "status", "recover-avatar", "stop-1", "stop-2",
+        )],
+        "result": "PASS",
+    }), encoding="utf-8")
+    return report
+
+
 def test_completion_passes_only_when_all_three_current_gates_pass(tmp_path: Path):
     release, human, install = _fixture(tmp_path)
     result = audit_completion(tmp_path, release, human, install, REVISION)
@@ -135,3 +168,53 @@ def test_completion_fails_closed_on_malformed_untrusted_fields(tmp_path: Path):
     assert result["result"] == "FAIL"
     assert "human_machine_evidence_invalid" in result["gates"][1]["errors"]
     assert "perception_gate_invalid" in result["gates"][1]["errors"]
+
+
+def test_completion_accepts_explicit_single_machine_portability_policy(tmp_path: Path):
+    release, human, _ = _fixture(tmp_path)
+    portability = _portability_fixture(tmp_path)
+    result = audit_completion(
+        tmp_path, release, human, portability, REVISION, "single-machine-portability",
+    )
+    assert result["result"] == "PASS"
+    assert result["deployment_assurance"] == "single-machine-isolated-portability"
+    assert result["gates"][2]["limitations"] == [
+        "same_windows_identity", "same_wsl_machine_id", "same_gpu_driver_stack",
+    ]
+
+
+def test_clean_machine_report_cannot_masquerade_as_reduced_policy(tmp_path: Path):
+    release, human, install = _fixture(tmp_path)
+    result = audit_completion(
+        tmp_path, release, human, install, REVISION, "single-machine-portability",
+    )
+    assert result["result"] == "FAIL"
+    assert "portability_schema_invalid" in result["gates"][2]["errors"]
+
+
+def test_portability_fails_closed_when_isolation_or_limit_is_missing(tmp_path: Path):
+    release, human, _ = _fixture(tmp_path)
+    portability = _portability_fixture(tmp_path)
+    document = json.loads(portability.read_text())
+    document["isolation"]["no_index_install"] = False
+    document["limitations"].remove("same_gpu_driver_stack")
+    portability.write_text(json.dumps(document))
+    result = audit_completion(
+        tmp_path, release, human, portability, REVISION, "single-machine-portability",
+    )
+    assert result["result"] == "FAIL"
+    assert "portability_isolation_incomplete" in result["gates"][2]["errors"]
+    assert "portability_limitations_missing" in result["gates"][2]["errors"]
+
+
+def test_portability_must_bind_the_current_release_id(tmp_path: Path):
+    release, human, _ = _fixture(tmp_path)
+    portability = _portability_fixture(tmp_path)
+    document = json.loads(portability.read_text())
+    document["release_id"] = "9" * 64
+    portability.write_text(json.dumps(document))
+    result = audit_completion(
+        tmp_path, release, human, portability, REVISION, "single-machine-portability",
+    )
+    assert result["result"] == "FAIL"
+    assert "release_mismatch" in result["gates"][2]["errors"]

@@ -14,6 +14,8 @@ PS_SCRIPTS = [
     REPO_ROOT / "ops" / "windows" / "StartLlamaCpp.ps1",
     REPO_ROOT / "ops" / "windows" / "ResolveWindowsHost.ps1",
     REPO_ROOT / "ops" / "windows" / "Install-CyberWife.ps1",
+    REPO_ROOT / "ops" / "acceptance" / "Invoke-INST1SingleMachinePortability.ps1",
+    REPO_ROOT / "ops" / "acceptance" / "Invoke-V1CompletionAudit.ps1",
 ]
 
 

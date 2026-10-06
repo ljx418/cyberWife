@@ -3,14 +3,14 @@
 **版本**：3.2
 **日期**：2026-10-06
 
-**状态**：B0～B5、B2.5、ARCH1、RES1及V1RC1自动化门完成；UX8普通话字幕/自然停顿机器门通过；V1FINAL正在关闭Narrator、物理麦克风与UX6/UX8人审，干净机安装仍为独立外部门
+**状态**：B0～B5、B2.5、ARCH1、RES1及V1RC1自动化门完成；UX8机器门通过；V1FINAL现场门待结构化报告，部署最低门调整为INST1-AC07单机隔离可移植性
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
 ## 1. 项目现状
 
 前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
 
-V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。UX5/ARCH1/RES1已关闭A/V机器量化、架构分层和AC-14资源红项；V1RC1又以当前代码重跑普通链、打断与60分钟组合。V1FINAL把原纯人工签字脚本升级为不保存正文/音频的headed Chrome机器取证器；INST1-AC06R以经授权的本地离线制品清单替代开发机硬编码模型、音色和Avatar依赖，当前机迁移及真实生命周期已通过。两者仍分别需要用户现场和真实新环境运行；商业发布继续被Wav2Lip ResearchOnly阻断。
+V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。UX5/ARCH1/RES1已关闭A/V机器量化、架构分层和AC-14资源红项；V1RC1又以当前代码重跑普通链、打断与60分钟组合。V1FINAL把原纯人工签字脚本升级为不保存正文/音频的headed Chrome机器取证器；INST1-AC06R已消除硬编码工件依赖。因所有者只有一台电脑，ADR-012新增AC07，以同机隔离venv、离线wheelhouse、替代数据根、便携制品和真实生命周期证明有限可移植性；AC06独立新环境降为增强项。商业发布继续被Wav2Lip ResearchOnly阻断。
 
 ## 2. 固定边界
 
@@ -50,7 +50,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | B5 | 本机边界、一键、故障恢复后形成候选版 | 所有后端实体、验收工具 | B3+B4 Pass | AC-01～14 全 Pass；P0/P1=0 |
 | UX4 | 用户在引导内把照片稳定生成并启用为动态人物 | AvatarAssetService、avatar_idle_pipeline、Onboarding | 三张工作流样片获人工批准 | UX4-AC01～08 Pass；未确认不替换；四服务恢复 |
 | UX8 | 普通话字幕不再保留粤语特有词形，句中自然停顿不被过早截断 | MandarinTranscriptNormalizer、UtteranceBoundaryDetector | 用户真实交互反馈 | UX8-AC01～06机器PASS；AC07物理麦克风待签 |
-| V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据；AC09拒绝跨版本或缺门报告 | Invoke-ACC1HumanGate、Playwright事件取证器、audit_v1_completion | V1RC1自动化PASS | VF-AC01～09；INST1-AC06R仍须独立新环境 |
+| V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据；部署证明采用显式保证等级 | Invoke-ACC1HumanGate、Invoke-INST1SingleMachinePortability、audit_v1_completion | V1RC1自动化PASS | VF-AC01～09；AC07为V1最低门，AC06为增强项 |
 
 ## 5. 每阶段交付包
 
@@ -92,7 +92,7 @@ CosyVoice2 已用正确参考逐字稿完成30条复测：CER=0.71%。V1RC1修�
 
 用户从干净启动状态执行一个入口即可完成自检、打开已批准的陪伴页面并开始连续语音对话；至少 20 轮成功率≥95%，可以在 P95 400ms 内打断，普通链首响P95≤7.0s（P50报告），数字人≥25FPS，运行 1 小时无崩溃/OOM/延迟积累；核心链无公网依赖或联网上传动作，记忆可彻底删除，不记录会话零持久化，退出后无残留进程与临时音频。
 
-V1 Go 需要 AC-01～AC-14 全部通过、开放 P0/P1=0，并完成安装、启动、备份、恢复、卸载和数据清除演练。当前目标机启动、备份、恢复、卸载保留数据与独立清除已有证据，但干净机安装与真实读屏/麦克风场景尚未闭环，因此本定义尚未全绿。
+V1 Go 需要 AC-01～AC-14 全部通过、开放 P0/P1=0，并完成安装、启动、备份、恢复、卸载和数据清除演练。部署至少通过AC07单机隔离可移植性，报告不得声称跨机器/驱动兼容；AC06独立干净机为增强保证。真实读屏/麦克风现场报告仍必须闭环。
 
 ## 9. V2 保留项
 

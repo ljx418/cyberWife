@@ -1,7 +1,7 @@
 # INST1 阶段结果
 
 **日期**：2026-10-05
-**结论**：CONDITIONAL；INST1.1～INST1.3实现、目标机验证、全新隔离Python运行时及离线wheelhouse复现PASS；INST1-AC06R已修复可移植制品缺口并通过当前机迁移/真实运行，正式干净Windows/WSL复现尚未执行。
+**结论**：CONDITIONAL；INST1.1～INST1.3、隔离Python运行时、离线wheelhouse和当前机真实生命周期已有PASS证据。ADR-012批准AC07作为V1最低部署门，门禁已实现，尚待宿主互操作恢复后生成绑定最终revision的正式报告；AC06干净Windows/WSL降为增强项。
 
 ## 已完成
 
@@ -23,6 +23,6 @@
 
 ## 未完成
 
-没有第二个全新Windows 11用户或干净VM+WSL可用，因此INST1-AC06正式accept仍未执行。执行器开发和当前机拒绝负例不能证明Windows用户、WSL发行版、GPU驱动与全部模型工件在另一环境的组合复现。
+没有第二个全新Windows 11用户或干净VM+WSL可用，因此项目不声称跨Windows用户、WSL发行版或GPU驱动复现。AC07只在报告中签署同机隔离可移植性；未来仍可用AC06提升保证，无需迁移产品架构。
 
 开放P1：`INST1-P1-01 干净Windows+WSL独立复现待执行`。AC06R工具已就绪，但没有新环境PASS报告前不得签INST1或V1全绿。

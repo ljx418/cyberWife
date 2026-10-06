@@ -165,3 +165,29 @@ def test_clean_install_is_driven_by_a_portable_private_artifact_manifest():
     ignored = (ROOT / ".gitignore").read_text(encoding="utf-8")
     assert "config/local-artifacts.local.json" in ignored
     assert "config/local-artifacts.private.json" in ignored
+
+
+def test_single_machine_portability_gate_is_explicit_offline_and_fail_closed():
+    wrapper = (ROOT / "ops/acceptance/Invoke-INST1SingleMachinePortability.ps1").read_text(
+        encoding="utf-8"
+    )
+    builder = (ROOT / "ops/acceptance/build_single_machine_portability_report.py").read_text(
+        encoding="utf-8"
+    )
+    completion = (ROOT / "ops/acceptance/Invoke-V1CompletionAudit.ps1").read_text(
+        encoding="utf-8"
+    )
+    assert "AcceptReducedAssurance" in wrapper
+    assert "does not prove another Windows/WSL/GPU stack" in wrapper
+    for step in ("start-1", "start-2", "status", "recover-avatar", "stop-1", "stop-2"):
+        assert step in wrapper
+    assert "wheelhouse_manifest.py" in wrapper
+    assert "prepare_local_artifacts.py" in wrapper
+    assert "ports_closed_after" in wrapper
+    for limitation in ("same_windows_identity", "same_wsl_machine_id", "same_gpu_driver_stack"):
+        assert limitation in builder
+    assert "verify_wheelhouse" in builder
+    assert "verify_published" in builder
+    assert '"status", "--porcelain", "--untracked-files=no"' in builder
+    assert "single-machine-portability" in completion
+    assert "clean-machine" in completion

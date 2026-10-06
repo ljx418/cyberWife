@@ -13,5 +13,6 @@
 | [ADR-009](ADR-009-stage-gate-ownership.md) | B2.5验首响/缓存、B2验Avatar恢复、B3验打断、B5完整组合回归 | Accepted |
 | [ADR-010](ADR-010-avatar-h264-websocket.md) | Avatar改为loopback WebSocket H.264 + WebCodecs | Accepted |
 | [ADR-011](ADR-011-avatar-independent-liveness.md) | Avatar独立存活通道 + H.264 WS应用层心跳 | Accepted |
+| [ADR-012](ADR-012-single-machine-portability-gate.md) | V1以单机隔离可移植性为最低部署门，独立干净机保留为增强项 | Accepted |
 
 任何决策变更需新增或取代 ADR，同时更新 PRD、目标架构、追踪矩阵、验收计划和 Draw.io。
