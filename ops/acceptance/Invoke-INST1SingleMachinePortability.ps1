@@ -65,6 +65,17 @@ function Add-Step([string]$Name, [bool]$Pass) {
     if (-not $Pass) { throw "acceptance step failed: $Name" }
 }
 
+function Convert-WindowsPathToWsl([string]$Path) {
+    # Windows PowerShell 5 can remove backslashes while marshalling native
+    # arguments. wslpath accepts drive paths with forward slashes unchanged.
+    $portablePath = $Path.Replace('\', '/')
+    $converted = ((& wsl.exe -- wslpath -a -u $portablePath) | Out-String).Trim()
+    if ($LASTEXITCODE -ne 0 -or -not $converted.StartsWith('/')) {
+        throw "cannot convert Windows path to WSL path: $Path"
+    }
+    return $converted
+}
+
 function Invoke-Launcher([string]$Name, [string]$Action, [string]$Component = 'all', [bool]$Force = $false) {
     # Invoke the launcher in-process. A nested powershell.exe connected to this
     # script's stdout pipeline can stay open while long-lived WSL services hold
@@ -125,12 +136,12 @@ try {
     } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $temporary -Encoding UTF8
 }
 
-$lifecycleWsl = ((& wsl.exe -- wslpath -a $temporary) | Out-String).Trim()
+$lifecycleWsl = Convert-WindowsPathToWsl $temporary
 $reportParent = Split-Path -Parent $ReportPath
 if ($reportParent -and -not (Test-Path -LiteralPath $reportParent)) {
     New-Item -ItemType Directory -Force -Path $reportParent | Out-Null
 }
-$reportWsl = ((& wsl.exe -- wslpath -a $ReportPath) | Out-String).Trim()
+$reportWsl = Convert-WindowsPathToWsl $ReportPath
 try {
     & wsl.exe --cd $WorkspaceWsl env 'PYTHONPATH=ops/acceptance' $PythonWsl `
         ops/acceptance/build_single_machine_portability_report.py `

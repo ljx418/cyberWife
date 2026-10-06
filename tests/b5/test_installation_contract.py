@@ -200,3 +200,6 @@ def test_single_machine_portability_gate_does_not_pipe_a_nested_powershell_launc
 
     assert "& $launcher -Action $Action -Component $Component" in wrapper
     assert "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher" not in wrapper
+    assert "function Convert-WindowsPathToWsl" in wrapper
+    assert ".Replace('\\', '/')" in wrapper
+    assert "wslpath -a -u $portablePath" in wrapper
