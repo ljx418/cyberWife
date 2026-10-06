@@ -191,3 +191,12 @@ def test_single_machine_portability_gate_is_explicit_offline_and_fail_closed():
     assert '"status", "--porcelain", "--untracked-files=no"' in builder
     assert "single-machine-portability" in completion
     assert "clean-machine" in completion
+
+
+def test_single_machine_portability_gate_does_not_pipe_a_nested_powershell_launcher():
+    wrapper = (ROOT / "ops/acceptance/Invoke-INST1SingleMachinePortability.ps1").read_text(
+        encoding="utf-8-sig"
+    )
+
+    assert "& $launcher @arguments | Out-Null" in wrapper
+    assert "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher" not in wrapper

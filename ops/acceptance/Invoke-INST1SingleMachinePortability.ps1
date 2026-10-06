@@ -74,7 +74,10 @@ function Invoke-Launcher([string]$Name, [string]$Action, [string]$Component = 'a
         '-OfflineStrict'
     )
     if ($Force) { $arguments += '-Force' }
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher @arguments | Out-Null
+    # Invoke the launcher in-process. A nested powershell.exe connected to this
+    # script's stdout pipeline can stay open while long-lived WSL services hold
+    # inherited handles, even after RuntimeLauncher itself has returned.
+    & $launcher @arguments | Out-Null
     if ($LASTEXITCODE -ne 0) { throw "runtime launcher failed: $Name" }
     if ($Action -eq 'stop') {
         Start-Sleep -Milliseconds 600
@@ -104,7 +107,7 @@ try {
 } finally {
     if ($lifecycleAttempted -and -not (Test-PortsClosed)) {
         try {
-            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher `
+            & $launcher `
                 -Action stop -Force -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl `
                 -LlamaCppPath $LlamaCppPath -ModelPath $LlamaModelPath `
                 -AvatarModelWsl $AvatarModelWsl -PidDir $pidDir -LogDir $logDir | Out-Null
