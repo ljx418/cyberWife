@@ -15,14 +15,17 @@ export type InputAudioSnapshot = {
 };
 
 export type InputAudioCallbacks = {
+  boundaryMode?: () => "normal" | "barge_in";
   onUtteranceStart: (preroll: ArrayBuffer[]) => boolean;
   onFrame: (pcm: ArrayBuffer) => void;
   onUtteranceEnd: () => void;
   onError: (error: Error) => void;
 };
 
-export const INPUT_VOICE_RMS_THRESHOLD = 0.012;
-export const INPUT_ONSET_FRAMES = 3; // 60 ms at the 20 ms PCM contract.
+export const INPUT_VOICE_RMS_THRESHOLD = 0.018;
+export const INPUT_BARGE_IN_RMS_THRESHOLD = 0.035;
+export const INPUT_ONSET_FRAMES = 5; // 100 ms at the 20 ms PCM contract.
+export const INPUT_BARGE_IN_ONSET_FRAMES = 12; // 240 ms rejects brief noise during playback.
 export const INPUT_HANGOVER_FRAMES = 45; // 900 ms: preserve natural clause pauses.
 
 export class UtteranceBoundaryDetector {
@@ -30,10 +33,14 @@ export class UtteranceBoundaryDetector {
   private voicedFrames = 0;
   private silentFrames = 0;
 
-  observe(voiced: boolean, acceptStart: () => boolean): "start" | "end" | null {
+  observe(
+    voiced: boolean,
+    acceptStart: () => boolean,
+    onsetFrames = INPUT_ONSET_FRAMES,
+  ): "start" | "end" | null {
     if (!this.capturing) {
       this.voicedFrames = voiced ? this.voicedFrames + 1 : 0;
-      if (this.voicedFrames < INPUT_ONSET_FRAMES) return null;
+      if (this.voicedFrames < onsetFrames) return null;
       this.voicedFrames = 0;
       if (!acceptStart()) return null;
       this.capturing = true;
@@ -45,6 +52,17 @@ export class UtteranceBoundaryDetector {
     this.capturing = false;
     this.silentFrames = 0;
     return "end";
+  }
+
+  observeLevel(
+    rms: number,
+    mode: "normal" | "barge_in",
+    acceptStart: () => boolean,
+  ): "start" | "end" | null {
+    const bargeIn = mode === "barge_in";
+    const threshold = bargeIn ? INPUT_BARGE_IN_RMS_THRESHOLD : INPUT_VOICE_RMS_THRESHOLD;
+    const onsetFrames = bargeIn ? INPUT_BARGE_IN_ONSET_FRAMES : INPUT_ONSET_FRAMES;
+    return this.observe(rms >= threshold, acceptStart, onsetFrames);
   }
 
   snapshot() {
@@ -159,15 +177,17 @@ export class InputAudioSessionController {
   }
 
   private consumeFrame(pcm: ArrayBuffer, rms: number): void {
-    // Roughly 200 ms pre-roll, 60 ms onset and 900 ms hangover. The backend
-    // remains the authoritative ASR/VAD; this detector only creates utterance boundaries.
-    const voiced = rms >= INPUT_VOICE_RMS_THRESHOLD;
+    // Roughly 200 ms pre-roll, 100 ms normal onset and a stricter 240 ms
+    // playback-state onset. The backend remains the authoritative ASR/VAD;
+    // this detector only creates utterance boundaries.
+    const mode = this.callbacks?.boundaryMode?.() ?? "normal";
     const wasCapturing = this.boundary.snapshot().capturing;
     if (!wasCapturing) {
       this.preroll.push(pcm.slice(0));
       if (this.preroll.length > 10) this.preroll.shift();
-      const event = this.boundary.observe(
-        voiced,
+      const event = this.boundary.observeLevel(
+        rms,
+        mode,
         () => this.callbacks?.onUtteranceStart(this.preroll.map((frame) => frame.slice(0))) ?? false,
       );
       if (event === "start") {
@@ -178,7 +198,7 @@ export class InputAudioSessionController {
       return;
     }
     this.emitFrame(pcm);
-    if (this.boundary.observe(voiced, () => false) === "end") {
+    if (this.boundary.observeLevel(rms, mode, () => false) === "end") {
       this.state = "listening";
       this.callbacks?.onUtteranceEnd();
     }

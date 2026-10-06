@@ -55,6 +55,8 @@ def test_runtime_inference_is_explicitly_offline():
     source = inspect.getsource(CosyVoiceTtsAdapter.synthesize_stream)
     assert "text_frontend=True" in source
     assert "zero_shot_spk_id=speaker_key" in source
+    assert "spoken_chars <= 7" in source
+    assert "set_all_random_seed(inference_seed)" in source
 
 
 def test_soundfile_compat_loader_preserves_tensor_contract(tmp_path: Path):

@@ -835,6 +835,8 @@ class ApiGateway:
             if session is None:
                 raise HTTPException(status_code=404, detail="session.not_found")
             self._orchestrator.close_session(session_id)
+            if self._turn_pipeline is not None:
+                self._turn_pipeline.forget_session(session_id)
             if (
                 self._repository is not None
                 and session.recording_policy == RecordingPolicy.STANDARD
@@ -985,6 +987,8 @@ class ApiGateway:
                         )
                     elif event_type == "conversation.stop":
                         self._orchestrator.close_session(session_id)
+                        if self._turn_pipeline is not None:
+                            self._turn_pipeline.forget_session(session_id)
                         if (
                             self._repository is not None
                             and session.recording_policy == RecordingPolicy.STANDARD

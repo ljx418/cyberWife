@@ -56,7 +56,8 @@ class _Speech:
 class _Llm:
     def generate_stream(self, prompt, **kwargs):
         assert "今天天气不错" in prompt
-        assert kwargs["max_tokens"] == 48
+        assert kwargs["max_tokens"] == 24
+        assert kwargs["temperature"] == 0.0
         yield "**是呀**，"
         yield "很适合聊聊天。"
 
@@ -145,6 +146,57 @@ async def test_turn_pipeline_final_creates_one_turn_and_sanitizes():
     assert pipeline.metrics()["active_turns"] == 0
     assert pipeline.metrics()["llm_queue_depth"] == 0
     assert pipeline.metrics()["llm_queue_max_observed"] <= pipeline.metrics()["llm_queue_capacity"]
+
+
+@pytest.mark.asyncio
+async def test_turn_pipeline_carries_bounded_history_and_can_forget_it():
+    class SequencedSpeech:
+        def __init__(self):
+            self.text = "请记住，我明天上午九点开会。"
+
+        def transcribe(self, pcm, sample_rate):
+            return {
+                "speech_detected": True,
+                "text": self.text,
+                "confidence": 0.99,
+                "language": "zh",
+                "segments": [],
+            }
+
+    class CapturingLlm:
+        def __init__(self):
+            self.prompts = []
+
+        def generate_stream(self, prompt, **kwargs):
+            self.prompts.append(prompt)
+            yield "好的，我记住九点了。"
+
+    orchestrator = ConversationOrchestrator()
+    session = orchestrator.open_session()
+    orchestrator.transition(session.id, SessionState.LISTENING)
+    speech = SequencedSpeech()
+    llm = CapturingLlm()
+    pipeline = TurnPipeline(
+        orchestrator,
+        speech,
+        llm,
+        PromptCompiler(),
+        OutputSanitizer(),
+    )
+
+    list_one = [event async for event in pipeline.run(session.id, 1, b"\x01\x00" * 320)]
+    assert any(event.type == "reply.text.final" for event in list_one)
+    speech.text = "我明天几点开会？"
+    list_two = [event async for event in pipeline.run(session.id, 2, b"\x01\x00" * 320)]
+    assert any(event.type == "reply.text.final" for event in list_two)
+    assert "请记住，我明天上午九点开会。" in llm.prompts[1]
+    assert "好的，我记住九点了。" in llm.prompts[1]
+
+    pipeline.forget_session(session.id)
+    speech.text = "还记得吗？"
+    list_three = [event async for event in pipeline.run(session.id, 3, b"\x01\x00" * 320)]
+    assert any(event.type == "reply.text.final" for event in list_three)
+    assert "请记住，我明天上午九点开会。" not in llm.prompts[2]
 
 
 @pytest.mark.asyncio

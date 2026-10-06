@@ -308,7 +308,7 @@ test('麦克风端点保留九百毫秒以内的自然句中停顿', async ({ pa
     } = await import('/src/services/InputAudioSession.ts')
     const detector = new UtteranceBoundaryDetector()
     const events: Array<string | null> = []
-    for (let index = 0; index < 3; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       events.push(detector.observe(true, () => true))
     }
     for (let index = 0; index < INPUT_HANGOVER_FRAMES - 1; index += 1) {
@@ -325,4 +325,34 @@ test('麦克风端点保留九百毫秒以内的自然句中停顿', async ({ pa
   expect(result.beforeBoundary.capturing).toBe(true)
   expect(result.beforeBoundary.silentFrames).toBe(44)
   expect(result.boundaryEvent).toBe('end')
+})
+
+test('播放态噪声和短脉冲不会误打断，持续人声二百四十毫秒触发', async ({ page }) => {
+  await page.goto('/?preview=1')
+  const result = await page.evaluate(async () => {
+    const {
+      INPUT_BARGE_IN_ONSET_FRAMES,
+      UtteranceBoundaryDetector,
+    } = await import('/src/services/InputAudioSession.ts')
+    const lowNoise = new UtteranceBoundaryDetector()
+    const lowNoiseEvents = Array.from({ length: 40 }, () => lowNoise.observeLevel(0.025, 'barge_in', () => true))
+    const impulse = new UtteranceBoundaryDetector()
+    const impulseEvents = Array.from(
+      { length: INPUT_BARGE_IN_ONSET_FRAMES - 1 },
+      () => impulse.observeLevel(0.08, 'barge_in', () => true),
+    )
+    impulseEvents.push(impulse.observeLevel(0.0, 'barge_in', () => true))
+    const speech = new UtteranceBoundaryDetector()
+    const speechEvents = Array.from(
+      { length: INPUT_BARGE_IN_ONSET_FRAMES },
+      () => speech.observeLevel(0.06, 'barge_in', () => true),
+    )
+    return { lowNoiseEvents, impulseEvents, speechEvents, onset: INPUT_BARGE_IN_ONSET_FRAMES }
+  })
+
+  expect(result.onset).toBe(12)
+  expect(result.lowNoiseEvents).not.toContain('start')
+  expect(result.impulseEvents).not.toContain('start')
+  expect(result.speechEvents.filter((event) => event === 'start')).toHaveLength(1)
+  expect(result.speechEvents.at(-1)).toBe('start')
 })

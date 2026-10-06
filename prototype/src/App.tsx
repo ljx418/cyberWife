@@ -104,7 +104,7 @@ function App() {
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [runtimeRows, setRuntimeRows] = useState<RuntimeService[]>(runtimeServices)
   const [onboardingStatus, setOnboardingStatus] = useState('正在读取本机设置…')
-  const [voiceTranscript, setVoiceTranscript] = useState('今天终于有一点空闲了，你想先聊什么？')
+  const [voiceTranscript, setVoiceTranscript] = useState('')
   const [userTranscript, setUserTranscript] = useState('')
   const [assistantTranscript, setAssistantTranscript] = useState('')
   const [conversationError, setConversationError] = useState('')
@@ -398,6 +398,7 @@ function App() {
       })
       void AvatarSession.start(avatarCanvasRef.current ?? undefined, activeAvatarId)
       await InputAudioSession.start({
+        boundaryMode: () => conversationStateRef.current === 'speaking' ? 'barge_in' : 'normal',
         onUtteranceStart: () => {
           const ws = socketRef.current
           const state = conversationStateRef.current
@@ -478,6 +479,7 @@ function App() {
 
   const uploadAndActivate = async (kind: 'portrait' | 'voice', file: File): Promise<AvatarBuild | void> => {
     try {
+      if (kind === 'voice' && !voiceTranscript.trim()) throw new Error('请先填写与录音完全一致的逐字稿')
       setOnboardingStatus(`正在校验${kind === 'portrait' ? '照片' : '声音'}…`)
       const uploaded = await ConversationClient.uploadAsset(kind, file)
       if (kind === 'portrait') {

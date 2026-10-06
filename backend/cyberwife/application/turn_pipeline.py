@@ -81,6 +81,11 @@ class TurnPipeline:
         self._warm_context_provider = warm_context_provider
         self._memory_provider = memory_provider
         self._logger = logger or _NullStructuredLogger()
+        # Short-term dialogue context is intentionally process-local.  It
+        # makes a live session coherent without turning no-record mode into a
+        # persistence loophole; ApiGateway explicitly drops it when a session
+        # is ended or deleted.
+        self._recent_history: dict[int, list[dict[str, str]]] = {}
         self._active_turns = 0
         self._llm_queue_depth = 0
         self._llm_queue_max_observed = 0
@@ -104,6 +109,23 @@ class TurnPipeline:
                 return
             self._closed = True
         self._llm_executor.shutdown(wait=True, cancel_futures=True)
+        self._recent_history.clear()
+
+    def forget_session(self, session_id: int) -> None:
+        """Forget volatile conversation context for a completed session."""
+        self._recent_history.pop(session_id, None)
+
+    def _remember_exchange(self, session_id: int, user_text: str, reply_text: str) -> None:
+        history = self._recent_history.setdefault(session_id, [])
+        history.extend(
+            (
+                {"role": "user", "text": user_text},
+                {"role": "assistant", "text": reply_text},
+            )
+        )
+        # PromptCompiler consumes at most three user/assistant exchanges.
+        # Bound the source as well so long-running sessions cannot grow RAM.
+        del history[:-6]
 
     def _cancel_llm(self, token: CancellationToken) -> None:
         cancel = getattr(self._llm, "cancel", None)
@@ -223,8 +245,8 @@ class TurnPipeline:
 
             try:
                 kwargs = {
-                    "max_tokens": 48,
-                    "temperature": 0.7,
+                    "max_tokens": 24,
+                    "temperature": 0.0,
                     "stop": ["<|im_end|>"],
                 }
                 parameters = inspect.signature(self._llm.generate_stream).parameters.values()
@@ -389,6 +411,11 @@ class TurnPipeline:
                 if delta:
                     yield delta
                 self._orchestrator.complete_turn(session_id, cached_entry.reply_text)
+                self._remember_exchange(
+                    session_id,
+                    turn.user_text,
+                    cached_entry.reply_text,
+                )
                 if (
                     self._repository is not None
                     and session.recording_policy.value == "standard"
@@ -502,6 +529,7 @@ class TurnPipeline:
                 token.raise_if_cancelled()
             compiled = self._compiler.compile(
                 profile=profile,
+                history=list(self._recent_history.get(session_id, ())),
                 memories=memories,
                 user_input=turn.user_text,
             )
@@ -622,6 +650,7 @@ class TurnPipeline:
                 if event:
                     yield event
             self._orchestrator.complete_turn(session_id, final_text)
+            self._remember_exchange(session_id, turn.user_text, final_text)
             if (
                 self._repository is not None
                 and session.recording_policy.value == "standard"

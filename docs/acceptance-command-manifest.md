@@ -119,3 +119,15 @@ AC07要求release绑定、隔离venv、离线wheelhouse、替代数据根、便�
 ## 9. 实现前检查
 
 进入每个子阶段前，负责 Agent 必须先创建本阶段 runner 的合同测试与证据 schema，再实现产品功能。若实际环境无法提供本清单中的采样源，只能返回计划阶段修订，不能删减证据项或降低硬门。
+
+## 10. UX9 对话可懂度与抗误打断
+
+四组件健康后，在WSL项目根目录执行：
+
+```bash
+PYTHONPATH=. ~/.cyberWife/venvs/cosyvoice/bin/python \
+  tests/ux9/accept_voice_dialogue.py \
+  --output audit/v1/UX9/final.json
+```
+
+该命令必须用真实CosyVoice生成用户输入，经真实SpeechRuntime识读并进入真实WebSocket对话链，再把项目输出PCM送回SpeechRuntime。六场景必须全PASS，输入CER≤10%、输出CER≤15%、每条首响≤7秒、事实与上下文答案正确；报告只能包含合成脚本、转写、指标和哈希，不能保存PCM/WAV或私人路径。播放态噪声/脉冲/持续人声边界由Headless Playwright全量中的UX9用例签署。

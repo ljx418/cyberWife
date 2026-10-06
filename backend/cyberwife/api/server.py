@@ -51,6 +51,7 @@ from cyberwife.application.retention_service import RetentionService  # noqa: E4
 from cyberwife.application.launcher_service import LauncherService  # noqa: E402
 from cyberwife.application.avatar_asset_service import AvatarAssetService  # noqa: E402
 from cyberwife.application.runtime_metrics import RuntimeMetrics  # noqa: E402
+from cyberwife.application.voice_reference_quality import validate_voice_reference  # noqa: E402
 from cyberwife.infrastructure.asset_store import AssetStore  # noqa: E402
 from cyberwife.infrastructure.structured_logger import StructuredLogger  # noqa: E402
 
@@ -165,6 +166,11 @@ def main() -> None:
         runtime.get("models", {}).get("tts", "qwen3-tts-12hz-1.7b-base"),
     )
     cosyvoice_load_trt = os.environ.get("CW_COSYVOICE_LOAD_TRT", "0") == "1"
+    # Whole-utterance decoding avoids the clipped/unstable first phoneme seen
+    # in CosyVoice's streaming path. V1 permits a seven-second first-response
+    # budget, so intelligibility takes precedence; this remains reversible.
+    cosyvoice_stream = os.environ.get("CW_COSYVOICE_STREAM", "0") == "1"
+    cosyvoice_seed = int(os.environ.get("CW_COSYVOICE_SEED", "0"))
     tts_entry = registry.get(configured_tts)
     if tts_entry is None:
         raise SystemExit(f"TTS registry entry is required: {configured_tts}")
@@ -177,8 +183,9 @@ def main() -> None:
             tts_entry.absolute_path,
             source_dir=cosyvoice_source,
             fp16=True,
-            stream=True,
+            stream=cosyvoice_stream,
             load_trt=cosyvoice_load_trt,
+            random_seed=cosyvoice_seed,
         )
     else:
         tts = QwenTtsAdapter(tts_entry.absolute_path, device="cuda", dtype="bf16")
@@ -202,6 +209,16 @@ def main() -> None:
     sanitizer = OutputSanitizer()
     bootstrap_voice = _load_bootstrap_voice(runtime, data_root)
 
+    validated_voice_pairs: set[tuple[str, str]] = set()
+
+    def checked_voice_pair(audio_path: str, transcript: str) -> tuple[str, str]:
+        digest = hashlib.sha256(Path(audio_path).read_bytes()).hexdigest()
+        key = (digest, hashlib.sha256(transcript.encode("utf-8")).hexdigest())
+        if key not in validated_voice_pairs:
+            validate_voice_reference(audio_path, transcript, speech_client)
+            validated_voice_pairs.add(key)
+        return audio_path, transcript
+
     def voice_reference_provider() -> tuple[str, str]:
         """Resolve the active, consented local voice for every new TTS job."""
         active = repo.get_active_asset("voice") if repo.consent_active("voice") else None
@@ -211,9 +228,9 @@ def main() -> None:
             private_assets_root = assets_root.resolve()
             candidate = (private_assets_root / str(active["relative_path"])).resolve()
             if candidate.is_relative_to(private_assets_root) and candidate.is_file() and transcript:
-                return str(candidate), transcript
+                return checked_voice_pair(str(candidate), transcript)
         if bootstrap_voice is not None:
-            return bootstrap_voice
+            return checked_voice_pair(*bootstrap_voice)
         raise RuntimeError("no consented active voice or validated bootstrap voice is available")
 
     # Readiness means the expensive models are warm, not merely imported.
