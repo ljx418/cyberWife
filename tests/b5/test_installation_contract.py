@@ -198,5 +198,5 @@ def test_single_machine_portability_gate_does_not_pipe_a_nested_powershell_launc
         encoding="utf-8-sig"
     )
 
-    assert "& $launcher @arguments | Out-Null" in wrapper
+    assert "& $launcher -Action $Action -Component $Component" in wrapper
     assert "& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $launcher" not in wrapper

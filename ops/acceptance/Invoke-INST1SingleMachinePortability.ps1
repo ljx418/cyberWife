@@ -66,18 +66,22 @@ function Add-Step([string]$Name, [bool]$Pass) {
 }
 
 function Invoke-Launcher([string]$Name, [string]$Action, [string]$Component = 'all', [bool]$Force = $false) {
-    $arguments = @(
-        '-Action', $Action, '-Component', $Component,
-        '-WorkspaceWin', $WorkspaceWin, '-WorkspaceWsl', $WorkspaceWsl,
-        '-LlamaCppPath', $LlamaCppPath, '-ModelPath', $LlamaModelPath,
-        '-AvatarModelWsl', $AvatarModelWsl, '-PidDir', $pidDir, '-LogDir', $logDir,
-        '-OfflineStrict'
-    )
-    if ($Force) { $arguments += '-Force' }
     # Invoke the launcher in-process. A nested powershell.exe connected to this
     # script's stdout pipeline can stay open while long-lived WSL services hold
     # inherited handles, even after RuntimeLauncher itself has returned.
-    & $launcher @arguments | Out-Null
+    if ($Force) {
+        & $launcher -Action $Action -Component $Component `
+            -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl `
+            -LlamaCppPath $LlamaCppPath -ModelPath $LlamaModelPath `
+            -AvatarModelWsl $AvatarModelWsl -PidDir $pidDir -LogDir $logDir `
+            -OfflineStrict -Force | Out-Null
+    } else {
+        & $launcher -Action $Action -Component $Component `
+            -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl `
+            -LlamaCppPath $LlamaCppPath -ModelPath $LlamaModelPath `
+            -AvatarModelWsl $AvatarModelWsl -PidDir $pidDir -LogDir $logDir `
+            -OfflineStrict | Out-Null
+    }
     if ($LASTEXITCODE -ne 0) { throw "runtime launcher failed: $Name" }
     if ($Action -eq 'stop') {
         Start-Sleep -Milliseconds 600
