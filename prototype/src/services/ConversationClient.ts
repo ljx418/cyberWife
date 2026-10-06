@@ -104,6 +104,14 @@ export interface IdleGenerationJob {
   updated_at: string;
 }
 
+export interface MemoryCandidate {
+  content: string;
+  confidence: number;
+  source_session_id: number;
+  source_turn_id: number;
+  reason: string;
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${GATEWAY_BASE}${path}`, {
     method,
@@ -190,9 +198,25 @@ export const ConversationClient = {
   async getActiveAvatar() { return request<AvatarBuild>("GET", "/api/v1/avatar/active"); },
   async restoreAsset(kind: "portrait" | "voice") { return request<AvatarBuild | Record<string, unknown>>("POST", `/api/v1/assets/${kind}/restore`); },
   async getMemories(query = "") { return request<{ items: Array<any> }>("GET", `/api/v1/memories?q=${encodeURIComponent(query)}`); },
+  async createMemory(content: string) { return request<Record<string, any>>("POST", "/api/v1/memories", { content }); },
   async editMemory(id: number, content: string) { return request("PATCH", `/api/v1/memories/${id}`, { content }); },
   async deleteMemory(id: number) { return request("DELETE", `/api/v1/memories/${id}`); },
   async purgeMemories() { return request("DELETE", "/api/v1/memories", { confirmation: "PURGE_ALL" }); },
+  async getMemoryCandidates() { return request<{ items: MemoryCandidate[] }>("GET", "/api/v1/memory-candidates"); },
+  async confirmMemoryCandidate(candidate: MemoryCandidate) {
+    return request<Record<string, any>>("POST", "/api/v1/memory-candidates/confirm", {
+      session_id: candidate.source_session_id,
+      turn_id: candidate.source_turn_id,
+      content: candidate.content,
+    });
+  },
+  async rejectMemoryCandidate(candidate: MemoryCandidate) {
+    return request("POST", "/api/v1/memory-candidates/reject", {
+      session_id: candidate.source_session_id,
+      turn_id: candidate.source_turn_id,
+      content: candidate.content,
+    });
+  },
   async getRetention() { return request("GET", "/api/v1/retention/now"); },
   async previewVoice(text: string): Promise<Blob> {
     const response = await fetch(`${GATEWAY_BASE}/api/v1/tts/preview`, {

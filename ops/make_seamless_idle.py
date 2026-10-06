@@ -36,6 +36,71 @@ def palindrome_frames(frames: list[np.ndarray], half_frames: int = 80) -> list[n
     return forward + list(reversed(forward))
 
 
+def localized_blink_loop(
+    frames: list[np.ndarray],
+    boxes: np.ndarray,
+    *,
+    output_frames: int = 160,
+    motion_start: int = 64,
+) -> list[np.ndarray]:
+    """Keep the body/background fixed and retain one model-generated blink.
+
+    Wan I2V is useful for plausible eyelids but may add unwanted head/body
+    drift even under a locked-camera prompt.  The standardized portrait lets
+    us transplant only a feathered eye band into the first frame.  This is a
+    deterministic attenuation step, not a naturalness score; the resulting
+    candidate still requires visual approval.
+    """
+    if len(frames) < 29 or len(boxes) < 29:
+        raise ValueError("localized blink requires at least 29 frames and boxes")
+    base = frames[0].copy()
+
+    def eye_region(box: np.ndarray) -> tuple[int, int, int, int]:
+        y1, y2, x1, x2 = map(int, box)
+        height, width = y2 - y1, x2 - x1
+        return (
+            round(y1 + 0.18 * height), round(y1 + 0.56 * height),
+            round(x1 + 0.04 * width), round(x1 + 0.96 * width),
+        )
+
+    target_y1, target_y2, target_x1, target_x2 = eye_region(boxes[0])
+    target_height = target_y2 - target_y1
+    target_width = target_x2 - target_x1
+    if target_height < 8 or target_width < 8:
+        raise ValueError("detected face is too small for localized blink")
+    mask = np.ones((target_height, target_width), dtype=np.float32)
+    feather_y = max(4, round(target_height * 0.18))
+    feather_x = max(4, round(target_width * 0.08))
+    mask[:feather_y] *= np.linspace(0, 1, feather_y)[:, None]
+    mask[-feather_y:] *= np.linspace(1, 0, feather_y)[:, None]
+    mask[:, :feather_x] *= np.linspace(0, 1, feather_x)[None, :]
+    mask[:, -feather_x:] *= np.linspace(1, 0, feather_x)[None, :]
+    mask = cv2.GaussianBlur(mask, (0, 0), 3)[..., None]
+
+    def composite(index: int) -> np.ndarray:
+        source_y1, source_y2, source_x1, source_x2 = eye_region(boxes[index])
+        patch = frames[index][source_y1:source_y2, source_x1:source_x2]
+        if patch.size == 0:
+            raise ValueError(f"empty eye patch at frame {index}")
+        patch = cv2.resize(patch, (target_width, target_height))
+        output = base.copy()
+        target = output[target_y1:target_y2, target_x1:target_x2].astype(np.float32)
+        output[target_y1:target_y2, target_x1:target_x2] = (
+            target * (1 - mask) + patch.astype(np.float32) * mask
+        ).astype(np.uint8)
+        return output
+
+    forward = [composite(index) for index in range(0, 29, 2)]
+    blink = forward + forward[-2::-1]
+    if motion_start < 0 or motion_start + len(blink) > output_frames:
+        raise ValueError("localized blink does not fit output timeline")
+    return (
+        [base.copy() for _ in range(motion_start)]
+        + blink
+        + [base.copy() for _ in range(output_frames - motion_start - len(blink))]
+    )
+
+
 def mean_absolute_error(left: np.ndarray, right: np.ndarray) -> float:
     return float(np.mean(np.abs(left.astype(np.float32) - right.astype(np.float32))))
 

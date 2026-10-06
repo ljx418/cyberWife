@@ -1,6 +1,6 @@
 import numpy as np
 
-from ops.build_video_avatar import AVATAR_BUILD_REVISION, WAV2LIP_FACE_SIZE, _letterbox, _loop_metrics, _smooth, _wav2lip_box
+from ops.build_video_avatar import AVATAR_BUILD_REVISION, WAV2LIP_FACE_SIZE, _idle_motion_metrics, _letterbox, _loop_metrics, _smooth, _wav2lip_box
 from ops.make_seamless_idle import palindrome_frames
 
 
@@ -50,3 +50,25 @@ def test_non_palindrome_is_kept_on_legacy_ping_pong_mode():
 
     assert metrics["mode"] == "ping_pong"
     assert metrics["first_last_mae"] > 3.0
+
+
+def test_idle_motion_metrics_accept_subtle_face_box_motion():
+    boxes = np.asarray([
+        [200, 470, 150, 365],
+        [201, 471, 151, 366],
+        [199, 469, 149, 364],
+    ])
+    metrics = _idle_motion_metrics(boxes)
+    assert metrics["face_center_p95_percent_diagonal"] < 2.5
+    assert metrics["face_area_cv_percent"] < 3.0
+
+
+def test_idle_motion_metrics_expose_large_translation_and_scale():
+    boxes = np.asarray([
+        [200, 470, 150, 365],
+        [260, 590, 220, 480],
+        [150, 390, 100, 300],
+    ])
+    metrics = _idle_motion_metrics(boxes)
+    assert metrics["face_center_p95_percent_diagonal"] > 2.5
+    assert metrics["face_area_cv_percent"] > 3.0

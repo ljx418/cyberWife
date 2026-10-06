@@ -93,6 +93,9 @@ test('主舞台使用当前 active avatar 的循环 Idle，静态图只作兜底
 })
 
 test('设置、记忆删除确认和主题切换可用', async ({ page }) => {
+  await page.route('http://127.0.0.1:7860/api/v1/memory-candidates', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ items: [] }) })
+  })
   await page.route('http://127.0.0.1:7860/api/v1/memories*', async (route) => {
     if (route.request().method() === 'DELETE') {
       await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ deleted: 1 }) })

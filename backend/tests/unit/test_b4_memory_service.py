@@ -89,6 +89,59 @@ def test_extract_is_idempotent_by_normalized_content(tmp_path) -> None:
     assert memory_repo.layer_counts()["source"] == 1
 
 
+def test_manual_memory_uses_all_index_layers_and_is_idempotent(tmp_path) -> None:
+    _, memory_repo, service = make_service(tmp_path)
+    created = service.create_manual("用户偏好安静的背景")
+    duplicate = service.create_manual(" 用户偏好安静的背景。 ")
+    assert created["id"] == duplicate["id"]
+    assert created["source"] == "manual"
+    assert created["edited"] is True
+    assert memory_repo.layer_counts() == {"source": 1, "fts": 1, "vector": 1, "meta": 1}
+    assert service.recall("安静的背景")[0][0].id == created["id"]
+    assert service.delete(created["id"]) is True
+    assert memory_repo.layer_counts() == {"source": 0, "fts": 0, "vector": 0, "meta": 0}
+
+
+def test_pending_candidate_requires_confirmation_and_is_consumed_once(tmp_path) -> None:
+    repo, memory_repo, service = make_service(tmp_path)
+    session_id = repo.create_session("standard")
+    add_turn(repo, session_id, 1, "今天天气不错")
+    result = service.extract_session(session_id)
+    assert result["pending_count"] == 1
+    candidate = service.all_candidates()[0]
+    assert service.recall(candidate["content"]) == []
+    confirmed = service.confirm_candidate(
+        session_id=session_id,
+        turn_id=1,
+        content=candidate["content"],
+    )
+    assert confirmed is not None
+    assert confirmed["source"] == "conversation"
+    assert service.all_candidates() == []
+    repeated = service.confirm_candidate(
+        session_id=session_id,
+        turn_id=1,
+        content=candidate["content"],
+    )
+    assert repeated is not None and repeated["id"] == confirmed["id"]
+    assert memory_repo.layer_counts()["source"] == 1
+
+
+def test_rejected_candidate_never_reaches_recall(tmp_path) -> None:
+    repo, _, service = make_service(tmp_path)
+    session_id = repo.create_session("standard")
+    add_turn(repo, session_id, 1, "今天想早点休息")
+    service.extract_session(session_id)
+    candidate = service.all_candidates()[0]
+    assert service.reject_candidate(
+        session_id=session_id,
+        turn_id=1,
+        content=candidate["content"],
+    ) is True
+    assert service.all_candidates() == []
+    assert service.recall(candidate["content"]) == []
+
+
 def test_composite_query_is_split_and_temporal_fillers_are_removed() -> None:
     assert MemoryService._query_clauses("我周末喜欢喝什么，住在哪里？") == [
         "我喜欢喝什么",

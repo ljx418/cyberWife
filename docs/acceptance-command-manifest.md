@@ -1,6 +1,6 @@
 # B3—B5 验收命令与证据清单
 
-**版本**：1.2　**日期**：2026-10-06　**状态**：IMPLEMENTED / AUDITED
+**版本**：1.3　**日期**：2026-10-06　**状态**：IMPLEMENTED / AUDITED
 本清单定义已经实现的稳定命令接口。目标机证据已生成；诊断失败目录与最终通过目录必须并存，报告只能引用明确标记为正式候选的结果，禁止挑选性忽略失败历史。
 
 ## 1. 统一调用合同
@@ -131,3 +131,14 @@ PYTHONPATH=. ~/.cyberWife/venvs/cosyvoice/bin/python \
 ```
 
 该命令必须用真实CosyVoice生成用户输入，经真实SpeechRuntime识读并进入真实WebSocket对话链，再把项目输出PCM送回SpeechRuntime。六场景必须全PASS，输入CER≤10%、输出CER≤15%、每条首响≤7秒、事实与上下文答案正确；报告只能包含合成脚本、转写、指标和哈希，不能保存PCM/WAV或私人路径。播放态噪声/脉冲/持续人声边界由Headless Playwright全量中的UX9用例签署。
+
+## 11. UX10 人工总验收前修补
+
+```bash
+cd prototype && npm run build && npx playwright test --reporter=line
+cd .. && PYTHONPATH=. ~/.cyberWife/venvs/cosyvoice/bin/python \
+  -m tests.ux10.accept_memory_candidate \
+  --output audit/v1/UX10/real-memory-candidate.json
+```
+
+Idle必须从`ops.avatar_idle_pipeline.run_pipeline`真实执行，输出私有候选后再由`ops/build_video_avatar.py`跑SCRFD/黑帧/接缝/脸框运动门；不得把一次性后处理文件冒充产品流水线结果。生成会临时释放Avatar/Speech/LLM，结束后必须逐组件真实probe并恢复六组件`ready`。候选在人工批准前不得调用approve或写active。HTML总览位于`audit/v1/UX10/acceptance-report.html`。

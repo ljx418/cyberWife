@@ -86,6 +86,7 @@ async function installLocalContracts(page: Page) {
     if (path === '/api/v1/sessions' && request.method() === 'POST') return json({ session_ref: 'ac11-local', next_turn_id: 1 })
     if (path === '/api/v1/profile' && request.method() === 'GET') return json({ name: '小悠', user_nickname: '你', persona: '温柔、自然', relationship_context: '私人日常伴侣', example_dialogue: '', version: 1 })
     if (path === '/api/v1/profile' && request.method() === 'PUT') return json({ name: '小悠', user_nickname: '你', persona: '清醒、温柔、自然', relationship_context: '私人日常伴侣', example_dialogue: '', version: 2 })
+    if (path === '/api/v1/memory-candidates') return json({ items: [] })
     if (path.startsWith('/api/v1/memories')) {
       if (request.method() === 'DELETE') return json({ deleted: 1 })
       return json({ items: [{ id: 41, content: 'ACC1 隔离测试记忆', source_session_id: 'ac11-local', created_at: '2026-10-05T00:00:00Z', edited: false }] })

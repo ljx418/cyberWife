@@ -7,7 +7,7 @@ import type {
   ThemeMode,
   VisualVariant,
 } from './types'
-import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
+import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { AvatarSession } from './services/AvatarSession'
@@ -55,6 +55,35 @@ const onboardingSteps = [
 
 const defaultMemories: MemoryRecord[] = []
 
+const sceneBackgrounds = [
+  { id: 'blue-hour-living', label: '蓝调客厅', description: '暖灯与城市蓝调', src: '/backgrounds/blue-hour-living.webp' },
+  { id: 'morning-bedroom', label: '清晨卧室', description: '柔和晨光与浅木色', src: '/backgrounds/morning-bedroom.webp' },
+  { id: 'rainy-library', label: '雨夜书房', description: '安静深色与雨窗', src: '/backgrounds/rainy-library.webp' },
+  { id: 'garden-sunroom', label: '花园阳光房', description: '自然绿意与午后光', src: '/backgrounds/garden-sunroom.webp' },
+] as const
+
+type LayoutMode = 'standard' | 'portrait' | 'ultratall' | 'strip'
+
+const classifyLayout = (width: number, height: number): LayoutMode => {
+  const ratio = width / Math.max(1, height)
+  if (height <= 260 && ratio >= 4) return 'strip'
+  if (ratio <= 0.72) return 'ultratall'
+  if (ratio < 1) return 'portrait'
+  return 'standard'
+}
+
+const toMemoryRecord = (item: Record<string, any>): MemoryRecord => ({
+  id: String(item.id),
+  content: String(item.content || ''),
+  source: item.source === 'manual'
+    ? '手工记忆'
+    : item.source_session_id
+      ? `会话 ${item.source_session_id}`
+      : '已保留事实',
+  createdAt: item.created_at ? new Date(item.created_at).toLocaleString() : '刚刚',
+  edited: Boolean(item.edited),
+})
+
 const runtimeServices: RuntimeService[] = [
   { id: 'llm', name: '对话模型', detail: '正在读取真实状态', status: 'loading' },
   { id: 'asr', name: '语音识别', detail: '正在读取真实状态', status: 'loading' },
@@ -88,6 +117,8 @@ function App() {
   const [memories, setMemories] = useState<MemoryRecord[]>(defaultMemories)
   const [memoryQuery, setMemoryQuery] = useState('')
   const [editingMemory, setEditingMemory] = useState<string | null>(null)
+  const [newMemory, setNewMemory] = useState('')
+  const [memoryCandidates, setMemoryCandidates] = useState<MemoryCandidate[]>([])
   const [deleteTarget, setDeleteTarget] = useState<string | 'all' | null>(null)
   const [doNotRecord, setDoNotRecord] = useState(false)
   const [personaText, setPersonaText] = useState(
@@ -102,6 +133,8 @@ function App() {
   const [idleJob, setIdleJob] = useState<IdleGenerationJob | null>(null)
   const [idleVideoReady, setIdleVideoReady] = useState(false)
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
+  const [backgroundId, setBackgroundId] = useState(() => localStorage.getItem('cyberwife-background') || sceneBackgrounds[0].id)
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => classifyLayout(window.innerWidth, window.innerHeight))
   const [runtimeRows, setRuntimeRows] = useState<RuntimeService[]>(runtimeServices)
   const [onboardingStatus, setOnboardingStatus] = useState('正在读取本机设置…')
   const [voiceTranscript, setVoiceTranscript] = useState('')
@@ -137,6 +170,17 @@ function App() {
   const lastEventSeqRef = useRef(0)
 
   useEffect(() => { conversationStateRef.current = conversationState }, [conversationState])
+
+  useEffect(() => {
+    const update = () => setLayoutMode(classifyLayout(window.innerWidth, window.innerHeight))
+    window.addEventListener('resize', update)
+    update()
+    return () => window.removeEventListener('resize', update)
+  }, [])
+
+  useEffect(() => {
+    localStorage.setItem('cyberwife-background', backgroundId)
+  }, [backgroundId])
 
   useEffect(() => {
     let active = true
@@ -244,12 +288,12 @@ function App() {
             setPersonaText(profile.persona); setProfileVersion(profile.version)
           }
         } else if (settingsTab === 'memory') {
-          const response = await ConversationClient.getMemories(memoryQuery)
-          setMemories(response.items.map((item) => ({
-            id: String(item.id), content: item.content,
-            source: item.source_session_id ? `会话 ${item.source_session_id}` : '已保留事实',
-            createdAt: new Date(item.created_at).toLocaleString(), edited: item.edited,
-          })))
+          const [response, candidates] = await Promise.all([
+            ConversationClient.getMemories(memoryQuery),
+            ConversationClient.getMemoryCandidates(),
+          ])
+          setMemories(response.items.map(toMemoryRecord))
+          setMemoryCandidates(candidates.items)
         } else if (settingsTab === 'privacy') {
           await Promise.all([ConversationClient.getConsents(), ConversationClient.getRetention()])
         } else if (settingsTab === 'runtime') {
@@ -691,12 +735,21 @@ function App() {
     && idleJob.has_video_preview
       ? ConversationClient.idlePreviewUrl(activeAvatarDerivativeId, 'video', idleJob.updated_at)
       : null
+  const activeBackground = sceneBackgrounds.find((item) => item.id === backgroundId) ?? sceneBackgrounds[0]
 
   return (
     <main
       className={`experience experience--${variant} ${compact ? 'experience--compact' : ''}`}
+      data-layout={layoutMode}
+      data-background={activeBackground.id}
       aria-label="cyberWife 交互原型"
     >
+      <div
+        className="scene-background"
+        data-testid="scene-background"
+        aria-hidden="true"
+        style={{ backgroundImage: `url("${activeBackground.src}")` }}
+      />
       <div
         className="portrait portrait--backdrop"
         aria-hidden="true"
@@ -851,12 +904,42 @@ function App() {
           setPersonaText={setPersonaText}
           theme={theme}
           setTheme={setTheme}
+          backgroundId={activeBackground.id}
+          setBackgroundId={setBackgroundId}
           memories={filteredMemories}
           memoryQuery={memoryQuery}
           setMemoryQuery={setMemoryQuery}
           editingMemory={editingMemory}
           setEditingMemory={setEditingMemory}
           setMemories={setMemories}
+          newMemory={newMemory}
+          setNewMemory={setNewMemory}
+          memoryCandidates={memoryCandidates}
+          onCreateMemory={async () => {
+            const content = newMemory.trim()
+            if (!content) { setSettingsStatus('请输入需要记住的内容'); return }
+            try {
+              const created = await ConversationClient.createMemory(content)
+              setMemories((items) => [toMemoryRecord(created), ...items.filter((item) => item.id !== String(created.id))])
+              setNewMemory('')
+              setSettingsStatus('记忆已保存到本机并建立检索索引')
+            } catch (error) { setSettingsStatus(`记忆未保存：${String(error)}`) }
+          }}
+          onConfirmCandidate={async (candidate) => {
+            try {
+              const created = await ConversationClient.confirmMemoryCandidate(candidate)
+              setMemories((items) => [toMemoryRecord(created), ...items.filter((item) => item.id !== String(created.id))])
+              setMemoryCandidates((items) => items.filter((item) => item !== candidate))
+              setSettingsStatus('候选已确认并进入长期记忆')
+            } catch (error) { setSettingsStatus(`候选未确认：${String(error)}`) }
+          }}
+          onRejectCandidate={async (candidate) => {
+            try {
+              await ConversationClient.rejectMemoryCandidate(candidate)
+              setMemoryCandidates((items) => items.filter((item) => item !== candidate))
+              setSettingsStatus('候选已忽略，不会进入长期记忆')
+            } catch (error) { setSettingsStatus(`候选未忽略：${String(error)}`) }
+          }}
           requestDelete={requestDelete}
           doNotRecord={doNotRecord}
           setDoNotRecord={(enabled) => { void changeNoRecord(enabled) }}
@@ -1214,12 +1297,20 @@ interface SettingsDrawerProps {
   setPersonaText: (value: string) => void
   theme: ThemeMode
   setTheme: (theme: ThemeMode) => void
+  backgroundId: string
+  setBackgroundId: (id: string) => void
   memories: MemoryRecord[]
   memoryQuery: string
   setMemoryQuery: (value: string) => void
   editingMemory: string | null
   setEditingMemory: (id: string | null) => void
   setMemories: React.Dispatch<React.SetStateAction<MemoryRecord[]>>
+  newMemory: string
+  setNewMemory: (content: string) => void
+  memoryCandidates: MemoryCandidate[]
+  onCreateMemory: () => Promise<void>
+  onConfirmCandidate: (candidate: MemoryCandidate) => Promise<void>
+  onRejectCandidate: (candidate: MemoryCandidate) => Promise<void>
   requestDelete: (id: string | 'all') => void
   doNotRecord: boolean
   setDoNotRecord: (enabled: boolean) => void
@@ -1265,9 +1356,30 @@ function SettingsDrawer(props: SettingsDrawerProps) {
             <section>
               <SectionHeader index="01" title="人物形象" description="新文件先由本机校验并创建版本，成功后原子激活；上一可用版本始终可恢复。" />
               <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><button className="secondary-button" type="button" onClick={async () => { try { const restored = await ConversationClient.restoreAsset('portrait') as AvatarBuild; props.onPortraitRestored(restored); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
+              <hr />
+              <SectionHeader index="02" title="相处空间" description="背景与人物独立保存在本机；切换空间不会替换当前人物或中断对话。" />
+              <div className="background-grid" role="radiogroup" aria-label="本地背景">
+                {sceneBackgrounds.map((background) => (
+                  <button
+                    type="button"
+                    role="radio"
+                    aria-checked={props.backgroundId === background.id}
+                    className={props.backgroundId === background.id ? 'background-card is-active' : 'background-card'}
+                    key={background.id}
+                    onClick={() => {
+                      props.setBackgroundId(background.id)
+                      props.setSettingsStatus(`已切换到${background.label}，选择只保存在本机`)
+                    }}
+                  >
+                    <img src={background.src} alt="" />
+                    <span><strong>{background.label}</strong><small>{background.description}</small></span>
+                  </button>
+                ))}
+              </div>
+              <hr />
               <PortraitSetup onPortrait={props.onPortrait} idleJob={props.idleJob} onGenerateIdle={props.onGenerateIdle} onApproveIdle={props.onApproveIdle} compact />
               <hr />
-              <SectionHeader index="02" title="界面主题" description="默认使用电影感深色，也可选择柔和浅色或跟随系统。" />
+              <SectionHeader index="03" title="界面主题" description="默认使用电影感深色，也可选择柔和浅色或跟随系统。" />
               <div className="segmented" role="radiogroup" aria-label="界面主题">
                 {([
                   ['cinematic-dark', '电影深色'],
@@ -1299,10 +1411,28 @@ function SettingsDrawer(props: SettingsDrawerProps) {
           )}
           {props.activeTab === 'memory' && (
             <section>
-              <SectionHeader index="03" title="她记得的事" description="以下均为原型示例，可编辑和删除。" />
+              <SectionHeader index="03" title="她记得的事" description="你可以直接添加，也可以在一轮对话结束后确认候选；未确认候选不会参与回答。" />
+              <div className="memory-create">
+                <label className="field field--grow">添加一条长期记忆<input value={props.newMemory} maxLength={2000} onChange={(event) => props.setNewMemory(event.target.value)} placeholder="例如：我周末喜欢去公园散步" /></label>
+                <button className="primary-button" type="button" onClick={() => { void props.onCreateMemory() }} disabled={!props.newMemory.trim()}>记住</button>
+              </div>
+              {props.memoryCandidates.length > 0 && (
+                <section className="memory-candidates" aria-labelledby="memory-candidates-title">
+                  <header><strong id="memory-candidates-title">等待你确认</strong><span>来自已结束的本机会话</span></header>
+                  {props.memoryCandidates.map((candidate) => (
+                    <article key={`${candidate.source_session_id}-${candidate.source_turn_id}-${candidate.content}`}>
+                      <p>{candidate.content}</p>
+                      <footer>
+                        <span>会话 {candidate.source_session_id} · {candidate.reason === 'temporary_context' ? '可能只是临时信息' : candidate.reason}</span>
+                        <div><button type="button" onClick={() => { void props.onRejectCandidate(candidate) }}>忽略</button><button type="button" onClick={() => { void props.onConfirmCandidate(candidate) }}>确认记住</button></div>
+                      </footer>
+                    </article>
+                  ))}
+                </section>
+              )}
               <label className="search-field"><span>搜索记忆</span><input value={props.memoryQuery} onChange={(event) => props.setMemoryQuery(event.target.value)} placeholder="输入关键词" /></label>
               <div className="memory-list">
-                {props.memories.length === 0 ? <div className="empty-state"><strong>没有找到记忆</strong><span>新的重要信息会在获得允许后出现在这里。</span></div> : props.memories.map((memory) => (
+                {props.memories.length === 0 ? <div className="empty-state"><strong>还没有长期记忆</strong><span>你可以在上方直接添加；对话结束后，可能的信息会先等待你确认。</span></div> : props.memories.map((memory) => (
                   <article className="memory-card" key={memory.id}>
                     {props.editingMemory === memory.id ? (
                       <textarea autoFocus value={memory.content} onChange={(event) => props.setMemories((items) => items.map((item) => item.id === memory.id ? { ...item, content: event.target.value, edited: true } : item))} />

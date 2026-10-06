@@ -14,6 +14,24 @@ class _MemoryService:
     def list_or_search(self, query=""):
         return list(self.items.values())
 
+    def create_manual(self, content):
+        if not str(content).strip():
+            raise ValueError("memory_content_invalid")
+        next_id = max(self.items, default=0) + 1
+        self.items[next_id] = {"id": next_id, "content": content, "edited": True, "source": "manual"}
+        return self.items[next_id]
+
+    def all_candidates(self):
+        return [{"session_id": 8, "turn_id": 2, "content": "今天想散步", "reason": "temporary_context"}]
+
+    def confirm_candidate(self, *, session_id, turn_id, content):
+        if (session_id, turn_id, content) != (8, 2, "今天想散步"):
+            return None
+        return self.create_manual(content)
+
+    def reject_candidate(self, *, session_id, turn_id, content):
+        return (session_id, turn_id, content) == (8, 2, "今天想散步")
+
     def edit(self, memory_id, content):
         if memory_id not in self.items:
             return None
@@ -48,6 +66,36 @@ def test_memory_crud_and_purge_confirmation_contract():
     assert purged.status_code == 200
     assert purged.json()["deleted"] == 1
     assert service.items == {}
+
+
+def test_manual_and_candidate_api_contracts():
+    client, _ = make_client()
+    created = client.post("/api/v1/memories", json={"content": "用户喜欢安静的房间"})
+    assert created.status_code == 201
+    assert created.json()["source"] == "manual"
+    candidates = client.get("/api/v1/memory-candidates")
+    assert candidates.status_code == 200
+    assert candidates.json()["items"][0]["content"] == "今天想散步"
+    confirmed = client.post(
+        "/api/v1/memory-candidates/confirm",
+        json={"session_id": 8, "turn_id": 2, "content": "今天想散步"},
+    )
+    assert confirmed.status_code == 200
+    rejected = client.post(
+        "/api/v1/memory-candidates/reject",
+        json={"session_id": 8, "turn_id": 2, "content": "今天想散步"},
+    )
+    assert rejected.status_code == 200
+
+
+def test_candidate_confirmation_validates_identity_and_manual_content():
+    client, _ = make_client()
+    assert client.post("/api/v1/memories", json={"content": ""}).status_code == 422
+    missing = client.post(
+        "/api/v1/memory-candidates/confirm",
+        json={"session_id": 9, "turn_id": 2, "content": "今天想散步"},
+    )
+    assert missing.status_code == 404
 
 
 def test_missing_memory_uses_catalogued_error():

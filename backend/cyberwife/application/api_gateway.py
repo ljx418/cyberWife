@@ -357,6 +357,57 @@ class ApiGateway:
                 "query": q,
             }
 
+        @app.post("/api/v1/memories", status_code=201)
+        async def post_memory(payload: dict):
+            if self._memory_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                return await asyncio.to_thread(
+                    self._memory_service.create_manual, str(payload.get("content", ""))
+                )
+            except ValueError:
+                raise HTTPException(status_code=422, detail="asset.invalid")
+
+        @app.get("/api/v1/memory-candidates")
+        async def get_memory_candidates():
+            if self._memory_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            return {"items": await asyncio.to_thread(self._memory_service.all_candidates)}
+
+        @app.post("/api/v1/memory-candidates/confirm")
+        async def confirm_memory_candidate(payload: dict):
+            if self._memory_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                result = await asyncio.to_thread(
+                    self._memory_service.confirm_candidate,
+                    session_id=int(payload.get("session_id")),
+                    turn_id=int(payload.get("turn_id")),
+                    content=str(payload.get("content", "")),
+                )
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=422, detail="asset.invalid")
+            if result is None:
+                raise HTTPException(status_code=404, detail="memory.not_found")
+            return result
+
+        @app.post("/api/v1/memory-candidates/reject")
+        async def reject_memory_candidate(payload: dict):
+            if self._memory_service is None:
+                raise HTTPException(status_code=503, detail="health.component_unavailable")
+            try:
+                rejected = await asyncio.to_thread(
+                    self._memory_service.reject_candidate,
+                    session_id=int(payload.get("session_id")),
+                    turn_id=int(payload.get("turn_id")),
+                    content=str(payload.get("content", "")),
+                )
+            except (TypeError, ValueError):
+                raise HTTPException(status_code=422, detail="asset.invalid")
+            if not rejected:
+                raise HTTPException(status_code=404, detail="memory.not_found")
+            return {"rejected": True}
+
         @app.patch("/api/v1/memories/{memory_id}")
         async def patch_memory(memory_id: int, payload: dict):
             if self._memory_service is None:

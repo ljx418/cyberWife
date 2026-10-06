@@ -93,6 +93,28 @@ def _loop_metrics(frames: list[np.ndarray]) -> dict[str, float | str]:
     }
 
 
+def _idle_motion_metrics(
+    boxes: np.ndarray,
+    *,
+    frame_width: int = 512,
+    frame_height: int = 768,
+) -> dict[str, float]:
+    """Measure face translation/scale without pretending to score naturalness."""
+    values = boxes.astype(np.float32)
+    centers_x = (values[:, 2] + values[:, 3]) / 2
+    centers_y = (values[:, 0] + values[:, 1]) / 2
+    median_x, median_y = np.median(centers_x), np.median(centers_y)
+    diagonal = float(np.hypot(frame_width, frame_height))
+    displacement = np.hypot(centers_x - median_x, centers_y - median_y) / diagonal * 100
+    areas = np.maximum(1.0, values[:, 1] - values[:, 0]) * np.maximum(
+        1.0, values[:, 3] - values[:, 2]
+    )
+    return {
+        "face_center_p95_percent_diagonal": round(float(np.percentile(displacement, 95)), 4),
+        "face_area_cv_percent": round(float(np.std(areas) / np.mean(areas) * 100), 4),
+    }
+
+
 def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id: str) -> Path:
     if not source_portrait.is_file() or not idle_video.is_file():
         raise FileNotFoundError("source portrait or idle video is missing")
@@ -131,6 +153,12 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
     boxes = _smooth(np.asarray(raw_boxes))
     if np.max(np.abs(np.diff(boxes, axis=0))) > 48:
         raise RuntimeError("face box discontinuity exceeds 48 pixels")
+    motion_metrics = _idle_motion_metrics(boxes)
+    if (
+        motion_metrics["face_center_p95_percent_diagonal"] > 2.5
+        or motion_metrics["face_area_cv_percent"] > 3.0
+    ):
+        raise RuntimeError(f"idle motion exceeds low-motion gate: {motion_metrics}")
     target = output_root / avatar_id
     if target.exists():
         raise FileExistsError(f"target exists; refusing overwrite: {target}")
@@ -176,6 +204,7 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
             "loop_seam": {
                 key: value for key, value in loop_metrics.items() if key != "mode"
             },
+            "idle_motion": motion_metrics,
             "face_detector": "scrfd",
             "visual_approval_required": True,
         }

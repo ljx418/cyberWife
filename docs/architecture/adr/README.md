@@ -14,5 +14,6 @@
 | [ADR-010](ADR-010-avatar-h264-websocket.md) | Avatar改为loopback WebSocket H.264 + WebCodecs | Accepted |
 | [ADR-011](ADR-011-avatar-independent-liveness.md) | Avatar独立存活通道 + H.264 WS应用层心跳 | Accepted |
 | [ADR-012](ADR-012-single-machine-portability-gate.md) | V1以单机隔离可移植性为最低部署门，独立干净机保留为增强项 | Accepted |
+| [ADR-013](ADR-013-v2-experience-first-expansion.md) | V2先做体验交互优化，再以稳定ID和可迁移清单扩容多形象/空间/记忆平台 | Accepted |
 
 任何决策变更需新增或取代 ADR，同时更新 PRD、目标架构、追踪矩阵、验收计划和 Draw.io。

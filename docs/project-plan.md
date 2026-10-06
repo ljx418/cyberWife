@@ -1,14 +1,14 @@
-# cyberWife V1 项目里程碑与交付计划
+# cyberWife V1～V2 项目里程碑与交付计划
 
-**版本**：3.2
+**版本**：3.4
 **日期**：2026-10-06
 
-**状态**：B0～B5、B2.5、ARCH1、RES1及V1RC1自动化门完成；UX8机器门通过；V1FINAL现场门待结构化报告，部署最低门调整为INST1-AC07单机隔离可移植性
+**状态**：B0～B5、B2.5、ARCH1、RES1、V1RC1及UX10自动化门完成；V1FINAL现场门待结构化报告，新Idle候选待人工决定是否激活；部署最低门为INST1-AC07单机隔离可移植性
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
 ## 1. 项目现状
 
-前端既有交互体验已被用户确认为满足 V1，后续不再以视觉重构为里程碑。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是完整产品。
+前端既有主交互已被用户确认为满足 V1，六态、主操作和对话链继续受G-UX保护；项目所有者于2026-10-06批准极端窗口、背景、Idle、记忆工作台等定向体验优化，并批准V2按体验交互优化→架构扩容执行。仓库已有领域对象、SQLite 基础、Gateway REST 骨架、六态状态机、VAD/ASR/LLM/Qwen/CosyVoice 适配器、Avatar 上游代码以及 PowerShell 启动脚本；这些是可复用基础，不是V2新增能力的完成证据。
 
 V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.264 WebSocket/WebCodecs完成故障恢复，B3/B4/B5完成打断、记忆隐私、组合回归和发布冻结。UX5/ARCH1/RES1已关闭A/V机器量化、架构分层和AC-14资源红项；V1RC1又以当前代码重跑普通链、打断与60分钟组合。V1FINAL把原纯人工签字脚本升级为不保存正文/音频的headed Chrome机器取证器；INST1-AC06R已消除硬编码工件依赖。因所有者只有一台电脑，ADR-012新增AC07，以同机隔离venv、离线wheelhouse、替代数据根、便携制品和真实生命周期证明有限可移植性；AC06独立新环境降为增强项。商业发布继续被Wav2Lip ResearchOnly阻断。
 
@@ -19,7 +19,7 @@ V1核心功能已完成开发并取得目标硬件真实证据。B2以本机H.26
 - 网络：仅 loopback/当次Windows↔WSL本机桥接；核心体验不得依赖公网。物理断网会中断宿主终端，按用户决议改用白盒出站审查与运行期连接采样。
 - 数据：原始麦克风音频不落盘；转录 30 天；长期记忆保留至用户删除。
 - 模型：非 TensorRT CosyVoice2 为 V1 默认；Qwen3-TTS 保留为显式回退，不双常驻。
-- 前端：体验范围冻结；只做后端合同接线与必要回归修复。
+- 前端：V1主交互和六态保持稳定；只实施已批准的定向体验工作包，任何新增路由/组件必须绑定V1修补或V2-X/V2-A需求与验收ID。
 
 ## 3. 总体依赖
 
@@ -50,6 +50,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | B5 | 本机边界、一键、故障恢复后形成候选版 | 所有后端实体、验收工具 | B3+B4 Pass | AC-01～14 全 Pass；P0/P1=0 |
 | UX4 | 用户在引导内把照片稳定生成并启用为动态人物 | AvatarAssetService、avatar_idle_pipeline、Onboarding | 三张工作流样片获人工批准 | UX4-AC01～08 Pass；未确认不替换；四服务恢复 |
 | UX8 | 普通话字幕不再保留粤语特有词形，句中自然停顿不被过早截断 | MandarinTranscriptNormalizer、UtteranceBoundaryDetector | 用户真实交互反馈 | UX8-AC01～06机器PASS；AC07物理麦克风待签 |
+| UX10 | 极端窗口无空白、背景可切换、Idle低动作候选与记忆新增/确认可用 | App布局、MemoryService、avatar_idle_pipeline | V1人工反馈及G-V2定向授权 | 自动化PASS；新Idle不自动激活，现场自然度待签 |
 | V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据；部署证明采用显式保证等级 | Invoke-ACC1HumanGate、Invoke-INST1SingleMachinePortability、audit_v1_completion | V1RC1自动化PASS | VF-AC01～09；AC07为V1最低门，AC06为增强项 |
 
 ## 5. 每阶段交付包
@@ -94,6 +95,15 @@ CosyVoice2 已用正确参考逐字稿完成30条复测：CER=0.71%。V1RC1修�
 
 V1 Go 需要 AC-01～AC-14 全部通过、开放 P0/P1=0，并完成安装、启动、备份、恢复、卸载和数据清除演练。部署至少通过AC07单机隔离可移植性，报告不得声称跨机器/驱动兼容；AC06独立干净机为增强保证。真实读屏/麦克风现场报告仍必须闭环。
 
-## 9. V2 保留项
+## 9. V1 后续体验修补与 V2 阶段
 
-Docker/Compose、容器 GPU、卷迁移、公网访问、桌面壳、多用户、多角色与商业发布不进入 V1。任何前移都必须重新修改 PRD、架构、追踪矩阵、验收计划和图纸。
+V1人工总验收前四项低风险修补已由UX10实现并通过自动化：极端窗口布局、本地背景库、低幅Idle候选、记忆手工新增/候选确认。低动作候选仍受人工批准门保护，当前active不会被自动替换。UX10的完成不提前解锁V2-X实际开发；仍先执行V1现场总验收。
+
+V2 已由项目所有者批准拆成两个顺序阶段：
+
+| 阶段 | 用户可感知结果 | 架构边界 | 出门门 |
+|---|---|---|---|
+| V2-X 体验交互优化（先执行） | 多源照片、头像/半身/全身构图、外观与背景预设、低幅Idle、可确认的图像描述、可视化记忆工作台 | 仍为一个活动角色；所有新增素材用稳定ID和版本化清单，为迁移预留边界 | V2X-AC01～07全PASS；V1门无回退；P0/P1=0 |
+| V2-A 架构扩容（后执行） | 多形象、多空间、文件隔离、导入导出、图谱聚类、MCP/RAG/CLI记忆连接器 | 模块化单体新增Character/Appearance/Space/Memory bounded context；只隔离不可信插件宿主 | V2A-AC01～07全PASS；迁移可回滚；串数据/越权为0 |
+
+详细任务、顺序、验收和停线条件以 [`V2-development-plan.md`](V2-development-plan.md) 为准；架构决策见 [`ADR-013`](architecture/adr/ADR-013-v2-experience-first-expansion.md)。Docker/Compose由ADR-007保留为独立部署轨，不得阻塞V2-X体验开发，也不得默认成为V2-A本机运行前置条件。公网访问、多用户、云同步与商业发布仍不在已批准V2范围内。

@@ -99,8 +99,18 @@ select:focus-visible {
   inset: 0;
   animation: arrive 1.4s cubic-bezier(0.2, 0.75, 0.2, 1) both;
 }
+.scene-background {
+  position: absolute;
+  inset: 0;
+  z-index: -7;
+  background-color: #0b0e0f;
+  background-position: center;
+  background-size: cover;
+  filter: saturate(0.86) brightness(0.72);
+  transition: background-image 0.35s ease, filter 0.35s ease;
+}
 .portrait--backdrop {
-  z-index: -6;
+  z-index: -8;
   transform: scale(1.06);
   filter: blur(22px) saturate(0.72) brightness(0.58);
 }
@@ -687,6 +697,43 @@ select:focus-visible {
   color: var(--ink);
   box-shadow: 0 3px 15px rgba(0, 0, 0, 0.12);
 }
+.background-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.background-card {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: var(--soft);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+.background-card img {
+  width: 104px;
+  height: 64px;
+  object-fit: cover;
+}
+.background-card > span {
+  display: grid;
+  gap: 4px;
+}
+.background-card strong {
+  font-size: 11px;
+}
+.background-card small {
+  color: var(--muted);
+  font-size: 9px;
+}
+.background-card.is-active {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
 .form-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -751,6 +798,59 @@ select:focus-visible {
   gap: 8px;
   color: var(--muted);
   font-size: 11px;
+}
+.memory-create {
+  display: flex;
+  align-items: end;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.memory-create .field {
+  margin: 0;
+}
+.memory-create .primary-button {
+  min-height: 42px;
+}
+.memory-candidates {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 24px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--accent) 62%, transparent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+.memory-candidates > header,
+.memory-candidates article footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.memory-candidates > header span,
+.memory-candidates article footer span {
+  color: var(--faint);
+  font-size: 9px;
+}
+.memory-candidates article {
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+.memory-candidates article p {
+  margin: 0 0 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.memory-candidates article footer div {
+  display: flex;
+  gap: 8px;
+}
+.memory-candidates article button {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  background: var(--solid);
+  color: var(--ink);
+  font-size: 10px;
+  cursor: pointer;
 }
 .memory-list {
   display: grid;
@@ -1293,6 +1393,104 @@ button:disabled {
     padding: 35px;
   }
 }
+
+.experience[data-layout="ultratall"] .portrait--foreground,
+.experience[data-layout="ultratall"] .idle-avatar-video,
+.experience[data-layout="ultratall"] .avatar-video {
+  top: 0;
+  bottom: auto;
+  width: 100%;
+  height: 68%;
+  object-fit: cover;
+  object-position: center 24%;
+  background-position: center 24%;
+  background-size: cover;
+}
+.experience[data-layout="ultratall"] .conversation-copy {
+  top: auto;
+  bottom: 18%;
+  left: 7vw;
+  width: 86vw;
+  transform: none;
+}
+.experience[data-layout="ultratall"] .conversation-copy h1 {
+  font-size: clamp(58px, 10vw, 150px);
+}
+.experience[data-layout="ultratall"] .conversation-copy .subtitle {
+  max-width: 80vw;
+  font-size: clamp(22px, 3vw, 42px);
+}
+.experience[data-layout="ultratall"] .voice-dock {
+  bottom: 3.5%;
+}
+
+.experience[data-layout="strip"] {
+  min-height: 0;
+  height: 100dvh;
+}
+.experience[data-layout="strip"] .scene-background {
+  filter: saturate(0.78) brightness(0.54);
+}
+.experience[data-layout="strip"] .topbar {
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  padding: 9px 18px;
+}
+.experience[data-layout="strip"] .brand__edition,
+.experience[data-layout="strip"] .local-status,
+.experience[data-layout="strip"] .eyebrow,
+.experience[data-layout="strip"] .voice-caption,
+.experience[data-layout="strip"] .tweaks-trigger,
+.experience[data-layout="strip"] .signal-rail {
+  display: none;
+}
+.experience[data-layout="strip"] .portrait--foreground,
+.experience[data-layout="strip"] .idle-avatar-video,
+.experience[data-layout="strip"] .avatar-video {
+  top: -118%;
+  right: 5vw;
+  bottom: auto;
+  width: 28vw;
+  height: 350%;
+  object-fit: contain;
+  object-position: center 30%;
+  background-position: center 30%;
+  background-size: contain;
+}
+.experience[data-layout="strip"] .conversation-copy,
+.experience--quiet[data-layout="strip"] .conversation-copy {
+  top: 54%;
+  left: 20px;
+  width: 53vw;
+  transform: translateY(-50%);
+}
+.experience[data-layout="strip"] .conversation-copy h1 {
+  overflow: hidden;
+  font-size: clamp(22px, 2.3vw, 40px);
+  line-height: 1.05;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.experience[data-layout="strip"] .conversation-copy .subtitle {
+  overflow: hidden;
+  max-width: 52vw;
+  margin-top: 8px;
+  font-size: clamp(10px, 0.9vw, 15px);
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.experience[data-layout="strip"] .voice-dock {
+  top: 50%;
+  right: 24px;
+  bottom: auto;
+  left: auto;
+  transform: translateY(-50%) scale(0.64);
+}
+.experience[data-layout="strip"] .portrait-shade {
+  background: linear-gradient(90deg, rgba(5, 8, 9, 0.88), rgba(5, 8, 9, 0.28) 65%, rgba(5, 8, 9, 0.62));
+}
 @media (max-width: 620px) {
   .experience {
     min-height: 680px;
@@ -1386,6 +1584,15 @@ button:disabled {
   }
   .memory-card footer {
     align-items: flex-start;
+    flex-direction: column;
+  }
+  .background-grid {
+    grid-template-columns: 1fr;
+  }
+  .memory-create,
+  .memory-candidates > header,
+  .memory-candidates article footer {
+    align-items: stretch;
     flex-direction: column;
   }
   .onboarding__portrait {

@@ -46,6 +46,118 @@ class MemoryService:
         with self._lock:
             return [asdict(item) for item in self._candidates.get(session_id, [])]
 
+    def all_candidates(self) -> list[dict]:
+        """Return pending candidates without making them available to recall."""
+        with self._lock:
+            items = [item for values in self._candidates.values() for item in values]
+        return [asdict(item) for item in sorted(
+            items,
+            key=lambda item: (item.source_session_id, item.source_turn_id, item.content),
+        )]
+
+    def create_manual(self, content: str) -> dict:
+        """Create a user-authored fact through the same indexed transaction as extraction."""
+        content = self._validate_content(content)
+        normalized = self._normalize(content)
+        existing = next(
+            (item for item in self._memories.list_all() if self._normalize(item.content) == normalized),
+            None,
+        )
+        if existing is not None:
+            return self._serialize(existing, 1.0)
+        now = datetime.now(timezone.utc)
+        record = MemoryRecord(
+            id=0,
+            source_session_id=None,
+            content=content,
+            confidence=1.0,
+            edited=True,
+            created_at=now,
+            updated_at=now,
+        )
+        memory_id = self._memories.upsert(record, self._embedding.embed(content))
+        stored = self._memories.get(memory_id)
+        assert stored is not None
+        return self._serialize(stored, 1.0)
+
+    def confirm_candidate(
+        self,
+        *,
+        session_id: int,
+        turn_id: int,
+        content: str,
+    ) -> dict | None:
+        """Persist exactly one still-pending candidate and consume it idempotently."""
+        content = self._validate_content(content)
+        normalized = self._normalize(content)
+        with self._lock:
+            values = self._candidates.get(session_id, [])
+            selected = next(
+                (
+                    item
+                    for item in values
+                    if item.source_turn_id == turn_id
+                    and self._normalize(item.content) == normalized
+                ),
+                None,
+            )
+            if selected is None:
+                existing = next(
+                    (
+                        item
+                        for item in self._memories.list_all()
+                        if item.source_session_id == session_id
+                        and self._normalize(item.content) == normalized
+                    ),
+                    None,
+                )
+                return self._serialize(existing, 1.0) if existing is not None else None
+            existing = next(
+                (item for item in self._memories.list_all() if self._normalize(item.content) == normalized),
+                None,
+            )
+            if existing is None:
+                now = datetime.now(timezone.utc)
+                memory_id = self._memories.upsert(
+                    MemoryRecord(
+                        id=0,
+                        source_session_id=session_id,
+                        content=selected.content,
+                        confidence=1.0,
+                        created_at=now,
+                        updated_at=now,
+                    ),
+                    self._embedding.embed(selected.content),
+                )
+                existing = self._memories.get(memory_id)
+            remaining = [item for item in values if item is not selected]
+            if remaining:
+                self._candidates[session_id] = remaining
+            else:
+                self._candidates.pop(session_id, None)
+        assert existing is not None
+        return self._serialize(existing, 1.0)
+
+    def reject_candidate(self, *, session_id: int, turn_id: int, content: str) -> bool:
+        normalized = self._normalize(content)
+        with self._lock:
+            values = self._candidates.get(session_id, [])
+            remaining = [
+                item
+                for item in values
+                if not (
+                    item.source_turn_id == turn_id
+                    and self._normalize(item.content) == normalized
+                )
+            ]
+            if len(remaining) == len(values):
+                return False
+            if remaining:
+                self._candidates[session_id] = remaining
+            else:
+                self._candidates.pop(session_id, None)
+            return True
+
     def extract_session(self, session_id: int) -> dict:
         turns = self._sessions.list_session_turns(session_id)
         committed: list[int] = []
@@ -146,9 +258,7 @@ class MemoryService:
         return [self._serialize(record, score) for record, score in rows]
 
     def edit(self, memory_id: int, content: str) -> dict | None:
-        content = content.strip()
-        if not content or len(content) > 2000:
-            raise ValueError("memory_content_invalid")
+        content = self._validate_content(content)
         record = self._memories.get(memory_id)
         if record is None:
             return None
@@ -186,7 +296,15 @@ class MemoryService:
             "created_at": record.created_at.isoformat(),
             "updated_at": record.updated_at.isoformat(),
             "score": score,
+            "source": "manual" if record.source_session_id is None else "conversation",
         }
+
+    @staticmethod
+    def _validate_content(content: str) -> str:
+        content = content.strip()
+        if not content or len(content) > 2000:
+            raise ValueError("memory_content_invalid")
+        return content
 
     @staticmethod
     def _normalize(content: str) -> str:

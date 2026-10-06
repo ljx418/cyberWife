@@ -1,8 +1,8 @@
-# cyberWife V1 后端目标架构
+# cyberWife V1 基线与 V2 演进目标架构
 
-**版本**：2.8
+**版本**：3.0
 **日期**：2026-10-06
-**状态**：B0～B5、B2.5、UX4、UX5、ARCH1、RES1、V1RC1与INST1-AC07自动化门已有目标机证据；仅V1FINAL现场人工报告待闭环
+**状态**：B0～B5、B2.5、UX4、UX5、UX10、ARCH1、RES1、V1RC1与INST1-AC07自动化门已有目标机证据；V1FINAL现场人工报告与新Idle候选激活待闭环
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -33,7 +33,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 
 | 层 | 当前仓库事实 | V1 目标 | 状态 |
 |---|---|---|---|
-| 前端 | G-UX/G-OX体验已获批准；已有 ConversationClient/MediaSession | 只做真实事件接线、局部阶段反馈与回归修复 | 已验收/冻结 |
+| 前端 | ConversationClient/MediaSession保持主链；UX10新增宽高比舞台、本地背景层和记忆新增/候选确认 | V1主交互保持稳定；按G-V2只增加有需求/验收ID的定向体验模块 | V1修补已开发/自动化PASS；V2待开发 |
 | API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
@@ -41,8 +41,8 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
 | Avatar | H.264/WebCodecs全链、打断清队列、降级/恢复与长稳态通过；UX5 A/V量化及用户视觉批准已完成 | 保持动态形象逐素材人工确认门 | 已开发/已验收 |
-| 人物生成 | Qwen Image正面化→Wan Idle→10秒闭环→双预览→人工确认→Wav2Lip数据构建；文件任务状态可恢复 | 逐素材人工身份/自然度签署 | 已开发/人工门持续执行 |
-| 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、原子删除与no-record均已实现 | 保持事务与保留策略 | 已开发/已验收 |
+| 人物生成 | Qwen Image正面化→Wan Idle→固定首帧/羽化局部眨眼衰减→10秒闭环→双预览→人工确认→Wav2Lip数据构建；缓存绑定工作流与处理版本 | 逐素材人工身份/自然度签署 | UX10机器门PASS；新候选待人工激活 |
+| 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
 | 验收 | V1FINAL现场报告绑定Git revision；AC09总门复算完整源码、依赖、前端和证据SHA，并校验现场/部署报告同提交；部署策略显式区分AC07同机隔离与AC06独立机 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator | AC07当前revision报告PASS；仅现场人工报告待生成 |
@@ -63,7 +63,7 @@ backend/cyberwife/
 │  ├─ interruption_controller.py             [已开发] generation/cancel/queue purge
 │  ├─ prompt_compiler.py                     [保留]
 │  ├─ output_sanitizer.py                    [保留]
-│  ├─ memory_service.py                      [已开发]
+│  ├─ memory_service.py                      [已开发/UX10] 手工记忆、候选确认/拒绝、召回隔离
 │  ├─ retention_service.py                   [已开发]
 │  ├─ health_aggregator.py                   [已开发] 真实探针与资源
 │  └─ model_registry.py                      [已开发] 清单不是 ready 证据
@@ -99,6 +99,9 @@ workers/speech_worker/
 workers/avatar/                              [上游]
 scripts/windows/RuntimeLauncher.ps1          [已开发] 生命周期与功能探针
 tests/{b3,b4,b5}/                            [已开发] 目标机验收runner
+tests/ux10/                                  [已开发] 真实语音候选记忆验收
+ops/avatar_idle_pipeline.py                  [已开发/UX10] 工作流版本绑定、局部眨眼衰减
+prototype/src/App.tsx                        [已开发/UX10] 宽高比舞台、本地背景、记忆工作台
 ```
 
 目标依赖只允许 `api → application → domain + ports`；`adapters/infrastructure → ports/domain`。ARCH1已把`SqliteRepository`、`AssetStore`、`StructuredLogger`的具体装配集中到`api/server.py`，运行指标为应用层无I/O实现，并以AST门禁持续保证`application/domain/ports`对`infrastructure/adapters/api`的反向导入为0。
@@ -267,3 +270,53 @@ B2.5 不改变本架构的依赖方向。新增 `WarmResponsePolicy`、`WarmResp
 - B4（已实现）：记忆、隐私、保留和 sqlite-vec 真实往返已落地；运行时不以 FTS-only 或内存 fallback 冒充 ready。
 - B5（已实现、人工门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层、资源和AC07最低部署红项已关闭，只需人工Narrator/物理麦克风与主观体验签署。
 - 详细计划和真实门槛见 `stages/B3～B5`；可编辑总图为 `cyberWife-b3-b5-delivery-gap.drawio`。
+
+## 16. V2 演进边界
+
+V2采用ADR-013的“先体验、后扩容”，详细任务和验收只在 [`../V2-development-plan.md`](../V2-development-plan.md) 维护。本节冻结架构方向。
+
+### 16.1 V2-X：兼容层内的体验优化
+
+- 保留现有单一活动 Avatar 合同和 `TurnPipeline`，不在体验阶段引入多角色并发。
+- 多源照片、Appearance和Scene以版本化manifest保存；创建时即使用不可变UUID、SHA-256、授权ID和provenance。
+- 原图只读、派生资产分离；用户未确认的图像描述不得进入Profile/Memory。
+- 记忆图谱先作为内置SQLite记忆的只读派生视图；任何边必须能回到源记忆或用户确认事件。
+- 生成模型与实时模型串行调度，不双常驻；V1的RAM、VRAM、首响、打断和稳定性门保持不变。
+
+### 16.2 V2-A：正式领域扩容
+
+```text
+Browser UI
+  ├─ Character / Appearance / Space 管理
+  └─ Memory Workbench / Connector Control
+        │ REST + WS
+        ▼
+App Gateway（模块化单体）
+  ├─ Conversation Context（复用V1）
+  ├─ Character Context      [新增]
+  ├─ Space Context          [新增]
+  ├─ Asset Package Context  [新增]
+  └─ Memory Platform        [扩展]
+       ├─ Built-in SQLite Provider（权威写存储）
+       ├─ RAG / llmwiki Adapter
+       ├─ MCP Tool Bridge
+       └─ Codex / Claude CLI Bridge
+                            │
+                            └─ 低权限Plugin Host（仅不可信执行）
+```
+
+关键实体为`Character`、`AppearanceSet`、`SourcePack`、`Rendition`、`Space`、`ActiveContext`、`MemoryEdge`、`MemoryCluster`和`ProviderRegistration`。`ActiveContext`在本地用户范围内仍为单例，但引用的各聚合不再是单例。切换必须在事务内检查授权、就绪状态和资源预算，失败保持旧上下文。
+
+依赖方向继续是`api → application → domain + ports`；连接器和插件只能实现port，禁止application/domain直接依赖MCP SDK、CLI实现、llmwiki或外部RAG客户端。V2不拆业务微服务，只有不可信插件宿主可以进程隔离。
+
+### 16.3 数据与迁移
+
+- V2-X manifest先登记为V2-A正式实体，ID保持不变；禁止重新生成ID造成资产失联。
+- 私有路径按`characters/<id>`、`spaces/<id>`、`renditions/<id>`隔离，所有路径由服务端验证过的ID解析。
+- 导入只进入staging；schema、哈希、授权、配额和路径穿越检查全过后原子提升。
+- 内置SQLite仍是核心记忆权威写存储；外部提供方默认只读/候选，需统一策略和用户确认才能固化。
+- schema与资产迁移必须有前置备份、dry-run、重复执行和回滚证据。
+
+### 16.4 阶段出门
+
+V2-X必须先通过V2X-AC01～07，V2-A才可开发。V2-A通过V2A-AC01～07后才可以宣称支持多形象、多空间、导入导出或可插拔记忆。任何人物/声音/记忆串用、未授权事实固化、插件越权或V1性能回退均为P0/P1停线项。
