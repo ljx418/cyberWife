@@ -4,6 +4,7 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from cyberwife.application.api_gateway import ApiGateway
@@ -83,7 +84,23 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
         progress("building_seamless_loop", 80)
         video = job_dir / "idle-loop-10s.mp4"
         video.write_bytes(b"real-local-idle-loop")
-        return {"frontal_path": str(frontal), "video_path": str(video)}
+        scenes = job_dir / "scenes"
+        scenes.mkdir()
+        outputs = {}
+        for scene_id in (
+            "blue-hour-living", "garden-sunroom",
+            "morning-bedroom", "rainy-library",
+        ):
+            scene_video = scenes / f"idle-{scene_id}.mp4"
+            scene_video.write_bytes(f"scene:{scene_id}".encode())
+            outputs[scene_id] = {"path": str(scene_video)}
+        scene_manifest = scenes / "scene-composite-manifest.json"
+        scene_manifest.write_text(json.dumps({"outputs": outputs}), encoding="utf-8")
+        return {
+            "frontal_path": str(frontal),
+            "video_path": str(video),
+            "scene_manifest_path": str(scene_manifest),
+        }
 
     service = AvatarAssetService(
         repo,
@@ -149,6 +166,11 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
     assert job["progress"] == 100
     assert job["has_frontal_preview"] is True
     assert job["has_video_preview"] is True
+    assert job["has_scene_previews"] is True
+    assert job["scene_ids"] == [
+        "blue-hour-living", "garden-sunroom",
+        "morning-bedroom", "rainy-library",
+    ]
     repeated = client.post(
         f"/api/v1/avatar-builds/{derivative_id}/idle-generation"
     )
@@ -166,6 +188,11 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
     assert frontal.headers["cache-control"] == "no-store, private"
     assert video.content == b"real-local-idle-loop"
     assert video.headers["content-type"].startswith("video/mp4")
+    scene = client.get(
+        f"/api/v1/avatar-builds/{derivative_id}/idle-generation/scenes/rainy-library"
+    )
+    assert scene.content == b"scene:rainy-library"
+    assert scene.headers["cache-control"] == "no-store, private"
 
     approved = client.post(
         f"/api/v1/avatar-builds/{derivative_id}/idle-generation/approve"
@@ -178,3 +205,68 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
         f"/api/v1/avatar-builds/{derivative_id}/idle-generation"
     ).json()["status"] == "active"
     assert client.get("/api/v1/avatar/active").json()["avatar_id"] == approved.json()["avatar_id"]
+
+    sequence = tmp_path / "approved-sequence"
+    sequence.mkdir()
+    sequence_files = {
+        "intro": sequence / "intro.mp4",
+        "idle": sequence / "idle.mp4",
+        "outro": sequence / "outro.mp4",
+    }
+    for kind, path in sequence_files.items():
+        path.write_bytes(f"approved-{kind}".encode())
+    close_keyframe = sequence / "frontal.png"
+    close_keyframe.write_bytes(b"approved-frontal")
+    manifest = {
+        "generation_mode": "direct_complete_scene_sequence",
+        "matting": False,
+        "close_keyframe": {
+            "sha256": hashlib.sha256(close_keyframe.read_bytes()).hexdigest(),
+        },
+    }
+    for kind, path in sequence_files.items():
+        manifest[kind] = {
+            "path": str(path.resolve()),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    manifest_path = sequence / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="avatar.visual_approval_required"):
+        service.install_approved_sequence(
+            derivative_id,
+            manifest_path=manifest_path,
+            close_keyframe=close_keyframe,
+            visually_approved=False,
+        )
+
+    tampered_manifest = sequence / "tampered-manifest.json"
+    tampered = {**manifest, "idle": {**manifest["idle"], "sha256": "0" * 64}}
+    tampered_manifest.write_text(json.dumps(tampered), encoding="utf-8")
+    with pytest.raises(ValueError, match="avatar.sequence_output_mismatch"):
+        service.install_approved_sequence(
+            derivative_id,
+            manifest_path=tampered_manifest,
+            close_keyframe=close_keyframe,
+            visually_approved=True,
+        )
+
+    installed = service.install_approved_sequence(
+        derivative_id,
+        manifest_path=manifest_path,
+        close_keyframe=close_keyframe,
+        visually_approved=True,
+    )
+    assert installed["has_sequence_previews"] is True
+    assert installed["has_intro_preview"] is True
+    assert installed["has_outro_preview"] is True
+    assert installed["sequence_version"].startswith("ux13-frontal-")
+    assert client.get(
+        f"/api/v1/avatar-builds/{derivative_id}/idle-generation/intro"
+    ).content == b"approved-intro"
+    assert client.get(
+        f"/api/v1/avatar-builds/{derivative_id}/idle-generation/video"
+    ).content == b"approved-idle"
+    assert client.get(
+        f"/api/v1/avatar-builds/{derivative_id}/idle-generation/outro"
+    ).content == b"approved-outro"

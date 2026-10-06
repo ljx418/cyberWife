@@ -44,14 +44,36 @@ class BaseASR:
         self.stride_right_size = opt.r
         #self.context_size = 10
         self.feat_queue = Queue(maxsize=2)
+        # Loopback PCM arrives every 20 ms.  The historical 10 ms dequeue
+        # timeout inserted synthetic silence between valid real-time packets,
+        # diluting the mel sequence and making the mouth appear almost static.
+        # Once an external packet has arrived, tolerate normal scheduler jitter
+        # for the remainder of the current batch window.
+        self._last_external_audio_at = 0.0
+        self._realtime_wait_seconds = max(0.04, self.chunk / self.sample_rate * 2.5)
+        self._realtime_hold_seconds = max(
+            0.20,
+            self.chunk / self.sample_rate * self.batch_size * 2 + 0.10,
+        )
 
         #self.warm_up()
 
     def flush_talk(self):
         self.queue.queue.clear()
+        self._last_external_audio_at = 0.0
 
     def put_audio_frame(self,audio_chunk:NDArray[np.float32],datainfo:dict): #16khz 20ms pcm
+        self._last_external_audio_at = time.monotonic()
         self.queue.put(AudioFrameData(data=audio_chunk,type=0,userdata=datainfo))
+
+    def _audio_queue_timeout(self, now: float | None = None) -> float:
+        observed = time.monotonic() if now is None else now
+        if (
+            self._last_external_audio_at > 0
+            and observed - self._last_external_audio_at <= self._realtime_hold_seconds
+        ):
+            return self._realtime_wait_seconds
+        return 0.01
 
     #return frame:audio pcm; type: 0-normal speak, 1-silence; eventpoint:custom event sync with audio
     def get_audio_frame(self)->AudioFrameData:        
@@ -61,7 +83,7 @@ class BaseASR:
                 type = self.parent.custom_audiotype
                 return AudioFrameData(data=frame, type=type, userdata={})
             else:
-                frame = self.queue.get(block=True,timeout=0.01)
+                frame = self.queue.get(block=True, timeout=self._audio_queue_timeout())
                 return frame
             #print(f'[INFO] get frame {frame.shape}')
         except queue.Empty:

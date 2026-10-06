@@ -12,17 +12,16 @@ import urllib.request
 from pathlib import Path
 from typing import Callable
 
-import numpy as np
-
-from ops.make_seamless_idle import encode, localized_blink_loop, mean_absolute_error, read_frames
+from ops.make_seamless_idle import encode, mean_absolute_error, palindrome_frames, read_frames
+from ops.offline_scene_compositor import compose_scenes
 from ops.scrfd_detector import detect_faces
-from ops.build_video_avatar import _smooth, _wav2lip_box
 
 
 ROOT = Path(__file__).resolve().parents[1]
 COMFY_ROOT = Path("/mnt/c/ComfyUI-aki-v2/ComfyUI")
 COMFY_PYTHON = Path("/mnt/c/ComfyUI-aki-v2/python/python.exe")
 FACE_DETECTOR = COMFY_ROOT / "models/insightface/models/buffalo_l/det_10g.onnx"
+BACKGROUND_ROOT = ROOT / "prototype/public/backgrounds"
 RUNTIME_LAUNCHER = ROOT / "ops/windows/RuntimeLauncher.ps1"
 RUNTIME_HEALTH = {
     "avatar": ("http://127.0.0.1:8010/health", "http://127.0.0.1:8011/healthz"),
@@ -36,6 +35,10 @@ REQUIRED_LOCAL_FILES = (
     ROOT / "ops/comfy_avatar_frontalize_api.json",
     ROOT / "ops/comfy_avatar_idle_api.json",
     FACE_DETECTOR,
+    *(BACKGROUND_ROOT / name for name in (
+        "blue-hour-living.webp", "garden-sunroom.webp",
+        "morning-bedroom.webp", "rainy-library.webp",
+    )),
     COMFY_ROOT / "models/diffusion_models/qwen-image-2.1-Q6_K.gguf",
     COMFY_ROOT / "models/text_encoders/qwen3vl_8b_bf16.safetensors",
     COMFY_ROOT / "models/vae/qwen_image_2.1_vae_bf16.safetensors",
@@ -51,7 +54,7 @@ REQUIRED_LOCAL_FILES = (
 def _workflow_revision() -> str:
     """Bind reusable candidates to the exact image and motion workflows."""
     digest = hashlib.sha256()
-    digest.update(b"localized-blink-v1\0")
+    digest.update(b"full-frame-prompted-idle-v2\0")
     for name in ("comfy_avatar_frontalize_api.json", "comfy_avatar_idle_api.json"):
         digest.update((ROOT / "ops" / name).read_bytes())
     return digest.hexdigest()
@@ -221,8 +224,12 @@ def run_pipeline(
     checkpoint_path = job_dir / "pipeline-result.json"
     checkpoint_frontal = job_dir / "frontal.png"
     checkpoint_video = job_dir / "idle-loop-10s.mp4"
+    checkpoint_scenes = job_dir / "scenes" / "scene-composite-manifest.json"
     workflow_revision = _workflow_revision()
-    if checkpoint_path.is_file() and checkpoint_frontal.is_file() and checkpoint_video.is_file():
+    if (
+        checkpoint_path.is_file() and checkpoint_frontal.is_file()
+        and checkpoint_video.is_file() and checkpoint_scenes.is_file()
+    ):
         checkpoint = json.loads(checkpoint_path.read_text(encoding="utf-8"))
         if (
             checkpoint.get("source_sha256") == source_sha256
@@ -234,6 +241,7 @@ def run_pipeline(
             return {
                 "frontal_path": str(checkpoint_frontal),
                 "video_path": str(checkpoint_video),
+                "scene_manifest_path": str(checkpoint_scenes),
                 "metrics": checkpoint,
             }
     suffix = ".jpg" if source.suffix.lower() in {".jpg", ".jpeg"} else ".png"
@@ -298,17 +306,16 @@ def run_pipeline(
 
         progress("closing_ten_second_loop", 88)
         frames, source_fps = read_frames(source_idle)
-        raw_boxes = []
-        for index, frame in enumerate(frames[:29]):
+        # Preserve the model-generated full-frame motion.  Naturalness must be
+        # created by the positive/negative prompt, never by transplanting an
+        # eye strip or another local facial patch after generation.
+        for index, frame in enumerate(frames[:80]):
             faces = detect_faces(frame, FACE_DETECTOR)
             if len(faces) != 1:
                 raise RuntimeError(
                     f"avatar.idle_face_detection_failed:{index}:{len(faces)}"
                 )
-            x1, y1, x2, y2, _ = faces[0]
-            raw_boxes.append(_wav2lip_box((x1, y1, x2, y2)))
-        boxes = _smooth(np.asarray(raw_boxes))
-        loop = localized_blink_loop(frames, boxes)
+        loop = palindrome_frames(frames)
         video_path = job_dir / "idle-loop-10s.mp4"
         encode(loop, video_path)
         decoded, output_fps = read_frames(video_path)
@@ -322,10 +329,27 @@ def run_pipeline(
             "duration_seconds": round(len(decoded) / output_fps, 3),
             "first_last_mae": round(mean_absolute_error(decoded[0], decoded[-1]), 4),
             "turnaround_mae": round(mean_absolute_error(decoded[79], decoded[80]), 4),
-            "construction": "fixed_plate_plus_localized_blink",
+            "construction": "full_frame_prompted_motion_palindrome",
+            "localized_facial_compositing": False,
         }
         if len(decoded) != 160 or metrics["first_last_mae"] > 3.0:
             raise RuntimeError("avatar.loop_validation_failed")
+        progress("matting_whole_person", 90)
+        scene_manifest = compose_scenes(
+            video_path,
+            {
+                path.stem: path
+                for path in sorted(BACKGROUND_ROOT.glob("*.webp"))
+            },
+            job_dir / "scenes",
+        )
+        metrics["scene_composites"] = {
+            "count": len(scene_manifest["outputs"]),
+            "mask_area_cv_percent": scene_manifest["mask_area_cv_percent"],
+            "mask_temporal_delta_p95_percent": scene_manifest[
+                "mask_temporal_delta_p95_percent"
+            ],
+        }
         checkpoint_path.write_text(
             json.dumps(metrics, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"
         )
@@ -333,6 +357,7 @@ def run_pipeline(
         return {
             "frontal_path": str(frontal_path),
             "video_path": str(video_path),
+            "scene_manifest_path": str(job_dir / "scenes" / "scene-composite-manifest.json"),
             "metrics": metrics,
         }
     finally:

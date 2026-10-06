@@ -1,6 +1,6 @@
 # cyberWife V1～V2 全局开发状态
 
-**快照日期**：2026-10-06（UX10自动化验收完成）
+**快照日期**：2026-10-07（UX13非说话态序列已接入；AC-06A实时嘴部响应机器门4/4通过，浏览器人工感知待签）
 
 **判定口径**：按阶段出门门禁，不按代码文件数量或局部测试数量
 
@@ -15,21 +15,24 @@
 | G-UX / DOC-B | PASS（ACC1自动部分） | 前端方向已批准；三视口15/15完整键盘任务、Playwright 15/15；Narrator/Chrome存在 | 真读屏完整任务仍需人工听感签字 |
 | B0 | PASS | 幂等生命周期、六组件真实probe | 无 |
 | B1 | PASS | 真实PCM→VAD→ASR→LLM 20/20 | 无 |
-| B2 | PASS（性能门） | H.264/WebCodecs双FPS≥25、故障降级与原页恢复；UX5完成A/V机器量化 | 当前人物自然度仍需V1FINAL人工评分 |
+| B2 | MACHINE PASS / WAIT HUMAN | H.264/WebCodecs双FPS≥25、故障降级与原页恢复；实时PCM抖动修复后当前人物嘴部响应4/4通过 | 浏览器音画同步和嘴部自然度仍由AC-06A人工门签署；静止嘴型直接FAIL |
 | B2.5 | PASS | Cosy普通链P95≤7s、严格缓存、授权盲听、回退 | 无 |
 | B3 | PASS（授权音频） | 30次真实打断、旧轮零泄漏、压力证据 | 真实物理麦克风自由对话未自动化覆盖 |
 | B4 | PASS | sqlite-vec、删除事务、no-record、30天保留 | 无 |
 | B5 / V1RC1 | CONDITIONAL（自动化门PASS） | 当前候选普通链30/30、打断30/30、60分钟、数据生命周期、一键启动、恢复和冻结均PASS | Narrator、结构化物理麦克风、UX6完整主观签署；商业化需换Avatar许可 |
 | UX4 | PASS | 授权照片→正面化→10秒无缝Idle→双预览→人工确认→实时Avatar；196.187秒真实生产编排；四服务恢复 | 口型感知/A-V偏移仍归B2未闭环项，不由Idle视频替代 |
-| UX5 / UX6 | REOPENED / ACTIVATED, WAIT RETEST | 已完成主舞台Idle、四视口构图、停止后Idle恢复和Crop V2紧裁切；用户批准候选并已激活；浏览器确认实际请求新ID，传输/FPS通过 | 激活后需用户完成至少三轮真实对话并签署口型、嘴部与Idle自然度；相对运动诊断仍有一项边缘未过 |
+| UX5 / UX6 | MACHINE PASS / ACTIVATED, WAIT HUMAN | 主舞台Idle、四视口、停止后Idle、Crop V2及实时PCM抖动修复已完成；4段有声/静音嘴部运动比1.132～1.279，黑帧/冻结/丢帧0 | 激活后需用户完成至少三轮真实对话并签署音画同步、嘴部与Idle自然度；直连偏移只作诊断 |
 | UX8 | MACHINE PASS / WAIT USER RETEST | 保守普通话词形归一、全文/segment一致、中文空格清理、900ms句中停顿；真实ASR 3/3、四进程E2E 3/3、Playwright 16/16 | 用户用物理麦克风复验普通话字幕与自然停顿；不得由fixture代签 |
 | UX9 | AUTOMATION PASS / WAIT HUMAN | 播放态噪声门、参考音色ASR强校验、三轮短期上下文与确定性短句；真实语音闭环6/6，输出CER最高10%，普通轮首响4.985～5.999秒 | 真实房间噪声、物理麦克风和声音自然度由V1人工总验收签署 |
-| UX10 | AUTOMATION PASS / WAIT HUMAN ACTIVATE | 四视口含2160×3500/3840×180、4个本地独立背景、真实手工记忆与候选确认链；低动作候选中心位移0.0542%、面积CV 0.151%、黑帧0 | 人工判断新Idle自然度后决定是否激活；不代签口型/声音/物理麦克风 |
+| UX10 | AUTOMATION PASS / IDLE SUPERSEDED | 四视口、4个本地背景和记忆链继续有效；旧眼部局部合成候选已由UX11淘汰 | 不再激活旧候选 |
+| UX11 | SUPERSEDED / FALLBACK ONLY | 完整帧Idle和预览机制仍可复用；整人物Alpha预合成被用户判定边缘、发丝、光影和场景交互不可接受 | 不再作为目标路线或待激活候选 |
+| UX12 | SUPERSEDED BY UX13 / RESEARCH BASE | 无人物场景→三种完整场景全身关键帧→Wan首尾约束→10秒闭环；3段均160帧/16fps、黑帧0、首尾MAE 1.8635～1.9588；主链无抠图 | 其他姿势仍是未激活候选；不得冒充UX13运行态或说话态 |
+| UX13 | NON-SPEAKING PASS / ACTIVE | 用户人工批准严格正脸Idle序列；intro→idle→outro、媒体SHA与Chrome切换通过 | 只覆盖非说话态；说话态机器响应已通过，最终浏览器音画感知仍待人工签署 |
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；当前Playwright 16/16；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
 | INST1 | PASS（AC07最低保证） | 隔离venv、7.5GB wheelhouse、替代数据根、便携工件、start×2/status/recover/stop×2共12/12步骤PASS，端口/PID归零 | AC06独立机仅为增强项 |
-| V1FINAL | AUTOMATION COMPLETE / WAIT HUMAN | headed Chrome取证器绑定当前Git revision；AC09发布门和AC07部署门PASS | 仅缺现场结构化人工总验收报告 |
+| V1FINAL | AUTOMATION PASS / WAIT HUMAN | headed Chrome取证器绑定当前Git revision；AC09与AC07既有证据保留；实时嘴部响应机器门4/4通过且静止嘴型失败关闭 | 浏览器音画/嘴部/Idle评分、物理麦克风、Narrator与现场总报告 |
 
 ## 3. 已完成依赖链
 
@@ -47,11 +50,11 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX6四项实现缺陷已关闭，Crop V2仍为当前active；UX8、UX9机器门完成。UX10自动化全绿，新低动作Idle仅为私有待审候选，不能在人工确认前替换active。V1FINAL现场取证器已通过无人值守测试。AC07既有候选报告已经12/12步骤PASS，最低部署保证闭环；由于UX10产生新revision，现场报告仍需绑定最终提交重新执行。自动化开发与验收已推进到人工总验收门前；V1尚未全绿的原因是现场结构化人工报告与新Idle主观激活决定尚未执行。
+已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。Crop V2仍是实时说话态 active 工件；UX13非说话态序列已版本化安装。2026-10-07已修复Avatar把20ms实时PCM误插10ms合成静音的根因，四段当前人物真实采集均通过嘴部响应机器门。历史FPS、Canvas live和UX13视频仍不能代签FR-10；V1FINAL取证器保留`mouth_motion_observed`失败关闭字段。AC07部署报告保持有效，V1尚未全绿的原因是浏览器音画/嘴部/Idle感知、物理麦克风、Narrator和整体现场报告仍待人工签署。
 
 ## 5. V2 规划状态
 
-项目所有者已批准V2按`体验交互优化 → 架构扩容`执行，当前状态为**文档基线完成、代码未开始**：
+项目所有者已批准V2按`体验交互优化 → 架构扩容`执行；UX13完成X3/X4“完整场景直接生成”的单活动人物首个正式运行态接入，多实体V2仍未开始：
 
 | 阶段 | 状态 | 入口 | 计划结果 |
 |---|---|---|---|

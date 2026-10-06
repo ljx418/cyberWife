@@ -64,6 +64,7 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
         },
         "narrator": {key: True for key in ("settings", "start", "interrupt", "persona", "delete_memory")},
         "perception": {
+            "mouth_motion_observed": True,
             "lip_sync_score": 4,
             "mouth_naturalness_score": 4,
             "idle_naturalness_score": 4,
@@ -167,6 +168,18 @@ def test_completion_fails_closed_on_malformed_untrusted_fields(tmp_path: Path):
     result = audit_completion(tmp_path, release, human, install, REVISION)
     assert result["result"] == "FAIL"
     assert "human_machine_evidence_invalid" in result["gates"][1]["errors"]
+    assert "perception_gate_invalid" in result["gates"][1]["errors"]
+
+
+def test_completion_rejects_static_mouth_even_when_subjective_scores_are_high(tmp_path: Path):
+    release, human, install = _fixture(tmp_path)
+    document = json.loads(human.read_text())
+    document["perception"]["mouth_motion_observed"] = False
+    document["perception"]["lip_sync_score"] = 5
+    document["perception"]["mouth_naturalness_score"] = 5
+    human.write_text(json.dumps(document))
+    result = audit_completion(tmp_path, release, human, install, REVISION)
+    assert result["result"] == "FAIL"
     assert "perception_gate_invalid" in result["gates"][1]["errors"]
 
 

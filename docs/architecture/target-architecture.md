@@ -1,8 +1,8 @@
 # cyberWife V1 基线与 V2 演进目标架构
 
-**版本**：3.0
-**日期**：2026-10-06
-**状态**：B0～B5、B2.5、UX4、UX5、UX10、ARCH1、RES1、V1RC1与INST1-AC07自动化门已有目标机证据；V1FINAL现场人工报告与新Idle候选激活待闭环
+**版本**：3.2
+**日期**：2026-10-07
+**状态**：UX13非说话态序列已接入；Avatar实时PCM抖动缓冲已修复且AC-06A机器嘴部响应4/4通过；浏览器音画/自然度人工门仍阻断V1FINAL
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -33,15 +33,15 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 
 | 层 | 当前仓库事实 | V1 目标 | 状态 |
 |---|---|---|---|
-| 前端 | ConversationClient/MediaSession保持主链；UX10新增宽高比舞台、本地背景层和记忆新增/候选确认 | V1主交互保持稳定；按G-V2只增加有需求/验收ID的定向体验模块 | V1修补已开发/自动化PASS；V2待开发 |
+| 前端 | ConversationClient/MediaSession保持主链；UX10新增宽高比舞台；UX13新增intro→idle→实时Avatar→outro视觉状态机 | V1主交互保持稳定；视觉序列不得接管实时音频/口型时钟；失败回退旧Idle/静态图 | UX13人工与自动化PASS；多实体V2待开发 |
 | API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
 | VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发/机器验收；物理麦克风复验待签 |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
-| Avatar | H.264/WebCodecs全链、打断清队列、降级/恢复与长稳态通过；UX5 A/V量化及用户视觉批准已完成 | 保持动态形象逐素材人工确认门 | 已开发/已验收 |
-| 人物生成 | Qwen Image正面化→Wan Idle→固定首帧/羽化局部眨眼衰减→10秒闭环→双预览→人工确认→Wav2Lip数据构建；缓存绑定工作流与处理版本 | 逐素材人工身份/自然度签署 | UX10机器门PASS；新候选待人工激活 |
+| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口，避免Mel批次误插静音 | AC-06A机器嘴部响应4/4通过；浏览器295ms播放预留后的音画同步、嘴部自然度仍须人工≥4/5 | 机器PASS；体验WAIT HUMAN |
+| 人物生成 | 身份参考+无人物ScenePlate→完整场景关键帧→Wan首尾条件→人工确认；UX13以批准清单安装intro/正脸半身Idle/outro，按哈希版本化；UX11 Alpha预合成只保留回退 | 逐素材人工身份/自然度/场景物理关系签署；视觉序列与实时说话Avatar分层，后者必须单独实测 | UX13序列已active；实时说话仍为Crop V2，未虚报同场景全身口型 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
@@ -100,8 +100,14 @@ workers/avatar/                              [上游]
 scripts/windows/RuntimeLauncher.ps1          [已开发] 生命周期与功能探针
 tests/{b3,b4,b5}/                            [已开发] 目标机验收runner
 tests/ux10/                                  [已开发] 真实语音候选记忆验收
-ops/avatar_idle_pipeline.py                  [已开发/UX10] 工作流版本绑定、局部眨眼衰减
-prototype/src/App.tsx                        [已开发/UX10] 宽高比舞台、本地背景、记忆工作台
+ops/avatar_idle_pipeline.py                  [已开发/UX11回退] 旧完整帧Idle与派生调度
+ops/offline_scene_compositor.py              [已开发/兼容回退] Alpha预合成，不再是目标路线
+ops/fullscene_idle_pipeline.py               [已开发/UX12候选] 完整场景三姿势、Wan首尾条件、10秒全帧闭环与门禁
+ops/comfy_avatar_fullscene_idle_api.json     [已开发/UX12候选] 本机Wan完整场景API工作流
+ops/scene_sequence_pipeline.py               [已开发/UX13] 开场、严格正脸Idle、反向结束与自动指标
+ops/install_scene_sequence.py                [已开发/UX13] 人工批准令牌、哈希校验和版本化私有安装
+backend/cyberwife/application/avatar_asset_service.py [已开发/UX13] 序列清单验证和私有媒体路径门
+prototype/src/App.tsx                        [已开发/UX13] 宽高比舞台、记忆工作台与intro/idle/live/outro状态机
 ```
 
 目标依赖只允许 `api → application → domain + ports`；`adapters/infrastructure → ports/domain`。ARCH1已把`SqliteRepository`、`AssetStore`、`StructuredLogger`的具体装配集中到`api/server.py`，运行指标为应用层无I/O实现，并以AST门禁持续保证`application/domain/ports`对`infrastructure/adapters/api`的反向导入为0。
@@ -256,7 +262,7 @@ Mock 测试只能让实体进入“合同通过”，不能进入“已验收”
 
 ## 13. 架构出门条件
 
-架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14 与 AC-04A 全部通过、开放 P0/P1=0，且 B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1、RES1与INST1-AC07当前revision报告已关闭分层、资源和最低部署红项；只剩完整现场人工门。INST1-AC06独立机复现为增强保证，不再是V1最低门。
+架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14、AC-04A 与 AC-06A 全部通过、开放 P0/P1=0，且 B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1、RES1与INST1-AC07当前revision报告已关闭分层、资源和最低部署红项；实时口型AC-06A及完整现场人工门仍开放。INST1-AC06独立机复现为增强保证，不再是V1最低门。
 
 ## 14. B2.5 优化扩展
 
@@ -268,7 +274,7 @@ B2.5 不改变本架构的依赖方向。新增 `WarmResponsePolicy`、`WarmResp
 
 - B3（已实现）：Gateway 已切换全双工 session runtime，并通过统一取消与 generation fence 验收。
 - B4（已实现）：记忆、隐私、保留和 sqlite-vec 真实往返已落地；运行时不以 FTS-only 或内存 fallback 冒充 ready。
-- B5（已实现、人工门待闭环）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；口型量化、分层、资源和AC07最低部署红项已关闭，只需人工Narrator/物理麦克风与主观体验签署。
+- B5（已实现、出门门重开）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；分层、资源和AC07最低部署红项已关闭。实时口型AC-06A、人工Narrator、物理麦克风与主观体验未通过前不得出门。
 - 详细计划和真实门槛见 `stages/B3～B5`；可编辑总图为 `cyberWife-b3-b5-delivery-gap.drawio`。
 
 ## 16. V2 演进边界

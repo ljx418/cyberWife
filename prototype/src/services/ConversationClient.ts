@@ -101,6 +101,12 @@ export interface IdleGenerationJob {
   error_code?: string | null;
   has_frontal_preview: boolean;
   has_video_preview: boolean;
+  has_scene_previews?: boolean;
+  has_sequence_previews?: boolean;
+  has_intro_preview?: boolean;
+  has_outro_preview?: boolean;
+  sequence_version?: string | null;
+  scene_ids?: string[];
   updated_at: string;
 }
 
@@ -192,8 +198,10 @@ export const ConversationClient = {
   async activateAvatarBuild(id: number) { return request<AvatarBuild>("POST", `/api/v1/avatar-builds/${id}/activate`); },
   async startIdleGeneration(id: number) { return request<IdleGenerationJob>("POST", `/api/v1/avatar-builds/${id}/idle-generation`); },
   async getIdleGeneration(id: number) { return request<IdleGenerationJob>("GET", `/api/v1/avatar-builds/${id}/idle-generation`); },
-  idlePreviewUrl: (id: number, kind: "frontal" | "video", revision: string | number = Date.now()) =>
+  idlePreviewUrl: (id: number, kind: "frontal" | "video" | "intro" | "outro", revision: string | number = Date.now()) =>
     `${GATEWAY_BASE}/api/v1/avatar-builds/${id}/idle-generation/${kind}?v=${encodeURIComponent(String(revision))}`,
+  idleScenePreviewUrl: (id: number, sceneId: string, revision: string | number = Date.now()) =>
+    `${GATEWAY_BASE}/api/v1/avatar-builds/${id}/idle-generation/scenes/${encodeURIComponent(sceneId)}?v=${encodeURIComponent(String(revision))}`,
   async approveIdleGeneration(id: number) { return request<AvatarBuild>("POST", `/api/v1/avatar-builds/${id}/idle-generation/approve`); },
   async getActiveAvatar() { return request<AvatarBuild>("GET", "/api/v1/avatar/active"); },
   async restoreAsset(kind: "portrait" | "voice") { return request<AvatarBuild | Record<string, unknown>>("POST", `/api/v1/assets/${kind}/restore`); },

@@ -167,7 +167,8 @@ def verify_human(path: Path, revision: str) -> dict[str, Any]:
         errors.append("narrator_tasks_invalid")
     perception = document.get("perception", {})
     if not isinstance(perception, dict) or not (
-        all(_number(perception.get(key)) >= 4 for key in (
+        perception.get("mouth_motion_observed") is True
+        and all(_number(perception.get(key)) >= 4 for key in (
             "lip_sync_score", "mouth_naturalness_score", "idle_naturalness_score"
         )) and perception.get("idle_continues_after_stop") is True
     ):

@@ -79,3 +79,11 @@ config/runtime.local.toml
 assets/
 audit/
 .consent-backup/
+docs/.*.bkp
+
+# 发布前端与浏览器合同夹具是源码级可复现工件，不属于用户私有媒体。
+!prototype/dist/assets/
+!prototype/dist/assets/*.js
+!prototype/dist/assets/*.css
+!prototype/tests/fixtures/
+!prototype/tests/fixtures/sequence.mp4

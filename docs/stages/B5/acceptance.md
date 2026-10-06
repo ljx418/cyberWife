@@ -9,7 +9,7 @@
 
 ## 1. 总验收
 
-- 完整执行 `acceptance-plan.md` 的 AC-01～AC-14 和 AC-04A。
+- 完整执行 `acceptance-plan.md` 的 AC-01～AC-14、AC-04A和AC-06A。
 - 完整执行 B2.5 OX-01～12；普通、缓存、打断、Avatar恢复必须在同一发布候选构建上无回退。
 - 所有场景保存构建ID、模型哈希、配置摘要、原始样本、截图/视频、脱敏日志、JUnit/JSON/CSV和缺陷ID。
 

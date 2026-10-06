@@ -1,6 +1,6 @@
 # B3—B5 验收命令与证据清单
 
-**版本**：1.3　**日期**：2026-10-06　**状态**：IMPLEMENTED / AUDITED
+**版本**：1.4　**日期**：2026-10-07　**状态**：IMPLEMENTED / AUDITED
 本清单定义已经实现的稳定命令接口。目标机证据已生成；诊断失败目录与最终通过目录必须并存，报告只能引用明确标记为正式候选的结果，禁止挑选性忽略失败历史。
 
 ## 1. 统一调用合同
@@ -26,6 +26,16 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 ```
 
 该限制属于验收工具P2：后续应提供统一根入口，避免执行者误把收集失败当成产品失败。
+
+当前人物实时嘴部响应复验使用至少三段真实CosyVoice WAV，以20ms节奏输入Avatar后运行：
+
+```text
+python3 tests/ux5/analyze_lipsync.py --capture <private-capture-dir> \
+  --wav <authorized-cosyvoice.wav> --dataset <active-avatar-dir> \
+  --require-mouth-motion
+```
+
+退出0只签署有声期嘴部实际响应、无黑帧和无冻结；直连采集不包含浏览器295ms播放预留，`--require-pass`的偏移相关性只作诊断，不能代签浏览器音画同步和自然度。
 
 ## 2. B3 命令
 
@@ -79,7 +89,7 @@ PYTHONPATH=.:backend python -m pytest -q tests/b3/test_accept_soak.py tests/b5/t
 .\ops\acceptance\Invoke-ACC1HumanGate.ps1 -AcceptFocusChange -Operator "验收人姓名"
 ```
 
-缺少`-AcceptFocusChange`必须在启动任何窗口前失败。取证器使用安装版headed Chrome和默认物理输入，自动验证PCM帧、至少三轮完整事件链、一次打断、取消后接续、当前active avatar和停止后Idle推进；人工只签Narrator五任务及三项自然度评分。`audit/v1/ACC1/human-gate.json`不得包含音频、字幕或回答正文，只有总结果为`PASS`且退出码为0才能关闭ACC1/UX6现场门。
+缺少`-AcceptFocusChange`必须在启动任何窗口前失败。取证器使用安装版headed Chrome和默认物理输入，自动验证PCM帧、至少三轮完整事件链、一次打断、取消后接续、当前active avatar和停止后Idle推进；人工必须额外明确确认`mouth_motion_observed=true`，并签Narrator五任务及三项自然度评分。静止嘴型即使FPS或评分字段较高也必须失败。`audit/v1/ACC1/human-gate.json`不得包含音频、字幕或回答正文，只有总结果为`PASS`且退出码为0才能关闭ACC1/UX6现场门。
 
 ## 7. INST1部署门
 

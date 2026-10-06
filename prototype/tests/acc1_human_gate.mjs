@@ -147,6 +147,7 @@ try {
     delete_memory: await askYesNo('Narrator可理解删除确认框并取消/确认'),
   }
   const perception = {
+    mouth_motion_observed: await askYesNo('她实际说话时，嘴型是否持续变化（不是静止嘴型或仅头部/画面在动）'),
     lip_sync_score: await askScore('当前人物口型同步度'),
     mouth_naturalness_score: await askScore('当前人物嘴部自然度'),
     idle_naturalness_score: await askScore('当前人物Idle自然度'),
@@ -178,6 +179,7 @@ try {
     && healthReady(healthBefore)
     && healthReady(healthAfter)
   const humanPass = Object.values(narrator).every(Boolean)
+    && perception.mouth_motion_observed
     && perception.lip_sync_score >= 4
     && perception.mouth_naturalness_score >= 4
     && perception.idle_naturalness_score >= 4

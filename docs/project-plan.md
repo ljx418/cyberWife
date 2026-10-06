@@ -1,9 +1,9 @@
 # cyberWife V1～V2 项目里程碑与交付计划
 
-**版本**：3.4
+**版本**：3.5
 **日期**：2026-10-06
 
-**状态**：B0～B5、B2.5、ARCH1、RES1、V1RC1及UX10自动化门完成；V1FINAL现场门待结构化报告，新Idle候选待人工决定是否激活；部署最低门为INST1-AC07单机隔离可移植性
+**状态**：UX13非说话态序列已接入；AC-06A实时嘴部响应机器门已4/4通过，浏览器音画同步与自然度人工门仍阻断V1FINAL出门；部署最低门仍为INST1-AC07
 **详细任务**：[`backend-development-plan.md`](backend-development-plan.md)
 
 ## 1. 项目现状
@@ -43,7 +43,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | DOC-B | 可以判断怎么开发、怎么失败、怎么验收 | PRD/架构/计划/Draw.io | G-UX 通过 | 文档内审通过 + 人类批准方向 |
 | B0 | 一个命令可靠启动并显示真实状态 | Launcher、Gateway、Health、ModelRegistry | 开发授权 | 幂等启动/停止；四进程真实 probe |
 | B1 | 说话后得到真实字幕和角色文本 | SpeechRuntime、TurnPipeline、WS | B0 Pass | 20 轮≥95%；事件不串轮 |
-| B2 | 听到克隆声音并看到同步人物 | QwenTtsAdapter、LiveTalkingAdapter | B1 Pass | 首响/FPS/资源/降级达门 |
+| B2 | 听到克隆声音并看到实际变化且同步的人物口型 | QwenTtsAdapter、LiveTalkingAdapter | B1 Pass | 首响/FPS/资源/降级达门，且AC-06A当前人物嘴部响应与人工门PASS |
 | B2.5 | 普通回答更快、问候可安全预热且随时可回退 | RuntimeMetrics、加速profile、WarmResponseCache | B2首响阻断 + G-OX批准 | OX-01～05、07、08、10～12 Pass |
 | B3 | 可随时打断并长期多轮稳定 | InterruptionController、CancellationToken | B2 Pass | 打断 P95≤400ms；1h 稳态 |
 | B4 | 记忆可查改删且支持不记录 | MemoryService、RetentionService、Repository | B3 Pass | 删除0召回；不记录0写入 |
@@ -51,6 +51,9 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | UX4 | 用户在引导内把照片稳定生成并启用为动态人物 | AvatarAssetService、avatar_idle_pipeline、Onboarding | 三张工作流样片获人工批准 | UX4-AC01～08 Pass；未确认不替换；四服务恢复 |
 | UX8 | 普通话字幕不再保留粤语特有词形，句中自然停顿不被过早截断 | MandarinTranscriptNormalizer、UtteranceBoundaryDetector | 用户真实交互反馈 | UX8-AC01～06机器PASS；AC07物理麦克风待签 |
 | UX10 | 极端窗口无空白、背景可切换、Idle低动作候选与记忆新增/确认可用 | App布局、MemoryService、avatar_idle_pipeline | V1人工反馈及G-V2定向授权 | 自动化PASS；新Idle不自动激活，现场自然度待签 |
+| UX11 | 不再使用眼部局部贴片；完整帧自然Idle可按四个本地场景预合成并审查 | avatar_idle_pipeline、offline_scene_compositor、AvatarAssetService、Onboarding | 用户拒绝UX10候选并批准整人物离线抠像路线 | 自动化PASS；UX11-AC07人工自然度/边缘门待签，当前active不变 |
+| UX12 | 人物、家具接触、遮挡、阴影和环境光在同一完整场景中生成；提供端坐、放松、站立三种全身Idle | fullscene_idle_pipeline、WanFirstLastFrameToVideo、FullSceneIdleRendition | 用户拒绝UX11抠图路线并批准完整场景直接生成 | 三段机器门PASS；连续观感待人工；说话态同场景未完成，当前active不变 |
+| UX13 | 进入时人物从沙发走近，正脸半身低幅Idle持续播放，正常停止后走回坐下 | scene_sequence_pipeline、AvatarAssetService、App序列状态机 | UX12技术基线 + 严格正脸版本人工批准 | 人工门PASS；运行态媒体哈希一致；浏览器切换及全量回归PASS；实时口型不回退 |
 | V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据；部署证明采用显式保证等级 | Invoke-ACC1HumanGate、Invoke-INST1SingleMachinePortability、audit_v1_completion | V1RC1自动化PASS | VF-AC01～09；AC07为V1最低门，AC06为增强项 |
 
 ## 5. 每阶段交付包
@@ -93,11 +96,11 @@ CosyVoice2 已用正确参考逐字稿完成30条复测：CER=0.71%。V1RC1修�
 
 用户从干净启动状态执行一个入口即可完成自检、打开已批准的陪伴页面并开始连续语音对话；至少 20 轮成功率≥95%，可以在 P95 400ms 内打断，普通链首响P95≤7.0s（P50报告），数字人≥25FPS，运行 1 小时无崩溃/OOM/延迟积累；核心链无公网依赖或联网上传动作，记忆可彻底删除，不记录会话零持久化，退出后无残留进程与临时音频。
 
-V1 Go 需要 AC-01～AC-14 全部通过、开放 P0/P1=0，并完成安装、启动、备份、恢复、卸载和数据清除演练。部署至少通过AC07单机隔离可移植性，报告不得声称跨机器/驱动兼容；AC06独立干净机为增强保证。真实读屏/麦克风现场报告仍必须闭环。
+V1 Go 需要 AC-01～AC-14、AC-04A与AC-06A全部通过、开放 P0/P1=0，并完成安装、启动、备份、恢复、卸载和数据清除演练。部署至少通过AC07单机隔离可移植性，报告不得声称跨机器/驱动兼容；AC06独立干净机为增强保证。实时嘴部响应机器门已闭环，但浏览器音画/自然度、真实读屏/麦克风现场报告仍必须闭环。
 
 ## 9. V1 后续体验修补与 V2 阶段
 
-V1人工总验收前四项低风险修补已由UX10实现并通过自动化：极端窗口布局、本地背景库、低幅Idle候选、记忆手工新增/候选确认。低动作候选仍受人工批准门保护，当前active不会被自动替换。UX10的完成不提前解锁V2-X实际开发；仍先执行V1现场总验收。
+V1人工总验收前四项低风险修补已由UX10实现并通过自动化。UX11抠图预合成因边缘、发丝、光影和场景交互债务被降为回退；UX12完成完整场景直接生成技术验证；UX13把唯一经人工批准的严格正脸版本以版本化私有素材和状态机接入运行态。实时说话仍使用已验收Crop V2 Avatar，加载失败回退旧Idle/静态人物。UX13只完成V2-X3/X4的单活动人物视觉序列，不等于完成同场景全身说话态或正式多实体V2。
 
 V2 已由项目所有者批准拆成两个顺序阶段：
 

@@ -1,4 +1,7 @@
 import { expect, test } from '@playwright/test'
+import { fileURLToPath } from 'node:url'
+
+const sequenceFixture = fileURLToPath(new URL('./fixtures/sequence.mp4', import.meta.url))
 
 test('首次设置授权门槛与主对话状态可用', async ({ page }) => {
   await page.goto('/')
@@ -32,8 +35,9 @@ test('用户引导完成照片到动态形象的预览确认闭环', async ({ pa
     if (path === '/api/v1/avatar-builds/9/idle-generation' && request.method() === 'POST') return json({ derivative_id: 9, status: 'generating', phase: 'generating_frontal_portrait', progress: 25, has_frontal_preview: false, has_video_preview: false, updated_at: 'r1' }, 202)
     if (path === '/api/v1/avatar-builds/9/idle-generation' && request.method() === 'GET') {
       idlePolls += 1
-      return json({ derivative_id: 9, status: 'awaiting_approval', phase: 'visual_review', progress: 100, has_frontal_preview: true, has_video_preview: true, updated_at: `r${idlePolls + 1}` })
+      return json({ derivative_id: 9, status: 'awaiting_approval', phase: 'visual_review', progress: 100, has_frontal_preview: true, has_video_preview: true, has_scene_previews: true, scene_ids: ['blue-hour-living', 'rainy-library'], updated_at: `r${idlePolls + 1}` })
     }
+    if (path.includes('/idle-generation/scenes/')) return route.fulfill({ status: 200, contentType: 'video/mp4', body: '' })
     if (path.endsWith('/idle-generation/frontal')) return route.fulfill({ status: 200, contentType: 'image/png', body: Buffer.from('89504e470d0a1a0a', 'hex') })
     if (path.endsWith('/idle-generation/video')) return route.fulfill({ status: 200, contentType: 'video/mp4', body: '' })
     if (path.endsWith('/idle-generation/approve')) {
@@ -51,6 +55,9 @@ test('用户引导完成照片到动态形象的预览确认闭环', async ({ pa
   await page.getByRole('button', { name: '生成动态形象' }).click()
   await expect(page.getByText('启用前人工检查')).toBeVisible({ timeout: 8_000 })
   await expect(page.getByText('10 秒首尾闭环待机')).toBeVisible()
+  await expect(page.getByText('整个人物离线抠像 · 场景预合成')).toBeVisible()
+  await page.getByRole('button', { name: '雨夜书房' }).click()
+  await expect(page.locator('.idle-scene-picker button[aria-pressed="true"]')).toHaveText('雨夜书房')
   await page.getByRole('button', { name: '确认并使用动态形象' }).click()
   await expect(page.getByText('当前动态形象')).toBeVisible()
   expect(approved).toBe(true)
@@ -66,13 +73,14 @@ test('主舞台使用当前 active avatar 的循环 Idle，静态图只作兜底
     if (path === '/api/v1/health') return json({ status: 'ready', components: {}, resources: {}, version: {} })
     if (path === '/api/v1/assets/portrait') return json({ kind: 'portrait', items: [{ id: 22, is_active: true }] })
     if (path === '/api/v1/avatar/active') return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-red', source_sha256: 'active-source', status: 'active', frame_size: [512, 768], face_box: [120, 560, 100, 420] })
-    if (path === '/api/v1/avatar-builds/12/idle-generation') return json({ derivative_id: 12, status: 'active', phase: 'complete', progress: 100, has_frontal_preview: true, has_video_preview: true, updated_at: 'ux6-r1' })
+    if (path === '/api/v1/avatar-builds/12/idle-generation') return json({ derivative_id: 12, status: 'active', phase: 'complete', progress: 100, has_frontal_preview: true, has_video_preview: true, has_scene_previews: true, scene_ids: ['blue-hour-living', 'rainy-library'], updated_at: 'ux11-r1' })
+    if (path.includes('/idle-generation/scenes/')) return route.fulfill({ status: 200, contentType: 'video/mp4', body: '' })
     if (path.endsWith('/idle-generation/video')) return route.fulfill({ status: 200, contentType: 'video/mp4', body: '' })
     return json({ ok: true })
   })
   await page.goto('/?preview=1')
   const idle = page.getByTestId('idle-avatar-video')
-  await expect(idle).toHaveAttribute('src', /avatar-builds\/12\/idle-generation\/video/)
+  await expect(idle).toHaveAttribute('src', /avatar-builds\/12\/idle-generation\/scenes\/blue-hour-living/)
   await expect(idle).toHaveAttribute('loop', '')
   await expect(idle).toHaveAttribute('autoplay', '')
   await expect(idle).toHaveJSProperty('muted', true)
@@ -90,6 +98,47 @@ test('主舞台使用当前 active avatar 的循环 Idle，静态图只作兜底
   expect(layout.foregroundSize).toBe('contain')
   expect(layout.canvasFit).toBe('contain')
   expect(layout.foregroundWidth).toBeLessThanOrEqual(layout.viewportWidth * 0.69)
+})
+
+test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle', async ({ page }) => {
+  await page.route('http://127.0.0.1:7860/api/v1/**', async (route) => {
+    const path = new URL(route.request().url()).pathname
+    const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
+    if (path === '/api/v1/onboarding/draft') return json({ id: 1, consent_granted: true, step_completed: 4, profile_draft_json: {}, settings_json: { completed: true }, device_snapshot_json: {}, updated_at: '2026-10-06T00:00:00Z' })
+    if (path === '/api/v1/profile') return json({ detail: 'profile_not_found' }, 404)
+    if (path === '/api/v1/health') return json({ status: 'ready', components: {}, resources: {}, version: {} })
+    if (path === '/api/v1/assets/portrait') return json({ kind: 'portrait', items: [{ id: 22, is_active: true }] })
+    if (path === '/api/v1/avatar/active') return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-red', source_sha256: 'active-source', status: 'active' })
+    if (path === '/api/v1/avatar-builds/12/idle-generation') return json({
+      derivative_id: 12, status: 'active', phase: 'complete', progress: 100,
+      has_frontal_preview: true, has_video_preview: true,
+      has_sequence_previews: true, has_intro_preview: true, has_outro_preview: true,
+      sequence_version: 'ux13-frontal-test', updated_at: 'ux13-r1',
+    })
+    if (path.endsWith('/idle-generation/intro') || path.endsWith('/idle-generation/video') || path.endsWith('/idle-generation/outro')) {
+      return route.fulfill({ status: 200, contentType: 'video/mp4', path: sequenceFixture })
+    }
+    return json({ ok: true })
+  })
+
+  await page.goto('/?preview=1')
+  const video = page.getByTestId('idle-avatar-video')
+  await expect(video).toHaveAttribute('data-sequence-phase', 'intro')
+  await expect(video).toHaveAttribute('src', /idle-generation\/intro/)
+  await expect(video).not.toHaveAttribute('loop', '')
+
+  await video.dispatchEvent('ended')
+  const idle = page.getByTestId('idle-avatar-video')
+  await expect(idle).toHaveAttribute('data-sequence-phase', 'idle')
+  await expect(idle).toHaveAttribute('src', /idle-generation\/video/)
+  await expect(idle).toHaveAttribute('loop', '')
+  const stage = await idle.evaluate((element) => ({
+    width: getComputedStyle(element).width,
+    objectFit: getComputedStyle(element).objectFit,
+    viewport: innerWidth,
+  }))
+  expect(Number.parseFloat(stage.width)).toBe(stage.viewport)
+  expect(stage.objectFit).toBe('cover')
 })
 
 test('设置、记忆删除确认和主题切换可用', async ({ page }) => {

@@ -63,6 +63,7 @@ const sceneBackgrounds = [
 ] as const
 
 type LayoutMode = 'standard' | 'portrait' | 'ultratall' | 'strip'
+type AvatarSequencePhase = 'legacy' | 'intro' | 'idle' | 'outro'
 
 const classifyLayout = (width: number, height: number): LayoutMode => {
   const ratio = width / Math.max(1, height)
@@ -132,6 +133,8 @@ function App() {
   const [activeAvatarDerivativeId, setActiveAvatarDerivativeId] = useState<number | null>(null)
   const [idleJob, setIdleJob] = useState<IdleGenerationJob | null>(null)
   const [idleVideoReady, setIdleVideoReady] = useState(false)
+  const [hasSceneSequence, setHasSceneSequence] = useState(false)
+  const [sequencePhase, setSequencePhase] = useState<AvatarSequencePhase>('legacy')
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [backgroundId, setBackgroundId] = useState(() => localStorage.getItem('cyberwife-background') || sceneBackgrounds[0].id)
   const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => classifyLayout(window.innerWidth, window.innerHeight))
@@ -243,6 +246,12 @@ function App() {
               ? await ConversationClient.startIdleGeneration(avatar.id!)
               : job
             setIdleJob(resumed)
+            const sequenceReady = resumed.status === 'active'
+              && resumed.has_sequence_previews === true
+              && resumed.has_intro_preview === true
+              && resumed.has_outro_preview === true
+            setHasSceneSequence(sequenceReady)
+            if (sequenceReady) setSequencePhase('intro')
           })
           .catch(() => {})
       }
@@ -401,7 +410,7 @@ function App() {
     }
   }
 
-  const stopConversation = async (notifyServer = true) => {
+  const stopConversation = async (notifyServer = true, playOutro = notifyServer) => {
     const socket = socketRef.current
     const ref = sessionRef.current
     socketRef.current = null
@@ -416,10 +425,15 @@ function App() {
     socket?.close()
     await Promise.allSettled([InputAudioSession.stop(), MediaSession.stop(), AvatarSession.stop()])
     setConversationState('idle')
+    if (hasSceneSequence && playOutro) {
+      setIdleVideoReady(false)
+      setSequencePhase('outro')
+    }
   }
 
   const startConversation = async () => {
     if (socketRef.current) return
+    if (hasSceneSequence) setSequencePhase('idle')
     setConversationError('')
     setUserTranscript('')
     setAssistantTranscript('')
@@ -486,7 +500,7 @@ function App() {
         input: () => InputAudioSession.snapshot(), avatar: () => AvatarSession.snapshot(), sessionRef: created.session_ref,
       }
     } catch (value) {
-      await stopConversation(false)
+      await stopConversation(false, false)
       setConversationError(value instanceof Error ? value.message : String(value))
       setConversationState('error')
     }
@@ -506,7 +520,7 @@ function App() {
     setTweaksOpen(false)
   }
 
-  useEffect(() => () => { void stopConversation() }, [])
+  useEffect(() => () => { void stopConversation(false, false) }, [])
 
   const filteredMemories = memories.filter((memory) =>
     memory.content.toLowerCase().includes(memoryQuery.toLowerCase()),
@@ -729,13 +743,23 @@ function App() {
   const activePortraitUrl = activePortraitRevision
     ? ConversationClient.activeAssetUrl('portrait', activePortraitRevision)
     : null
+  const activeBackground = sceneBackgrounds.find((item) => item.id === backgroundId) ?? sceneBackgrounds[0]
   const activeIdleVideoUrl = activeAvatarDerivativeId !== null
     && idleJob?.derivative_id === activeAvatarDerivativeId
     && idleJob.status === 'active'
     && idleJob.has_video_preview
-      ? ConversationClient.idlePreviewUrl(activeAvatarDerivativeId, 'video', idleJob.updated_at)
+      ? idleJob.has_scene_previews && idleJob.scene_ids?.includes(activeBackground.id)
+        ? ConversationClient.idleScenePreviewUrl(activeAvatarDerivativeId, activeBackground.id, idleJob.updated_at)
+        : ConversationClient.idlePreviewUrl(activeAvatarDerivativeId, 'video', idleJob.updated_at)
       : null
-  const activeBackground = sceneBackgrounds.find((item) => item.id === backgroundId) ?? sceneBackgrounds[0]
+  const sequenceVideoUrl = hasSceneSequence && activeAvatarDerivativeId !== null && idleJob
+    ? ConversationClient.idlePreviewUrl(
+      activeAvatarDerivativeId,
+      sequencePhase === 'intro' ? 'intro' : sequencePhase === 'outro' ? 'outro' : 'video',
+      `${idleJob.updated_at}-${sequencePhase}`,
+    )
+    : null
+  const stageIdleVideoUrl = sequenceVideoUrl ?? activeIdleVideoUrl
 
   return (
     <main
@@ -764,22 +788,35 @@ function App() {
         aria-label="本机人物形象"
         style={activePortraitUrl ? { backgroundImage: `url("${activePortraitUrl}")` } : undefined}
       />
-      {activeIdleVideoUrl && (
+      {stageIdleVideoUrl && (
         <video
-          key={activeIdleVideoUrl}
-          className={`idle-avatar-video ${idleVideoReady ? 'idle-avatar-video--ready' : ''}`}
+          key={stageIdleVideoUrl}
+          className={`idle-avatar-video ${hasSceneSequence ? 'idle-avatar-video--scene' : ''} ${idleVideoReady ? 'idle-avatar-video--ready' : ''}`}
           data-testid="idle-avatar-video"
           data-avatar-layer="idle"
-          src={activeIdleVideoUrl}
+          data-sequence-phase={hasSceneSequence ? sequencePhase : 'legacy'}
+          src={stageIdleVideoUrl}
           autoPlay
-          loop
+          loop={!hasSceneSequence || sequencePhase === 'idle'}
           muted
           playsInline
           preload="auto"
-          aria-label="本机人物动态待机画面"
+          aria-label={sequencePhase === 'intro' ? '人物走近镜头' : sequencePhase === 'outro' ? '人物返回沙发' : '本机人物动态待机画面'}
           onCanPlay={() => setIdleVideoReady(true)}
           onPlaying={() => setIdleVideoReady(true)}
-          onError={() => setIdleVideoReady(false)}
+          onEnded={() => {
+            if (hasSceneSequence && sequencePhase === 'intro') {
+              setIdleVideoReady(false)
+              setSequencePhase('idle')
+            }
+          }}
+          onError={() => {
+            setIdleVideoReady(false)
+            if (hasSceneSequence) {
+              setHasSceneSequence(false)
+              setSequencePhase('legacy')
+            }
+          }}
         />
       )}
       <canvas
@@ -1222,6 +1259,7 @@ function PortraitSetup({ onPortrait, idleJob, onGenerateIdle, onApproveIdle, com
   const [positionX, setPositionX] = useState(0)
   const [positionY, setPositionY] = useState(0)
   const [hidePreviousJob, setHidePreviousJob] = useState(false)
+  const [reviewSceneId, setReviewSceneId] = useState('blue-hour-living')
   useEffect(() => () => { if (preview) URL.revokeObjectURL(preview) }, [preview])
   useEffect(() => {
     if (idleJob?.status === 'queued' || idleJob?.status === 'generating') setHidePreviousJob(false)
@@ -1274,7 +1312,19 @@ function PortraitSetup({ onPortrait, idleJob, onGenerateIdle, onApproveIdle, com
             <div className="idle-review-grid">
               <figure><img src={ConversationClient.idlePreviewUrl(idleJob.derivative_id, 'frontal', idleJob.updated_at)} alt="标准化正面照片" /><figcaption>正面标准照</figcaption></figure>
               <figure><video src={ConversationClient.idlePreviewUrl(idleJob.derivative_id, 'video', idleJob.updated_at)} autoPlay loop muted playsInline controls /><figcaption>10 秒首尾闭环待机</figcaption></figure>
+              {idleJob.has_scene_previews && idleJob.scene_ids?.includes(reviewSceneId) && <figure>
+                <video src={ConversationClient.idleScenePreviewUrl(idleJob.derivative_id, reviewSceneId, idleJob.updated_at)} autoPlay loop muted playsInline controls />
+                <figcaption>整个人物离线抠像 · 场景预合成</figcaption>
+              </figure>}
             </div>
+            {idleJob.has_scene_previews && <div className="idle-scene-picker" aria-label="待机场景预览">
+              {(idleJob.scene_ids || []).map((sceneId) => <button
+                type="button"
+                key={sceneId}
+                aria-pressed={reviewSceneId === sceneId}
+                onClick={() => setReviewSceneId(sceneId)}
+              >{sceneBackgrounds.find((item) => item.id === sceneId)?.label || sceneId}</button>)}
+            </div>}
             {idleJob.status === 'awaiting_approval' && <button className="primary-button" type="button" onClick={() => { void onApproveIdle(idleJob.derivative_id).catch(() => {}) }}>确认并使用动态形象</button>}
           </>}
           {idleJob.status === 'failed' && <small className="idle-job__error">生成失败：{idleJob.error_code || '未知错误'}；原人物未被替换。</small>}

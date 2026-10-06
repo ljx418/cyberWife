@@ -23,7 +23,17 @@ def test_installer_requires_explicit_network_consent_and_checks_avatar_workflows
     assert "comfy_avatar_frontalize_api.json" in script
     assert "comfy_avatar_idle_api.json" in script
     assert (ROOT / "prototype/dist/index.html").is_file()
-    assert "prototype/dist/" not in (ROOT / ".gitignore").read_text(encoding="utf-8")
+    for release_asset in (
+        "prototype/dist/index.html",
+        next(
+            str(path.relative_to(ROOT))
+            for path in (ROOT / "prototype/dist/assets").glob("index-*.js")
+        ),
+    ):
+        assert subprocess.run(
+            ["git", "-C", str(ROOT), "check-ignore", "-q", release_asset],
+            capture_output=True,
+        ).returncode == 1
     assert subprocess.run(
         ["git", "-C", str(ROOT), "ls-files", "--error-unmatch", "prototype/dist/index.html"],
         capture_output=True,

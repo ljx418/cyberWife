@@ -90,6 +90,24 @@ def correlation_at_shift(audio: np.ndarray, motion: np.ndarray, shift_frames: in
     return float(np.corrcoef(standardize(a), standardize(m))[0, 1])
 
 
+def mouth_motion_pass(report: dict) -> bool:
+    """Return the machine gate for visible, audio-responsive mouth motion.
+
+    Direct Avatar capture does not include the browser's playback lead, so its
+    relative correlation offset is useful diagnostics but is not an end-user
+    A/V-sync measurement.  This gate deliberately checks only what the capture
+    can prove: voiced audio changes the lower face and the stream is neither
+    black nor frozen.
+    """
+
+    gates = report["gates"]
+    return bool(
+        gates["mouth_responds_during_voice"]
+        and gates["no_black_frames"]
+        and gates["no_frozen_frames"]
+    )
+
+
 def analyze(args: argparse.Namespace) -> dict:
     rows = list(csv.DictReader((args.capture / "video-timeline.csv").open(encoding="utf-8")))
     sequences = [int(row["sequence"]) for row in rows]
@@ -120,12 +138,15 @@ def analyze(args: argparse.Namespace) -> dict:
             "zero_beats_400ms_controls": controls[0] >= max(controls[-400], controls[400]),
             "mouth_responds_during_voice": voiced_motion > silent_motion * 1.10,
             "no_black_frames": visual["black_frames"] == 0,
+            "no_frozen_frames": visual["frozen_pairs"] == 0,
         },
         "limitations": [
             "This is not the unpublished Wav2Lip evaluation SyncNet.",
+            "Direct Avatar capture excludes the browser playback lead and cannot sign end-user A/V offset.",
             "Automated motion correlation cannot replace human phoneme/naturalness review.",
         ],
     }
+    report["mouth_motion_pass"] = mouth_motion_pass(report)
     report["automated_pass"] = all(report["gates"].values())
     (args.capture / "analysis-result.json").write_text(json.dumps(report, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return report
@@ -136,8 +157,24 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--capture", type=Path, required=True)
     parser.add_argument("--wav", type=Path, required=True)
     parser.add_argument("--dataset", type=Path, required=True)
+    parser.add_argument(
+        "--require-pass",
+        action="store_true",
+        help="exit 2 when any automated lip-response gate fails",
+    )
+    parser.add_argument(
+        "--require-mouth-motion",
+        action="store_true",
+        help="exit 3 unless voiced audio produces visible, non-black, non-frozen mouth motion",
+    )
     return parser.parse_args()
 
 
 if __name__ == "__main__":
-    print(json.dumps(analyze(parse_args()), ensure_ascii=False, indent=2))
+    arguments = parse_args()
+    result = analyze(arguments)
+    print(json.dumps(result, ensure_ascii=False, indent=2))
+    if arguments.require_pass and not result["automated_pass"]:
+        raise SystemExit(2)
+    if arguments.require_mouth_motion and not result["mouth_motion_pass"]:
+        raise SystemExit(3)

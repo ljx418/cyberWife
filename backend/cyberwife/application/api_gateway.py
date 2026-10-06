@@ -638,7 +638,9 @@ class ApiGateway:
 
         @app.get("/api/v1/avatar-builds/{derivative_id}/idle-generation/{kind}")
         async def get_idle_preview(derivative_id: int, kind: str):
-            if self._avatar_asset_service is None or kind not in {"frontal", "video"}:
+            if self._avatar_asset_service is None or kind not in {
+                "frontal", "video", "intro", "outro",
+            }:
                 raise HTTPException(status_code=404, detail="audit.entity_not_found")
             try:
                 target = await asyncio.to_thread(
@@ -670,6 +672,26 @@ class ApiGateway:
             except ValueError as exc:
                 raise HTTPException(status_code=409, detail=str(exc))
             return self._avatar_asset_service.public_record(row)
+
+        @app.get("/api/v1/avatar-builds/{derivative_id}/idle-generation/scenes/{scene_id}")
+        async def get_idle_scene_preview(derivative_id: int, scene_id: str):
+            if self._avatar_asset_service is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            try:
+                target = await asyncio.to_thread(
+                    self._avatar_asset_service.idle_scene_preview_path,
+                    derivative_id,
+                    scene_id,
+                )
+            except KeyError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            except ValueError:
+                raise HTTPException(status_code=422, detail="asset.invalid")
+            return FileResponse(
+                target,
+                media_type="video/mp4",
+                headers={"Cache-Control": "no-store, private"},
+            )
 
         @app.post("/api/v1/avatar-builds/{derivative_id}/activate")
         async def activate_avatar_build(derivative_id: int):

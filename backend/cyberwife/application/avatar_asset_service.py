@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
+import shutil
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
@@ -159,7 +160,9 @@ class AvatarAssetService:
             key: payload.get(key)
             for key in (
                 "derivative_id", "status", "phase", "progress", "error_code",
-                "has_frontal_preview", "has_video_preview", "updated_at",
+                "has_frontal_preview", "has_video_preview", "has_scene_previews",
+                "has_sequence_previews", "has_intro_preview", "has_outro_preview",
+                "sequence_version", "scene_ids", "updated_at",
             )
         }
 
@@ -223,11 +226,19 @@ class AvatarAssetService:
             result = runner(source, self._job_dir(derivative_id), progress)
             frontal = Path(result["frontal_path"]).resolve()
             video = Path(result["video_path"]).resolve()
+            scene_manifest = Path(result["scene_manifest_path"]).resolve()
             job_dir = self._job_dir(derivative_id).resolve()
-            if job_dir not in frontal.parents or job_dir not in video.parents:
+            if (
+                job_dir not in frontal.parents or job_dir not in video.parents
+                or job_dir not in scene_manifest.parents
+            ):
                 raise RuntimeError("avatar.pipeline_output_outside_job")
-            if not frontal.is_file() or not video.is_file():
+            if not frontal.is_file() or not video.is_file() or not scene_manifest.is_file():
                 raise RuntimeError("avatar.pipeline_output_missing")
+            scene_payload = json.loads(scene_manifest.read_text(encoding="utf-8"))
+            scene_ids = sorted(scene_payload.get("outputs", {}))
+            if len(scene_ids) < 4:
+                raise RuntimeError("avatar.scene_composites_incomplete")
             with self._idle_job_lock:
                 state = self._read_job(derivative_id) or {}
                 self._write_job(derivative_id, {
@@ -237,8 +248,11 @@ class AvatarAssetService:
                     "progress": 100,
                     "frontal_path": str(frontal),
                     "video_path": str(video),
+                    "scene_manifest_path": str(scene_manifest),
                     "has_frontal_preview": True,
                     "has_video_preview": True,
+                    "has_scene_previews": True,
+                    "scene_ids": scene_ids,
                 })
         except Exception as exc:
             with self._idle_job_lock:
@@ -260,14 +274,125 @@ class AvatarAssetService:
         return self.public_idle_job(payload)
 
     def idle_preview_path(self, derivative_id: int, kind: str) -> Path:
-        if kind not in {"frontal", "video"}:
+        path_keys = {
+            "frontal": "frontal_path",
+            "video": "video_path",
+            "intro": "intro_path",
+            "outro": "outro_path",
+        }
+        if kind not in path_keys:
             raise ValueError("avatar.invalid_preview_kind")
         payload = self._read_job(derivative_id)
         if payload is None or payload.get("status") not in {"awaiting_approval", "active"}:
             raise KeyError(derivative_id)
-        target = Path(payload[f"{kind}_path"]).resolve()
+        raw_path = payload.get(path_keys[kind])
+        if not raw_path:
+            raise KeyError(kind)
+        target = Path(raw_path).resolve()
         if self._job_dir(derivative_id).resolve() not in target.parents or not target.is_file():
             raise ValueError("avatar.invalid_preview_path")
+        return target
+
+    def install_approved_sequence(
+        self,
+        derivative_id: int,
+        *,
+        manifest_path: Path,
+        close_keyframe: Path,
+        visually_approved: bool,
+    ) -> dict:
+        """Install an approved intro/idle/outro set without replacing speaking data."""
+        if not visually_approved:
+            raise ValueError("avatar.visual_approval_required")
+        row = self._repository.get_avatar_derivative(derivative_id)
+        if row is None:
+            raise KeyError(derivative_id)
+        if row.get("status") != "active":
+            raise ValueError("avatar.active_build_required")
+        payload = self._read_job(derivative_id)
+        if payload is None or payload.get("status") != "active":
+            raise ValueError("avatar.active_idle_required")
+
+        manifest_path = Path(manifest_path).resolve()
+        close_keyframe = Path(close_keyframe).resolve()
+        if not manifest_path.is_file() or not close_keyframe.is_file():
+            raise FileNotFoundError("avatar.sequence_input_missing")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if manifest.get("generation_mode") != "direct_complete_scene_sequence":
+            raise ValueError("avatar.invalid_sequence_manifest")
+        if manifest.get("matting") is not False:
+            raise ValueError("avatar.sequence_matting_not_allowed")
+        expected_close = str(manifest.get("close_keyframe", {}).get("sha256", ""))
+        if hashlib.sha256(close_keyframe.read_bytes()).hexdigest() != expected_close:
+            raise ValueError("avatar.sequence_keyframe_mismatch")
+
+        sources: dict[str, Path] = {}
+        for kind in ("intro", "idle", "outro"):
+            record = manifest.get(kind)
+            if not isinstance(record, dict):
+                raise ValueError("avatar.invalid_sequence_manifest")
+            source = Path(str(record.get("path", ""))).resolve()
+            if source.parent != manifest_path.parent or not source.is_file():
+                raise ValueError("avatar.sequence_output_outside_manifest")
+            if hashlib.sha256(source.read_bytes()).hexdigest() != record.get("sha256"):
+                raise ValueError("avatar.sequence_output_mismatch")
+            sources[kind] = source
+
+        job_dir = self._job_dir(derivative_id)
+        job_dir.mkdir(parents=True, exist_ok=True)
+        revision = expected_close[:12]
+        destinations = {
+            "intro": job_dir / f"sequence-{revision}-intro.mp4",
+            "idle": job_dir / f"sequence-{revision}-idle.mp4",
+            "outro": job_dir / f"sequence-{revision}-outro.mp4",
+            "frontal": job_dir / f"sequence-{revision}-frontal.png",
+            "manifest": job_dir / f"sequence-{revision}-manifest.json",
+        }
+        copy_sources = {
+            "intro": sources["intro"], "idle": sources["idle"],
+            "outro": sources["outro"], "frontal": close_keyframe,
+            "manifest": manifest_path,
+        }
+        for key, source in copy_sources.items():
+            temporary = destinations[key].with_suffix(destinations[key].suffix + ".tmp")
+            shutil.copy2(source, temporary)
+            temporary.replace(destinations[key])
+
+        updated = self._write_job(derivative_id, {
+            **payload,
+            "frontal_path": str(destinations["frontal"].resolve()),
+            "video_path": str(destinations["idle"].resolve()),
+            "intro_path": str(destinations["intro"].resolve()),
+            "outro_path": str(destinations["outro"].resolve()),
+            "sequence_manifest_path": str(destinations["manifest"].resolve()),
+            "has_frontal_preview": True,
+            "has_video_preview": True,
+            "has_sequence_previews": True,
+            "has_intro_preview": True,
+            "has_outro_preview": True,
+            "sequence_version": f"ux13-frontal-{revision}",
+            "phase": "complete",
+            "progress": 100,
+        })
+        return self.public_idle_job(updated)
+
+    def idle_scene_preview_path(self, derivative_id: int, scene_id: str) -> Path:
+        if not re.fullmatch(r"[a-z0-9-]{1,64}", scene_id):
+            raise ValueError("avatar.invalid_scene_id")
+        payload = self._read_job(derivative_id)
+        if payload is None or payload.get("status") not in {"awaiting_approval", "active"}:
+            raise KeyError(derivative_id)
+        manifest_path = Path(payload.get("scene_manifest_path", "")).resolve()
+        job_dir = self._job_dir(derivative_id).resolve()
+        if job_dir not in manifest_path.parents or not manifest_path.is_file():
+            raise ValueError("avatar.invalid_scene_manifest")
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        record = manifest.get("outputs", {}).get(scene_id)
+        if not isinstance(record, dict):
+            raise KeyError(scene_id)
+        target = Path(str(record.get("path", ""))).resolve()
+        if job_dir not in target.parents or not target.is_file():
+            raise ValueError("avatar.invalid_scene_preview_path")
         return target
 
     def approve_idle_generation(self, derivative_id: int) -> dict:
