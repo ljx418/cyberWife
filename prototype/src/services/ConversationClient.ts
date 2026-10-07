@@ -106,6 +106,8 @@ export interface IdleGenerationJob {
   has_intro_preview?: boolean;
   has_outro_preview?: boolean;
   sequence_version?: string | null;
+  speaking_avatar_id?: string | null;
+  single_surface_ready?: boolean;
   scene_ids?: string[];
   updated_at: string;
 }

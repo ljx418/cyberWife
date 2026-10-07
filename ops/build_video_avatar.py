@@ -24,6 +24,7 @@ except ModuleNotFoundError:
 # original 96px Wav2Lip default is not compatible with this runtime).
 WAV2LIP_FACE_SIZE = 256
 AVATAR_BUILD_REVISION = "cropv2"
+SCENE_AVATAR_BUILD_REVISION = "scenev1"
 
 
 def _sha256(path: Path) -> str:
@@ -93,6 +94,26 @@ def _loop_metrics(frames: list[np.ndarray]) -> dict[str, float | str]:
     }
 
 
+def _validated_loop_mode(
+    duration: float,
+    metrics: dict[str, float | str],
+    *,
+    preserve_frame: bool,
+) -> str:
+    if duration <= 7:
+        return str(metrics["mode"])
+    if preserve_frame:
+        if (
+            float(metrics["first_last_mae"]) > 3.0
+            or float(metrics["turnaround_mae"]) > 3.0
+        ):
+            raise RuntimeError(f"complete-scene idle has a visible loop seam: {metrics}")
+        return "closed_complete_scene"
+    if metrics["mode"] != "closed_palindrome":
+        raise RuntimeError(f"long idle video is not a closed palindrome: {metrics}")
+    return str(metrics["mode"])
+
+
 def _idle_motion_metrics(
     boxes: np.ndarray,
     *,
@@ -115,7 +136,14 @@ def _idle_motion_metrics(
     }
 
 
-def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id: str) -> Path:
+def build(
+    source_portrait: Path,
+    idle_video: Path,
+    output_root: Path,
+    avatar_id: str,
+    *,
+    preserve_frame: bool = False,
+) -> Path:
     if not source_portrait.is_file() or not idle_video.is_file():
         raise FileNotFoundError("source portrait or idle video is missing")
     model_path = Path(os.environ.get(
@@ -128,16 +156,26 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
     source_fps = float(capture.get(cv2.CAP_PROP_FPS) or 0)
     frames: list[np.ndarray] = []
     raw_boxes: list[list[int]] = []
+    frame_width = 0
+    frame_height = 0
     while True:
         ok, frame = capture.read()
         if not ok:
             break
-        canvas = _letterbox(frame)
+        canvas = frame if preserve_frame else _letterbox(frame)
+        if not frames:
+            frame_height, frame_width = canvas.shape[:2]
+        elif canvas.shape[:2] != (frame_height, frame_width):
+            raise RuntimeError("idle video frame size changed within stream")
         faces = detect_faces(canvas, model_path)
         if len(faces) != 1:
             raise RuntimeError(f"frame {len(frames)} expected one face, found {len(faces)}")
         x1, y1, x2, y2, _ = faces[0]
-        raw_boxes.append(_wav2lip_box((x1, y1, x2, y2)))
+        raw_boxes.append(_wav2lip_box(
+            (x1, y1, x2, y2),
+            frame_width=frame_width,
+            frame_height=frame_height,
+        ))
         frames.append(canvas)
     capture.release()
     duration = len(frames) / source_fps if source_fps else 0
@@ -147,13 +185,18 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
             f"fps={source_fps:.3f}, duration={duration:.3f}"
         )
     loop_metrics = _loop_metrics(frames)
-    if duration > 7 and loop_metrics["mode"] != "closed_palindrome":
-        raise RuntimeError(f"long idle video is not a closed palindrome: {loop_metrics}")
+    loop_metrics["mode"] = _validated_loop_mode(
+        duration, loop_metrics, preserve_frame=preserve_frame,
+    )
 
     boxes = _smooth(np.asarray(raw_boxes))
     if np.max(np.abs(np.diff(boxes, axis=0))) > 48:
         raise RuntimeError("face box discontinuity exceeds 48 pixels")
-    motion_metrics = _idle_motion_metrics(boxes)
+    motion_metrics = _idle_motion_metrics(
+        boxes,
+        frame_width=frame_width,
+        frame_height=frame_height,
+    )
     if (
         motion_metrics["face_center_p95_percent_diagonal"] > 2.5
         or motion_metrics["face_area_cv_percent"] > 3.0
@@ -190,11 +233,12 @@ def build(source_portrait: Path, idle_video: Path, output_root: Path, avatar_id:
         median_box = np.median(boxes, axis=0).astype(int).tolist()
         manifest = {
             "schema": 2,
-            "build_revision": AVATAR_BUILD_REVISION,
+            "build_revision": SCENE_AVATAR_BUILD_REVISION if preserve_frame else AVATAR_BUILD_REVISION,
             "avatar_id": avatar_id,
             "source_sha256": _sha256(source_portrait),
             "idle_video_sha256": _sha256(idle_video),
-            "frame_size": [512, 768],
+            "frame_size": [frame_width, frame_height],
+            "presentation": "complete_scene" if preserve_frame else "portrait",
             "face_size": [WAV2LIP_FACE_SIZE, WAV2LIP_FACE_SIZE],
             "coordinates": median_box,
             "frame_count": len(frames),
@@ -224,8 +268,19 @@ def main() -> None:
     parser.add_argument("--video", required=True, type=Path)
     parser.add_argument("--output-root", required=True, type=Path)
     parser.add_argument("--avatar-id", required=True)
+    parser.add_argument(
+        "--preserve-frame",
+        action="store_true",
+        help="retain the complete generated scene as the speaking surface",
+    )
     args = parser.parse_args()
-    print(build(args.source, args.video, args.output_root, args.avatar_id))
+    print(build(
+        args.source,
+        args.video,
+        args.output_root,
+        args.avatar_id,
+        preserve_frame=args.preserve_frame,
+    ))
 
 
 if __name__ == "__main__":

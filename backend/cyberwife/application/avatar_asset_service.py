@@ -86,6 +86,7 @@ class AvatarAssetService:
         idle_video: Path,
         *,
         visually_approved: bool,
+        preserve_scene: bool = False,
     ) -> dict:
         """Build and stage a generated idle loop; never bypass visual approval."""
         if not visually_approved:
@@ -95,11 +96,19 @@ class AvatarAssetService:
             raise KeyError(derivative_id)
         source = self._store.resolve(str(row["relative_path"]))
         video_sha = hashlib.sha256(Path(idle_video).read_bytes()).hexdigest()
-        from ops.build_video_avatar import AVATAR_BUILD_REVISION, build
+        from ops.build_video_avatar import (
+            AVATAR_BUILD_REVISION,
+            SCENE_AVATAR_BUILD_REVISION,
+            build,
+        )
+
+        build_revision = (
+            SCENE_AVATAR_BUILD_REVISION if preserve_scene else AVATAR_BUILD_REVISION
+        )
 
         avatar_id = (
             f"wav2lip256_idle_p_{str(row['source_sha256'])[:16]}_"
-            f"{video_sha[:8]}_{AVATAR_BUILD_REVISION}"
+            f"{video_sha[:8]}_{build_revision}"
         )
 
         target = self._avatar_root / avatar_id
@@ -111,7 +120,13 @@ class AvatarAssetService:
             ):
                 raise RuntimeError("avatar.existing_artifact_mismatch")
         else:
-            target = build(source, Path(idle_video), self._avatar_root, avatar_id)
+            target = build(
+                source,
+                Path(idle_video),
+                self._avatar_root,
+                avatar_id,
+                preserve_frame=preserve_scene,
+            )
         manifest_path = target / "manifest.json"
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         manifest["visual_approved"] = True
@@ -162,7 +177,8 @@ class AvatarAssetService:
                 "derivative_id", "status", "phase", "progress", "error_code",
                 "has_frontal_preview", "has_video_preview", "has_scene_previews",
                 "has_sequence_previews", "has_intro_preview", "has_outro_preview",
-                "sequence_version", "scene_ids", "updated_at",
+                "sequence_version", "speaking_avatar_id", "single_surface_ready",
+                "scene_ids", "updated_at",
             )
         }
 
@@ -301,7 +317,7 @@ class AvatarAssetService:
         close_keyframe: Path,
         visually_approved: bool,
     ) -> dict:
-        """Install an approved intro/idle/outro set without replacing speaking data."""
+        """Install an approved sequence and bind its idle scene to speaking output."""
         if not visually_approved:
             raise ValueError("avatar.visual_approval_required")
         row = self._repository.get_avatar_derivative(derivative_id)
@@ -358,6 +374,12 @@ class AvatarAssetService:
             shutil.copy2(source, temporary)
             temporary.replace(destinations[key])
 
+        speaking = self.promote_idle_video(
+            derivative_id,
+            destinations["idle"],
+            visually_approved=True,
+            preserve_scene=True,
+        )
         updated = self._write_job(derivative_id, {
             **payload,
             "frontal_path": str(destinations["frontal"].resolve()),
@@ -371,6 +393,8 @@ class AvatarAssetService:
             "has_intro_preview": True,
             "has_outro_preview": True,
             "sequence_version": f"ux13-frontal-{revision}",
+            "speaking_avatar_id": speaking["avatar_id"],
+            "single_surface_ready": True,
             "phase": "complete",
             "progress": 100,
         })

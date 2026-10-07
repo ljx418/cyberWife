@@ -34,7 +34,7 @@
         <mxCell id="p1goal" value="目标体验闭环&#xa;&#xa;一键启动 → 自然连续说话 → 可随时插话 → 人物与声音不断线 → 记忆可查改删 → 本次不记录零业务持久化 → 故障原页恢复 → 安全退出" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#101B22;strokeColor=#E4A668;fontColor=#EDF4F5;fontSize=18;align=left;spacing=20;" vertex="1" parent="1">
           <mxGeometry x="130" y="500" width="1270" height="160" as="geometry" />
         </mxCell>
-        <mxCell id="p1gate" value="当前真实状态：UX13非说话态序列已接入；AC-06A实时嘴部响应机器门4/4通过。历史FPS/Canvas live不得代签；浏览器音画/自然度、物理麦克风与Narrator未通过前V1不出门。" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#73521F;strokeColor=#F2BD6B;fontColor=#FFFFFF;fontStyle=1;fontSize=18;" vertex="1" parent="1">
+        <mxCell id="p1gate" value="当前真实状态：UX14同场景单人物说话表面已接入；Idle与live共享人物/背景/机位，机器嘴部响应通过。浏览器音画/自然度、物理麦克风与Narrator未通过前V1不出门。" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#73521F;strokeColor=#F2BD6B;fontColor=#FFFFFF;fontStyle=1;fontSize=18;" vertex="1" parent="1">
           <mxGeometry x="300" y="720" width="930" height="70" as="geometry" />
         </mxCell>
         <mxCell id="p1e1" edge="1" parent="1" source="p1b0" target="p1b1" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#8AA0A9;endArrow=block;" />
@@ -54,7 +54,7 @@
         <mxCell id="p2t" value="当前实现 As-Is｜不能被文件存在或mock测试掩盖的缺口" style="text;html=1;fontSize=28;fontStyle=1;fontColor=#15313B;" vertex="1" parent="1">
           <mxGeometry x="50" y="30" width="1300" height="50" as="geometry" />
         </mxCell>
-        <mxCell id="p2a" value="已验收可复用&#xa;&#xa;RuntimeLauncher真实探针/按组件恢复&#xa;PCM→ASR→LLM真实链&#xa;CosyVoice普通链≤7秒&#xa;H.264/WebCodecs Avatar恢复&#xa;UX13：intro→正脸Idle→实时Avatar→outro&#xa;WarmResponseCache安全门" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#1F6B4A;strokeColor=#6ED39C;fontColor=#FFFFFF;align=left;spacing=18;fontSize=16;" vertex="1" parent="1">
+        <mxCell id="p2a" value="已验收可复用&#xa;&#xa;RuntimeLauncher真实探针/按组件恢复&#xa;PCM→ASR→LLM真实链&#xa;CosyVoice普通链≤7秒&#xa;H.264/WebCodecs Avatar恢复&#xa;UX14：intro→Idle→同场景单人物live→outro&#xa;WarmResponseCache安全门" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#1F6B4A;strokeColor=#6ED39C;fontColor=#FFFFFF;align=left;spacing=18;fontSize=16;" vertex="1" parent="1">
           <mxGeometry x="60" y="130" width="410" height="300" as="geometry" />
         </mxCell>
         <mxCell id="p2b" value="B3 + ARCH1 已闭环&#xa;&#xa;SessionRuntime持续receiver+单sender已实现&#xa;CancellationToken/InterruptionController已实现&#xa;MediaSession与Avatar按generation清理&#xa;30次真实链打断旧轮泄漏=0&#xa;Application反向导入=0，AST门禁持续执行" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#1E6B50;strokeColor=#70D6A7;fontColor=#FFFFFF;align=left;spacing=18;fontSize=16;" vertex="1" parent="1">
@@ -80,7 +80,7 @@
         <mxCell id="p3t" value="V1目标运行架构｜Windows浏览器 + Windows LLM + WSL2应用/模型" style="text;html=1;fontSize=28;fontStyle=1;fontColor=#15313B;" vertex="1" parent="1">
           <mxGeometry x="50" y="25" width="1400" height="55" as="geometry" />
         </mxCell>
-        <mxCell id="p3ui" value="Windows Chrome&#xa;App / ConversationClient&#xa;UX13视觉序列状态机（intro/idle/live/outro）&#xa;MediaSession / AvatarSession&#xa;WebCodecs / AudioWorklet" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#1F6B4A;strokeColor=#6ED39C;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+        <mxCell id="p3ui" value="Windows Chrome&#xa;App / ConversationClient&#xa;UX14单表面状态机（intro/idle/同场景live/outro）&#xa;MediaSession / AvatarSession&#xa;WebCodecs / AudioWorklet" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#1F6B4A;strokeColor=#6ED39C;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="70" y="150" width="290" height="170" as="geometry" />
         </mxCell>
         <mxCell id="p3gw" value="WSL App Gateway :7860 [已实现/分层达标]&#xa;&#xa;SessionRuntime / ConversationOrchestrator / TurnPipeline&#xa;CosyVoice2默认 / Qwen TTS回退（进程内Adapter）&#xa;InterruptionController / MemoryService / RetentionService&#xa;Repository / AssetStore / Logger由api/server.py组合根经Ports注入" style="rounded=1;html=1;whiteSpace=wrap;fillColor=#1E6B50;strokeColor=#70D6A7;strokeWidth=3;fontColor=#FFFFFF;align=left;spacing=16;" vertex="1" parent="1">

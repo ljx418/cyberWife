@@ -121,15 +121,23 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
         }), encoding="utf-8")
         return target
 
-    def fake_video_build(source: Path, video: Path, output_root: Path, avatar_id: str) -> Path:
-        assert video.read_bytes() == b"real-local-idle-loop"
+    def fake_video_build(
+        source: Path,
+        video: Path,
+        output_root: Path,
+        avatar_id: str,
+        *,
+        preserve_frame: bool = False,
+    ) -> Path:
+        assert video.read_bytes() in {b"real-local-idle-loop", b"approved-idle"}
         target = output_root / avatar_id
-        target.mkdir(parents=True)
+        target.mkdir(parents=True, exist_ok=True)
         (target / "manifest.json").write_text(json.dumps({
             "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
             "frame_count": 160,
-            "frame_size": [512, 768],
+            "frame_size": [768, 432] if preserve_frame else [512, 768],
             "coordinates": [100, 400, 80, 320],
+            "presentation": "complete_scene" if preserve_frame else "portrait",
         }), encoding="utf-8")
         return target
 
@@ -261,6 +269,9 @@ def test_idle_generation_requires_preview_then_promotes_approved_loop(tmp_path, 
     assert installed["has_intro_preview"] is True
     assert installed["has_outro_preview"] is True
     assert installed["sequence_version"].startswith("ux13-frontal-")
+    assert installed["single_surface_ready"] is True
+    assert installed["speaking_avatar_id"].endswith("_scenev1")
+    assert client.get("/api/v1/avatar/active").json()["avatar_id"] == installed["speaking_avatar_id"]
     assert client.get(
         f"/api/v1/avatar-builds/{derivative_id}/idle-generation/intro"
     ).content == b"approved-intro"

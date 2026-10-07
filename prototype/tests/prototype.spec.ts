@@ -108,12 +108,13 @@ test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle
     if (path === '/api/v1/profile') return json({ detail: 'profile_not_found' }, 404)
     if (path === '/api/v1/health') return json({ status: 'ready', components: {}, resources: {}, version: {} })
     if (path === '/api/v1/assets/portrait') return json({ kind: 'portrait', items: [{ id: 22, is_active: true }] })
-    if (path === '/api/v1/avatar/active') return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-red', source_sha256: 'active-source', status: 'active' })
+    if (path === '/api/v1/avatar/active') return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-scene', source_sha256: 'active-source', status: 'active', frame_size: [768, 432] })
     if (path === '/api/v1/avatar-builds/12/idle-generation') return json({
       derivative_id: 12, status: 'active', phase: 'complete', progress: 100,
       has_frontal_preview: true, has_video_preview: true,
       has_sequence_previews: true, has_intro_preview: true, has_outro_preview: true,
-      sequence_version: 'ux13-frontal-test', updated_at: 'ux13-r1',
+      sequence_version: 'ux13-frontal-test', speaking_avatar_id: 'active-scene',
+      single_surface_ready: true, updated_at: 'ux13-r1',
     })
     if (path.endsWith('/idle-generation/intro') || path.endsWith('/idle-generation/video') || path.endsWith('/idle-generation/outro')) {
       return route.fulfill({ status: 200, contentType: 'video/mp4', path: sequenceFixture })
@@ -139,6 +140,12 @@ test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle
   }))
   expect(Number.parseFloat(stage.width)).toBe(stage.viewport)
   expect(stage.objectFit).toBe('cover')
+  await expect(page.locator('main.experience')).toHaveAttribute('data-avatar-presentation', 'complete-scene')
+  const canvas = page.locator('.avatar-video')
+  await expect(canvas).toHaveAttribute('data-presentation', 'complete-scene')
+  await canvas.evaluate((element) => { (element as HTMLElement).dataset.avatarLayer = 'live' })
+  await expect(idle).toHaveCSS('opacity', '0')
+  await expect(canvas).toHaveCSS('width', `${stage.viewport}px`)
 })
 
 test('设置、记忆删除确认和主题切换可用', async ({ page }) => {

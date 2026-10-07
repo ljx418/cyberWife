@@ -134,6 +134,7 @@ function App() {
   const [idleJob, setIdleJob] = useState<IdleGenerationJob | null>(null)
   const [idleVideoReady, setIdleVideoReady] = useState(false)
   const [hasSceneSequence, setHasSceneSequence] = useState(false)
+  const [hasSingleSceneSurface, setHasSingleSceneSurface] = useState(false)
   const [sequencePhase, setSequencePhase] = useState<AvatarSequencePhase>('legacy')
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [backgroundId, setBackgroundId] = useState(() => localStorage.getItem('cyberwife-background') || sceneBackgrounds[0].id)
@@ -251,6 +252,11 @@ function App() {
               && resumed.has_intro_preview === true
               && resumed.has_outro_preview === true
             setHasSceneSequence(sequenceReady)
+            setHasSingleSceneSurface(
+              sequenceReady
+              && resumed.single_surface_ready === true
+              && resumed.speaking_avatar_id === avatar.avatar_id,
+            )
             if (sequenceReady) setSequencePhase('intro')
           })
           .catch(() => {})
@@ -766,6 +772,7 @@ function App() {
       className={`experience experience--${variant} ${compact ? 'experience--compact' : ''}`}
       data-layout={layoutMode}
       data-background={activeBackground.id}
+      data-avatar-presentation={hasSingleSceneSurface ? 'complete-scene' : 'portrait'}
       aria-label="cyberWife 交互原型"
     >
       <div
@@ -822,8 +829,9 @@ function App() {
       <canvas
         ref={avatarCanvasRef}
         className="avatar-video"
+        data-presentation={hasSingleSceneSurface ? 'complete-scene' : 'portrait'}
         aria-label="本机实时人物画面"
-        style={{ objectPosition: 'right center' }}
+        style={{ objectPosition: hasSingleSceneSurface ? 'center center' : 'right center' }}
       />
       <div className="portrait-shade" />
       <div className="ambient-grain" />

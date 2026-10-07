@@ -2,7 +2,7 @@
 
 **版本**：3.2
 **日期**：2026-10-07
-**状态**：UX13非说话态序列已接入；Avatar实时PCM抖动缓冲已修复且AC-06A机器嘴部响应4/4通过；浏览器音画/自然度人工门仍阻断V1FINAL
+**状态**：UX14单场景说话表面已接入；Idle完整帧直接构建Wav2Lip说话数据，同一人物/背景/机位原子切换；AC-06A机器门通过，浏览器音画/自然度人工门仍阻断V1FINAL
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -33,7 +33,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 
 | 层 | 当前仓库事实 | V1 目标 | 状态 |
 |---|---|---|---|
-| 前端 | ConversationClient/MediaSession保持主链；UX10新增宽高比舞台；UX13新增intro→idle→实时Avatar→outro视觉状态机 | V1主交互保持稳定；视觉序列不得接管实时音频/口型时钟；失败回退旧Idle/静态图 | UX13人工与自动化PASS；多实体V2待开发 |
+| 前端 | ConversationClient/MediaSession保持主链；UX13/14实现intro→idle→同场景实时Avatar→outro；首个live帧原子隐藏Idle | 同一时刻只显示一个人物表面；视觉序列不得接管实时音频/口型时钟；失败回退Idle/静态图 | 单表面机器PASS；多实体V2待开发 |
 | API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
@@ -41,7 +41,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
 | Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口，避免Mel批次误插静音 | AC-06A机器嘴部响应4/4通过；浏览器295ms播放预留后的音画同步、嘴部自然度仍须人工≥4/5 | 机器PASS；体验WAIT HUMAN |
-| 人物生成 | 身份参考+无人物ScenePlate→完整场景关键帧→Wan首尾条件→人工确认；UX13以批准清单安装intro/正脸半身Idle/outro，按哈希版本化；UX11 Alpha预合成只保留回退 | 逐素材人工身份/自然度/场景物理关系签署；视觉序列与实时说话Avatar分层，后者必须单独实测 | UX13序列已active；实时说话仍为Crop V2，未虚报同场景全身口型 |
+| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；UX14保留768×432完整Idle帧构建`scenev1`说话Avatar，不抠图、不叠第二人物 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | `scenev1`已active；同场景实时嘴部机器PASS |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
@@ -108,6 +108,8 @@ ops/scene_sequence_pipeline.py               [已开发/UX13] 开场、严格正
 ops/install_scene_sequence.py                [已开发/UX13] 人工批准令牌、哈希校验和版本化私有安装
 backend/cyberwife/application/avatar_asset_service.py [已开发/UX13] 序列清单验证和私有媒体路径门
 prototype/src/App.tsx                        [已开发/UX13] 宽高比舞台、记忆工作台与intro/idle/live/outro状态机
+ops/build_video_avatar.py                     [已开发/UX14] 保留完整场景帧构建scenev1说话Avatar
+prototype/src/styles.css                      [已开发/UX14] live首帧原子替换Idle、单人物全舞台表面
 ```
 
 目标依赖只允许 `api → application → domain + ports`；`adapters/infrastructure → ports/domain`。ARCH1已把`SqliteRepository`、`AssetStore`、`StructuredLogger`的具体装配集中到`api/server.py`，运行指标为应用层无I/O实现，并以AST门禁持续保证`application/domain/ports`对`infrastructure/adapters/api`的反向导入为0。

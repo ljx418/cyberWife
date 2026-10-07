@@ -1,6 +1,6 @@
 # cyberWife V1～V2 全局开发状态
 
-**快照日期**：2026-10-07（UX13非说话态序列已接入；AC-06A实时嘴部响应机器门4/4通过，浏览器人工感知待签）
+**快照日期**：2026-10-07（UX14单场景说话表面已接入；待机与实时口型同一人物/背景/机位，浏览器人工感知待签）
 
 **判定口径**：按阶段出门门禁，不按代码文件数量或局部测试数量
 
@@ -21,13 +21,14 @@
 | B4 | PASS | sqlite-vec、删除事务、no-record、30天保留 | 无 |
 | B5 / V1RC1 | CONDITIONAL（自动化门PASS） | 当前候选普通链30/30、打断30/30、60分钟、数据生命周期、一键启动、恢复和冻结均PASS | Narrator、结构化物理麦克风、UX6完整主观签署；商业化需换Avatar许可 |
 | UX4 | PASS | 授权照片→正面化→10秒无缝Idle→双预览→人工确认→实时Avatar；196.187秒真实生产编排；四服务恢复 | 口型感知/A-V偏移仍归B2未闭环项，不由Idle视频替代 |
-| UX5 / UX6 | MACHINE PASS / ACTIVATED, WAIT HUMAN | 主舞台Idle、四视口、停止后Idle、Crop V2及实时PCM抖动修复已完成；4段有声/静音嘴部运动比1.132～1.279，黑帧/冻结/丢帧0 | 激活后需用户完成至少三轮真实对话并签署音画同步、嘴部与Idle自然度；直连偏移只作诊断 |
+| UX5 / UX6 | MACHINE PASS / SUPERSEDED BY UX14 VISUAL | 主舞台Idle、四视口、停止恢复和实时PCM抖动修复有效；Crop V2视觉表面已由同场景scenev1替代 | 用户完成至少三轮真实对话并签署音画同步、嘴部与Idle自然度；直连偏移只作诊断 |
 | UX8 | MACHINE PASS / WAIT USER RETEST | 保守普通话词形归一、全文/segment一致、中文空格清理、900ms句中停顿；真实ASR 3/3、四进程E2E 3/3、Playwright 16/16 | 用户用物理麦克风复验普通话字幕与自然停顿；不得由fixture代签 |
 | UX9 | AUTOMATION PASS / WAIT HUMAN | 播放态噪声门、参考音色ASR强校验、三轮短期上下文与确定性短句；真实语音闭环6/6，输出CER最高10%，普通轮首响4.985～5.999秒 | 真实房间噪声、物理麦克风和声音自然度由V1人工总验收签署 |
 | UX10 | AUTOMATION PASS / IDLE SUPERSEDED | 四视口、4个本地背景和记忆链继续有效；旧眼部局部合成候选已由UX11淘汰 | 不再激活旧候选 |
 | UX11 | SUPERSEDED / FALLBACK ONLY | 完整帧Idle和预览机制仍可复用；整人物Alpha预合成被用户判定边缘、发丝、光影和场景交互不可接受 | 不再作为目标路线或待激活候选 |
 | UX12 | SUPERSEDED BY UX13 / RESEARCH BASE | 无人物场景→三种完整场景全身关键帧→Wan首尾约束→10秒闭环；3段均160帧/16fps、黑帧0、首尾MAE 1.8635～1.9588；主链无抠图 | 其他姿势仍是未激活候选；不得冒充UX13运行态或说话态 |
 | UX13 | NON-SPEAKING PASS / ACTIVE | 用户人工批准严格正脸Idle序列；intro→idle→outro、媒体SHA与Chrome切换通过 | 只覆盖非说话态；说话态机器响应已通过，最终浏览器音画感知仍待人工签署 |
+| UX14 | MACHINE PASS / ACTIVE | 批准Idle完整帧构建`scenev1`说话Avatar；active/job/socket同ID；768×432单场景输出；运动比1.280，偏移+40ms，黑帧/冻结/丢帧0；live时Idle透明 | 浏览器至少三轮确认始终只有一人，口型同步与嘴部自然度≥4/5 |
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；当前Playwright 16/16；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
@@ -50,7 +51,7 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 ## 4. V1结论与剩余边界
 
-已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。Crop V2仍是实时说话态 active 工件；UX13非说话态序列已版本化安装。2026-10-07已修复Avatar把20ms实时PCM误插10ms合成静音的根因，四段当前人物真实采集均通过嘴部响应机器门。历史FPS、Canvas live和UX13视频仍不能代签FR-10；V1FINAL取证器保留`mouth_motion_observed`失败关闭字段。AC07部署报告保持有效，V1尚未全绿的原因是浏览器音画/嘴部/Idle感知、物理麦克风、Narrator和整体现场报告仍待人工签署。
+已锁定的B0～B5功能开发项均有实现；ARCH1、RES1已关闭分层和资源红项。UX14已用人工批准的完整场景Idle构建`scenev1`实时说话工件，取代Crop V2视觉表面；Idle与live首帧原子切换，不再同屏显示两个视频人物。实时PCM伪静音根因已修复，本次同场景真实采集继续通过嘴部响应机器门。V1FINAL取证器保留`mouth_motion_observed`失败关闭字段。AC07部署报告保持有效，V1尚未全绿的原因是浏览器音画/嘴部/Idle感知、物理麦克风、Narrator和整体现场报告仍待人工签署。
 
 ## 5. V2 规划状态
 

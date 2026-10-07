@@ -1,7 +1,7 @@
 # cyberWife V1 需求追踪矩阵
 
 **版本**：3.2　**日期**：2026-10-06
-用途：确保已批准体验、实现实体与 AC-01～14/AC-04A/UX13 不发生偏移。当前运行态Idle与场景结论以 `stages/UX13/result.md` 及其实施审计为准；UX11抠图路线仅保留历史与回退语境，UX12是直接生成研究基线。
+用途：确保已批准体验、实现实体与 AC-01～14/AC-04A/UX13/UX14 不发生偏移。当前运行态视觉结论以 `stages/UX14/result.md` 为准；UX11抠图路线仅保留历史与回退语境，UX12是直接生成研究基线。
 
 ## 功能需求
 
@@ -16,7 +16,7 @@
 | FR-07 六态状态机 | ConversationOrchestrator、TurnPipeline | B1/B3 | AC-03/11 | 已实现并验收：真实事件链、状态播报与打断状态转换PASS |
 | FR-08 连续对话 | ApiGateway、SpeechRuntime、TurnPipeline、MandarinTranscriptNormalizer、UtteranceBoundaryDetector、各 adapter | B1/B2/B2.5/B3/UX8 | AC-03/04/UX8-AC01～07 | 主链已验收：20/20连续链、普通链30/30及60分钟组合PASS；UX8普通话归一/900ms句中停顿机器PASS，物理麦克风复验待签 |
 | FR-09 插话取消 | InterruptionController、CancellationToken | B3 | AC-05 | 已实现并验收：早/中/晚30/30，旧generation零泄漏PASS |
-| FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、BaseASR实时抖动缓冲、AvatarSession、AvatarAssetService、scene_sequence_pipeline、App序列状态机 | B2/UX5/UX6/UX10/UX12/UX13/V1FINAL | AC-06/AC-06A/UX13人工门/VF-AC05/06 | UX13非说话态序列已批准激活；当前人物四段有声期嘴部响应机器门通过。浏览器人工同步/自然度仍须≥4/5；FPS/Canvas live/Idle均不得代签 |
+| FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、BaseASR实时抖动缓冲、AvatarSession、AvatarAssetService、build_video_avatar(scenev1)、App单表面状态机 | B2/UX5/UX6/UX13/UX14/V1FINAL | AC-06/AC-06A/UX14单表面门/VF-AC05/06 | 同一批准Idle完整帧已用于实时口型，live时Idle隐藏且同屏一人；嘴部响应机器门通过。浏览器人工同步/自然度仍须≥4/5 |
 | FR-11 设置持久化 | Gateway application services、repositories | B0/B4/B5 | AC-01/02/08 | 已实现并验收：六页签真实API与跨重启持久化PASS |
 | FR-12 记忆 CRUD/来源 | MemoryService、SqliteMemoryRepository、VectorIndex | B4/UX10 | AC-07/08/UX10-AC05～07 | 已实现并验收：真实手工新增/编辑/删除；语音会话候选确认前0召回、确认后命中、重复确认幂等、删除后0命中 |
 | FR-13 本次不记录 | TurnPipeline、persistence policy | B4 | AC-09 | 已实现并验收：会话中启用后整场业务写入0，原始音频0落盘PASS |
