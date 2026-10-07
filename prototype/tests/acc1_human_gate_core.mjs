@@ -54,6 +54,23 @@ export function healthReady(health) {
   return health?.status === 'ready' && values.length > 0 && values.every((status) => status === 'ready')
 }
 
+export function perceptionPass(perception) {
+  const scoreKeys = [
+    'lip_sync_score',
+    'mouth_naturalness_score',
+    'speaking_clarity_score',
+    'idle_naturalness_score',
+  ]
+  const scoresValid = scoreKeys.every((key) => Number.isInteger(perception?.[key])
+    && perception[key] >= 1
+    && perception[key] <= 5)
+  return scoresValid
+    && perception?.mouth_motion_observed === true
+    && perception?.transition_continuity_observed === true
+    && perception?.idle_naturalness_score >= 4
+    && perception?.idle_continues_after_stop === true
+}
+
 export function redactError(value) {
   return String(value)
     .replace(/[A-Za-z]:\\Users\\[^\\\s]+/gi, '%USERPROFILE%')

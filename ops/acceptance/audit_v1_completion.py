@@ -166,11 +166,16 @@ def verify_human(path: Path, revision: str) -> dict[str, Any]:
     if not isinstance(narrator, dict) or not all(narrator.get(key) is True for key in NARRATOR_TASKS):
         errors.append("narrator_tasks_invalid")
     perception = document.get("perception", {})
+    quality_scores = (
+        "lip_sync_score", "mouth_naturalness_score",
+        "speaking_clarity_score", "idle_naturalness_score",
+    )
     if not isinstance(perception, dict) or not (
         perception.get("mouth_motion_observed") is True
-        and all(_number(perception.get(key)) >= 4 for key in (
-            "lip_sync_score", "mouth_naturalness_score", "idle_naturalness_score"
-        )) and perception.get("idle_continues_after_stop") is True
+        and all(1 <= _number(perception.get(key), -1) <= 5 for key in quality_scores)
+        and _number(perception.get("idle_naturalness_score"), -1) >= 4
+        and perception.get("transition_continuity_observed") is True
+        and perception.get("idle_continues_after_stop") is True
     ):
         errors.append("perception_gate_invalid")
     return _gate("human-machine-live", errors)

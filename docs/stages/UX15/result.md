@@ -12,8 +12,8 @@
 
 ## 自动化证据
 
-- 前端生产构建PASS；Playwright 24/24；人工报告核心3/3。
-- 后端375 passed/7 skipped；根验收56/56；Avatar 16/16。
+- 前端生产构建PASS；Playwright 24/24；人工报告核心4/4。
+- 后端375 passed/7 skipped；根验收58/58；Avatar 16/16。
 - Headless真实Gateway取证：循环Idle opacity=1、Intro叠加层opacity=1、Canvas complete-scene且未live时opacity=0；页面始终由完整场景覆盖，无矩形人物层。
 - Canvas像素测试确认stop后淡出窗口内最后帧仍保留，260ms后才清理。
 

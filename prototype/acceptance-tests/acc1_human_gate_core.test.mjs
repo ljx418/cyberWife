@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { healthReady, redactError, sanitizeControl, summarizeMachineEvidence } from '../tests/acc1_human_gate_core.mjs'
+import { healthReady, perceptionPass, redactError, sanitizeControl, summarizeMachineEvidence } from '../tests/acc1_human_gate_core.mjs'
 
 test('sanitizer keeps only routing evidence and drops private payload content', () => {
   const event = sanitizeControl(JSON.stringify({
@@ -43,4 +43,20 @@ test('health and error redaction are fail closed', () => {
   assert.equal(healthReady({ status: 'ready', components: { asr: 'loading' } }), false)
   assert.equal(redactError('C:\\Users\\Alice\\private.wav /home/bob/file').includes('Alice'), false)
   assert.equal(redactError('C:\\Users\\Alice\\private.wav /home/bob/file').includes('/home/bob'), false)
+})
+
+test('V2 quality debt is recorded while V1 still fails closed on motion and transition continuity', () => {
+  const baseline = {
+    mouth_motion_observed: true,
+    lip_sync_score: 2,
+    mouth_naturalness_score: 2,
+    speaking_clarity_score: 2,
+    idle_naturalness_score: 4,
+    transition_continuity_observed: true,
+    idle_continues_after_stop: true,
+  }
+  assert.equal(perceptionPass(baseline), true)
+  assert.equal(perceptionPass({ ...baseline, mouth_motion_observed: false }), false)
+  assert.equal(perceptionPass({ ...baseline, transition_continuity_observed: false }), false)
+  assert.equal(perceptionPass({ ...baseline, idle_naturalness_score: 3 }), false)
 })

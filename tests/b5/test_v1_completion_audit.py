@@ -67,7 +67,9 @@ def _fixture(tmp_path: Path) -> tuple[Path, Path, Path]:
             "mouth_motion_observed": True,
             "lip_sync_score": 4,
             "mouth_naturalness_score": 4,
+            "speaking_clarity_score": 3,
             "idle_naturalness_score": 4,
+            "transition_continuity_observed": True,
             "idle_continues_after_stop": True,
         },
     }), encoding="utf-8")
@@ -177,6 +179,27 @@ def test_completion_rejects_static_mouth_even_when_subjective_scores_are_high(tm
     document["perception"]["mouth_motion_observed"] = False
     document["perception"]["lip_sync_score"] = 5
     document["perception"]["mouth_naturalness_score"] = 5
+    human.write_text(json.dumps(document))
+    result = audit_completion(tmp_path, release, human, install, REVISION)
+    assert result["result"] == "FAIL"
+    assert "perception_gate_invalid" in result["gates"][1]["errors"]
+
+
+def test_completion_records_low_v2_quality_without_blocking_v1(tmp_path: Path):
+    release, human, install = _fixture(tmp_path)
+    document = json.loads(human.read_text())
+    document["perception"]["lip_sync_score"] = 2
+    document["perception"]["mouth_naturalness_score"] = 2
+    document["perception"]["speaking_clarity_score"] = 2
+    human.write_text(json.dumps(document))
+    result = audit_completion(tmp_path, release, human, install, REVISION)
+    assert result["result"] == "PASS"
+
+
+def test_completion_rejects_transition_flash_even_when_quality_scores_are_high(tmp_path: Path):
+    release, human, install = _fixture(tmp_path)
+    document = json.loads(human.read_text())
+    document["perception"]["transition_continuity_observed"] = False
     human.write_text(json.dumps(document))
     result = audit_completion(tmp_path, release, human, install, REVISION)
     assert result["result"] == "FAIL"

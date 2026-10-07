@@ -10,7 +10,7 @@
 | 三轮链路 | PASS（工具） | 按turn交集聚合ASR final、回复final、音频chunk/complete与浏览器播放结束；核心单测覆盖3轮 |
 | 打断与接续 | PASS（工具） | 同一事件时间序证明`turn.cancelled`后存在完整新轮；不由人工勾选替代 |
 | Avatar/Idle | PASS（工具） | active API、Avatar WebSocket参数、live Canvas和停止后视频时间推进联合判定 |
-| 人工边界 | PASS | Narrator五任务和三项1～5分感知保留给人；任一低于4或否均FAIL |
+| 人工边界 | PASS | Narrator五任务、嘴部实际变化、切换连续性、Idle持续与四项1～5分感知均由人填写；静止嘴型、切换闪动或Idle自然度<4直接FAIL，高清/同步/嘴部自然度评分进入V2-X基线 |
 | 隐私 | PASS | 二进制帧忽略；JSON事件只白名单保留type/turn/event_seq/generation；单测注入私密正文后报告对象不含正文 |
 | 生命周期 | PASS | Playwright context关闭并删除临时profile；只停止本轮启动的Narrator |
 | 产品架构 | PASS | 未修改Gateway、前端产品行为、模型或数据库；仅验收工具、测试与文档 |

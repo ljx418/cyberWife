@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import readline from 'node:readline/promises'
 import process from 'node:process'
-import { healthReady, redactError, sanitizeControl, summarizeMachineEvidence } from './acc1_human_gate_core.mjs'
+import { healthReady, perceptionPass, redactError, sanitizeControl, summarizeMachineEvidence } from './acc1_human_gate_core.mjs'
 
 function parseArgs(argv) {
   const result = {}
@@ -150,7 +150,9 @@ try {
     mouth_motion_observed: await askYesNo('她实际说话时，嘴型是否持续变化（不是静止嘴型或仅头部/画面在动）'),
     lip_sync_score: await askScore('当前人物口型同步度'),
     mouth_naturalness_score: await askScore('当前人物嘴部自然度'),
+    speaking_clarity_score: await askScore('当前说话画面清晰度'),
     idle_naturalness_score: await askScore('当前人物Idle自然度'),
+    transition_continuity_observed: await askYesNo('连续3次开始/结束对话均无闪动、黑屏、遮罩或第二人物'),
     idle_continues_after_stop: await askYesNo('结束对话后Idle持续播放且无黑屏'),
   }
 
@@ -179,11 +181,7 @@ try {
     && healthReady(healthBefore)
     && healthReady(healthAfter)
   const humanPass = Object.values(narrator).every(Boolean)
-    && perception.mouth_motion_observed
-    && perception.lip_sync_score >= 4
-    && perception.mouth_naturalness_score >= 4
-    && perception.idle_naturalness_score >= 4
-    && perception.idle_continues_after_stop
+    && perceptionPass(perception)
 
   result = {
     schema_version: 2,

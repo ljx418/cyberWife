@@ -9,7 +9,7 @@
 | fake media 冒充物理麦克风 | P1 | headed installed Chrome；禁止 fake media 参数；报告活动轨道和真实PCM帧增量 | CLOSED FOR ENTRY |
 | 报告泄露对话或音频 | P0 | 事件载荷字段白名单；仅存类型/ID/序号/计数/时间，不存 payload 文本和二进制 | CLOSED FOR ENTRY |
 | 自动化冒充读屏听感 | P1 | Narrator 五任务仍由人类逐项签字 | CLOSED FOR ENTRY |
-| 自动化冒充口型自然度 | P1 | 三项1～5分仍由人类评分，低于4直接FAIL | CLOSED FOR ENTRY |
+| 自动化冒充口型自然度 | P1 | 四项1～5分仍由人类评分；高清/同步/嘴部自然度按2026-10-07决议进入V2-X基线，V1仍对静止嘴型、切换闪动和Idle自然度<4失败关闭 | CLOSED FOR ENTRY |
 | 验收窗口抢占用户焦点 | P2 | `-AcceptFocusChange` 缺失即在启动前失败 | CLOSED FOR ENTRY |
 | 验收器误杀用户Chrome/Narrator | P1 | 独立临时profile；仅关闭本次profile进程；原本运行的Narrator保留 | CLOSED FOR ENTRY |
 | 当前WSL克隆冒充干净机 | P1 | INST1-AC06明确排除当前发行版及其导出克隆 | CLOSED FOR ENTRY |
