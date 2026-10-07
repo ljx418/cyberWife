@@ -15,7 +15,7 @@
 | G-UX / DOC-B | PASS（ACC1自动部分） | 前端方向已批准；三视口15/15完整键盘任务、Playwright 15/15；Narrator/Chrome存在 | 真读屏完整任务仍需人工听感签字 |
 | B0 | PASS | 幂等生命周期、六组件真实probe | 无 |
 | B1 | PASS | 真实PCM→VAD→ASR→LLM 20/20 | 无 |
-| B2 | MACHINE PASS / WAIT HUMAN | H.264/WebCodecs双FPS≥25、故障降级与原页恢复；实时PCM抖动修复后当前人物嘴部响应4/4通过 | 浏览器音画同步和嘴部自然度仍由AC-06A人工门签署；静止嘴型直接FAIL |
+| B2 | MACHINE PASS / WAIT HUMAN | H.264/WebCodecs双FPS≥25、故障降级与原页恢复；实时PCM抖动修复后当前人物嘴部响应4/4通过 | 静止嘴型直接FAIL；清晰度、同步与嘴部自然度评分作为V2-X8基线，不再单独阻断V1 |
 | B2.5 | PASS | Cosy普通链P95≤7s、严格缓存、授权盲听、回退 | 无 |
 | B3 | PASS（授权音频） | 30次真实打断、旧轮零泄漏、压力证据 | 真实物理麦克风自由对话未自动化覆盖 |
 | B4 | PASS | sqlite-vec、删除事务、no-record、30天保留 | 无 |
@@ -28,12 +28,13 @@
 | UX11 | SUPERSEDED / FALLBACK ONLY | 完整帧Idle和预览机制仍可复用；整人物Alpha预合成被用户判定边缘、发丝、光影和场景交互不可接受 | 不再作为目标路线或待激活候选 |
 | UX12 | SUPERSEDED BY UX13 / RESEARCH BASE | 无人物场景→三种完整场景全身关键帧→Wan首尾约束→10秒闭环；3段均160帧/16fps、黑帧0、首尾MAE 1.8635～1.9588；主链无抠图 | 其他姿势仍是未激活候选；不得冒充UX13运行态或说话态 |
 | UX13 | NON-SPEAKING PASS / ACTIVE | 用户人工批准严格正脸Idle序列；intro→idle→outro、媒体SHA与Chrome切换通过 | 只覆盖非说话态；说话态机器响应已通过，最终浏览器音画感知仍待人工签署 |
-| UX14 | MACHINE PASS / ACTIVE | 批准Idle完整帧构建`scenev1`说话Avatar；active/job/socket同ID；768×432单场景输出；运动比1.280，偏移+40ms，黑帧/冻结/丢帧0；live时Idle透明 | 浏览器至少三轮确认始终只有一人，口型同步与嘴部自然度≥4/5 |
+| UX14 | MACHINE PASS / ACTIVE | 批准Idle完整帧构建`scenev1`说话Avatar；active/job/socket同ID；768×432单场景输出；运动比1.280，偏移+40ms，黑帧/冻结/丢帧0；live时Idle透明 | 浏览器确认始终只有一人且嘴部实际变化；清晰度/同步/自然度记入V2-X8基线 |
+| UX15 | AUTOMATION PASS / WAIT HUMAN | 循环Idle常驻；Intro/Outro就绪后叠加；Canvas最后帧延迟清理；全量回归通过 | 强制刷新后连续3次开始/结束，人工确认无闪动、黑帧、遮罩或第二人物 |
 | ARCH1 | PASS | Application反向导入=0；AST门禁；后端/前端回归通过 | 无 |
 | RES1 | PASS | 60分钟20完整+10打断；Windows/WSL余量与趋势门PASS | 冷启动ready前瞬时余量低，必须保留启动准入等待 |
 | ACC1 | CONDITIONAL | 三视口15/15完整键盘任务；当前Playwright 16/16；显式焦点授权的Narrator+物理麦克风签字工具已就绪 | 人工读屏听感与物理麦克风现场旅程待验 |
 | INST1 | PASS（AC07最低保证） | 隔离venv、7.5GB wheelhouse、替代数据根、便携工件、start×2/status/recover/stop×2共12/12步骤PASS，端口/PID归零 | AC06独立机仅为增强项 |
-| V1FINAL | AUTOMATION PASS / WAIT HUMAN | headed Chrome取证器绑定当前Git revision；AC09与AC07既有证据保留；实时嘴部响应机器门4/4通过且静止嘴型失败关闭 | 浏览器音画/嘴部/Idle评分、物理麦克风、Narrator与现场总报告 |
+| V1FINAL | AUTOMATION PASS / WAIT HUMAN | headed Chrome取证器绑定当前Git revision；AC09与AC07既有证据保留；实时嘴部响应机器门4/4通过且静止嘴型失败关闭；UX15切换连续性自动门PASS | UX15连续操作、物理麦克风、Narrator与现场总报告；画质/口型自然度评分转入V2-X8基线 |
 
 ## 3. 已完成依赖链
 
@@ -59,7 +60,7 @@ B5.5历史正式候选曾通过，2026-10-04独立复验又因Windows最低1,840
 
 | 阶段 | 状态 | 入口 | 计划结果 |
 |---|---|---|---|
-| V2-X 体验交互优化 | PLANNED / FIRST | V1FINAL及低风险体验修补关闭或书面延期；P0/P1=0 | 多源素材、三档构图、背景/外观、低幅Idle、图像描述确认、记忆工作台 |
-| V2-A 架构扩容 | LOCKED BY G-V2X | V2X-AC01～07全PASS | 多形象/多空间ID与路径隔离、导入导出、图谱聚类、MCP/RAG/CLI连接器 |
+| V2-X 体验交互优化 | PLANNED / FIRST | V1FINAL及低风险体验修补关闭或书面延期；P0/P1=0 | 多源素材、三档构图、背景/外观、低幅Idle、图像描述确认、记忆工作台、说话态高清化与口型自然度升级 |
+| V2-A 架构扩容 | LOCKED BY G-V2X | V2X-AC01～08全PASS | 多形象/多空间ID与路径隔离、导入导出、图谱聚类、MCP/RAG/CLI连接器 |
 
 权威开发及验收计划为[`V2-development-plan.md`](V2-development-plan.md)，架构决策为[`ADR-013`](architecture/adr/ADR-013-v2-experience-first-expansion.md)。Docker/Compose仍是独立部署轨，不是V2-X的入口条件。

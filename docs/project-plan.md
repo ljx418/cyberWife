@@ -55,6 +55,7 @@ B2.5名称保留但不按编号机械排队；它是已完成的B2性能修复�
 | UX12 | 人物、家具接触、遮挡、阴影和环境光在同一完整场景中生成；提供端坐、放松、站立三种全身Idle | fullscene_idle_pipeline、WanFirstLastFrameToVideo、FullSceneIdleRendition | 用户拒绝UX11抠图路线并批准完整场景直接生成 | 三段机器门PASS；连续观感待人工；说话态同场景未完成，当前active不变 |
 | UX13 | 进入时人物从沙发走近，正脸半身低幅Idle持续播放，正常停止后走回坐下 | scene_sequence_pipeline、AvatarAssetService、App序列状态机 | UX12技术基线 + 严格正脸版本人工批准 | 人工门PASS；运行态媒体哈希一致；浏览器切换及全量回归PASS；实时口型不回退 |
 | UX14 | 待机与说话只显示同一个人物、背景和机位，实时嘴部在唯一画面内变化 | build_video_avatar(scenev1)、AvatarAssetService、App/CSS单表面切换 | UX13批准序列 + 用户双画面反馈 | 768×432完整场景实时输出；嘴部响应PASS；同屏一人；浏览器自然度待签 |
+| UX15 | 点击开始/结束时完整场景连续交接，无换源空窗或Canvas清空闪动 | App双缓冲媒体层、AvatarSession延迟清理 | UX14单场景表面 + 用户闪动反馈 | 自动门PASS；连续3次人工无闪动后进入V1总验收 |
 | V1FINAL | 人只做听感/说话，机器绑定现场三轮、打断、接续、人物与Idle证据；部署证明采用显式保证等级 | Invoke-ACC1HumanGate、Invoke-INST1SingleMachinePortability、audit_v1_completion | V1RC1自动化PASS | VF-AC01～09；AC07为V1最低门，AC06为增强项 |
 
 ## 5. 每阶段交付包
@@ -107,7 +108,7 @@ V2 已由项目所有者批准拆成两个顺序阶段：
 
 | 阶段 | 用户可感知结果 | 架构边界 | 出门门 |
 |---|---|---|---|
-| V2-X 体验交互优化（先执行） | 多源照片、头像/半身/全身构图、外观与背景预设、低幅Idle、可确认的图像描述、可视化记忆工作台 | 仍为一个活动角色；所有新增素材用稳定ID和版本化清单，为迁移预留边界 | V2X-AC01～07全PASS；V1门无回退；P0/P1=0 |
+| V2-X 体验交互优化（先执行） | 多源照片、头像/半身/全身构图、外观与背景预设、低幅Idle、可确认的图像描述、可视化记忆工作台、说话画质与口型自然度升级 | 仍为一个活动角色；所有新增素材用稳定ID和版本化清单，为迁移预留边界 | V2X-AC01～08全PASS；V1功能门无回退；P0/P1=0 |
 | V2-A 架构扩容（后执行） | 多形象、多空间、文件隔离、导入导出、图谱聚类、MCP/RAG/CLI记忆连接器 | 模块化单体新增Character/Appearance/Space/Memory bounded context；只隔离不可信插件宿主 | V2A-AC01～07全PASS；迁移可回滚；串数据/越权为0 |
 
 详细任务、顺序、验收和停线条件以 [`V2-development-plan.md`](V2-development-plan.md) 为准；架构决策见 [`ADR-013`](architecture/adr/ADR-013-v2-experience-first-expansion.md)。Docker/Compose由ADR-007保留为独立部署轨，不得阻塞V2-X体验开发，也不得默认成为V2-A本机运行前置条件。公网访问、多用户、云同步与商业发布仍不在已批准V2范围内。

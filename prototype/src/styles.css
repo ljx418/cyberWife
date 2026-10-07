@@ -116,6 +116,7 @@ select:focus-visible {
 }
 .portrait--foreground,
 .idle-avatar-video,
+.sequence-avatar-video,
 .avatar-video {
   position: absolute;
   top: 0;
@@ -148,15 +149,24 @@ select:focus-visible {
   object-fit: cover;
   object-position: center center;
 }
-.avatar-video {
+.sequence-avatar-video {
   z-index: -2;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.sequence-avatar-video--ready {
+  opacity: 1;
+}
+.avatar-video {
+  z-index: -1;
   opacity: 0;
   transition: opacity 0.18s ease;
 }
 .avatar-video[data-avatar-layer="live"] {
   opacity: 1;
 }
-.idle-avatar-video:has(~ .avatar-video[data-presentation="complete-scene"][data-avatar-layer="live"]) {
+.idle-avatar-video:has(~ .avatar-video[data-presentation="complete-scene"][data-avatar-layer="live"]),
+.sequence-avatar-video:has(~ .avatar-video[data-presentation="complete-scene"][data-avatar-layer="live"]) {
   opacity: 0;
 }
 .avatar-video[data-presentation="complete-scene"] {

@@ -127,16 +127,21 @@ test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle
   })
 
   await page.goto('/?preview=1')
-  const video = page.getByTestId('idle-avatar-video')
-  await expect(video).toHaveAttribute('data-sequence-phase', 'intro')
-  await expect(video).toHaveAttribute('src', /idle-generation\/intro/)
-  await expect(video).not.toHaveAttribute('loop', '')
-
-  await video.dispatchEvent('ended')
   const idle = page.getByTestId('idle-avatar-video')
   await expect(idle).toHaveAttribute('data-sequence-phase', 'idle')
   await expect(idle).toHaveAttribute('src', /idle-generation\/video/)
   await expect(idle).toHaveAttribute('loop', '')
+  const intro = page.getByTestId('sequence-avatar-video')
+  await expect(intro).toHaveAttribute('data-sequence-phase', 'intro')
+  await expect(intro).toHaveAttribute('src', /idle-generation\/intro/)
+  await expect(intro).not.toHaveAttribute('loop', '')
+  await expect(idle).toHaveCount(1)
+  await expect(idle).toHaveCSS('opacity', '1')
+
+  await intro.dispatchEvent('ended')
+  await expect(page.getByTestId('sequence-avatar-video')).toHaveCount(0)
+  await expect(idle).toHaveCount(1)
+  await expect(idle).toHaveAttribute('src', /idle-generation\/video/)
   const stage = await idle.evaluate((element) => ({
     width: getComputedStyle(element).width,
     objectFit: getComputedStyle(element).objectFit,
@@ -149,7 +154,11 @@ test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle
   await expect(canvas).toHaveAttribute('data-presentation', 'complete-scene')
   await canvas.evaluate((element) => { (element as HTMLElement).dataset.avatarLayer = 'live' })
   await expect(idle).toHaveCSS('opacity', '0')
+  await expect(canvas).toHaveCSS('opacity', '1')
   await expect(canvas).toHaveCSS('width', `${stage.viewport}px`)
+  await canvas.evaluate((element) => { (element as HTMLElement).dataset.avatarLayer = 'static' })
+  await expect(idle).toHaveCSS('opacity', '1')
+  await expect(canvas).toHaveCSS('opacity', '0')
   await canvas.evaluate((element) => {
     (element as HTMLElement).dataset.presentation = 'portrait'
   })
@@ -362,10 +371,23 @@ test('Avatar 停止或降级后透明画布让写真立即恢复而非黑屏', a
       avatarId: controller.snapshot().avatarId,
       layer: canvas.dataset.avatarLayer,
     }
+    const context = canvas.getContext('2d')!
+    context.fillStyle = '#ff0000'
+    context.fillRect(0, 0, 1, 1)
+    canvas.hidden = false
+    canvas.dataset.avatarLayer = 'live'
+    canvas.style.opacity = '1'
     await controller.stop()
+    const retainedDuringFade = context.getImageData(0, 0, 1, 1).data[3]
+    const visibleDuringFade = !canvas.hidden
+    await new Promise((resolve) => window.setTimeout(resolve, 300))
+    const clearedAfterFade = context.getImageData(0, 0, 1, 1).data[3]
     return {
       degraded,
       rebound,
+      retainedDuringFade,
+      visibleDuringFade,
+      clearedAfterFade,
       stopped: {
         hidden: canvas.hidden,
         opacity: canvas.style.opacity,
@@ -381,6 +403,9 @@ test('Avatar 停止或降级后透明画布让写真立即恢复而非黑屏', a
     avatarId: 'wav2lip256_idle_p_newscene_scenev1',
     layer: 'static',
   })
+  expect(result.retainedDuringFade).toBe(255)
+  expect(result.visibleDuringFade).toBe(true)
+  expect(result.clearedAfterFade).toBe(0)
   expect(result.stopped).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'stopped' })
 })
 

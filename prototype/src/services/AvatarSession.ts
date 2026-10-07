@@ -72,6 +72,7 @@ export class AvatarSessionController {
   private mediaGeneration = 0;
   private conversationSessionId: string | null = null;
   private canvas: HTMLCanvasElement | null = null;
+  private canvasClearTimer: number | null = null;
   private avatarId = "wav2lip256_avatar1";
   private timer: number | null = null;
   private active = false;
@@ -124,6 +125,7 @@ export class AvatarSessionController {
   }
 
   async start(canvas?: HTMLCanvasElement, avatarId?: string): Promise<void> {
+    this.cancelCanvasClear();
     const requestedAvatarId = avatarId && /^[A-Za-z0-9_-]{1,80}$/.test(avatarId)
       ? avatarId
       : this.avatarId;
@@ -157,7 +159,7 @@ export class AvatarSessionController {
     this.timer = null;
     this.closeTransport();
     this.setCanvasLive(false);
-    this.clearCanvas();
+    this.scheduleCanvasClear();
     this.canvas = null;
     this.decoderConfig = null;
     this.mediaGeneration = 0;
@@ -383,13 +385,31 @@ export class AvatarSessionController {
     }
   }
 
-  private clearCanvas(): void {
-    if (this.canvas) this.canvas.getContext("2d")?.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  private clearCanvas(canvas: HTMLCanvasElement | null = this.canvas): void {
+    if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  private cancelCanvasClear(): void {
+    if (this.canvasClearTimer !== null) window.clearTimeout(this.canvasClearTimer);
+    this.canvasClearTimer = null;
+  }
+
+  private scheduleCanvasClear(): void {
+    const canvas = this.canvas;
+    this.cancelCanvasClear();
+    if (!canvas) return;
+    this.canvasClearTimer = window.setTimeout(() => {
+      this.clearCanvas(canvas);
+      canvas.hidden = true;
+      this.canvasClearTimer = null;
+    }, 260);
   }
 
   private setCanvasLive(live: boolean): void {
     if (!this.canvas) return;
-    this.canvas.hidden = !live;
+    if (live) this.cancelCanvasClear();
+    const wasLive = this.canvas.dataset.avatarLayer === "live" && !this.canvas.hidden;
+    this.canvas.hidden = live ? false : !wasLive;
     this.canvas.dataset.avatarLayer = live ? "live" : "static";
     this.canvas.style.opacity = live ? "1" : "0";
   }
@@ -397,7 +417,7 @@ export class AvatarSessionController {
   private softDegrade(): void {
     if (!this.active) return;
     this.setCanvasLive(false);
-    this.clearCanvas();
+    this.scheduleCanvasClear();
     this.setState("static_fallback", { fallbackKind: "soft", controlStatus: "ready" });
     this.schedule(this.pollIntervalMs);
   }
@@ -406,7 +426,7 @@ export class AvatarSessionController {
     if (!this.active) return;
     this.closeTransport();
     this.setCanvasLive(false);
-    this.clearCanvas();
+    this.scheduleCanvasClear();
     this.setState("static_fallback", {
       reconnectAttempts: this.current.reconnectAttempts + 1,
       sessionId: null,
@@ -489,8 +509,8 @@ export class AvatarSessionController {
       decoder.configure(this.decoderConfig);
       this.current = { ...this.current, decoderBacklog: 0 };
     }
-    const canvas = this.canvas;
-    if (canvas) canvas.getContext("2d")?.clearRect(0, 0, canvas.width, canvas.height);
+    this.setCanvasLive(false);
+    this.scheduleCanvasClear();
     this.emit();
     return true;
   }

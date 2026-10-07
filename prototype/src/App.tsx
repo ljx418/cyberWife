@@ -133,6 +133,7 @@ function App() {
   const [activeAvatarDerivativeId, setActiveAvatarDerivativeId] = useState<number | null>(null)
   const [idleJob, setIdleJob] = useState<IdleGenerationJob | null>(null)
   const [idleVideoReady, setIdleVideoReady] = useState(false)
+  const [sequenceOverlayReady, setSequenceOverlayReady] = useState(false)
   const [hasSceneSequence, setHasSceneSequence] = useState(false)
   const [hasSingleSceneSurface, setHasSingleSceneSurface] = useState(false)
   const [sequencePhase, setSequencePhase] = useState<AvatarSequencePhase>('legacy')
@@ -257,7 +258,10 @@ function App() {
               && resumed.single_surface_ready === true
               && resumed.speaking_avatar_id === avatar.avatar_id,
             )
-            if (sequenceReady) setSequencePhase('intro')
+            if (sequenceReady) {
+              setSequenceOverlayReady(false)
+              setSequencePhase('intro')
+            }
           })
           .catch(() => {})
       }
@@ -432,7 +436,7 @@ function App() {
     await Promise.allSettled([InputAudioSession.stop(), MediaSession.stop(), AvatarSession.stop()])
     setConversationState('idle')
     if (hasSceneSequence && playOutro) {
-      setIdleVideoReady(false)
+      setSequenceOverlayReady(false)
       setSequencePhase('outro')
     }
   }
@@ -477,7 +481,10 @@ function App() {
       && job.speaking_avatar_id === active.avatar_id
     setHasSceneSequence(sequenceReady)
     setHasSingleSceneSurface(singleSurfaceReady)
-    if (sequenceReady) setSequencePhase('idle')
+    if (sequenceReady) {
+      setSequenceOverlayReady(false)
+      setSequencePhase((current) => current === 'outro' ? 'intro' : 'idle')
+    }
     return { avatarId: active.avatar_id, singleSurfaceReady }
   }
 
@@ -807,14 +814,16 @@ function App() {
         ? ConversationClient.idleScenePreviewUrl(activeAvatarDerivativeId, activeBackground.id, idleJob.updated_at)
         : ConversationClient.idlePreviewUrl(activeAvatarDerivativeId, 'video', idleJob.updated_at)
       : null
-  const sequenceVideoUrl = hasSceneSequence && activeAvatarDerivativeId !== null && idleJob
+  const sequenceOverlayVideoUrl = hasSceneSequence
+    && (sequencePhase === 'intro' || sequencePhase === 'outro')
+    && activeAvatarDerivativeId !== null
+    && idleJob
     ? ConversationClient.idlePreviewUrl(
       activeAvatarDerivativeId,
-      sequencePhase === 'intro' ? 'intro' : sequencePhase === 'outro' ? 'outro' : 'video',
+      sequencePhase,
       `${idleJob.updated_at}-${sequencePhase}`,
     )
     : null
-  const stageIdleVideoUrl = sequenceVideoUrl ?? activeIdleVideoUrl
 
   return (
     <main
@@ -844,34 +853,55 @@ function App() {
         aria-label="本机人物形象"
         style={activePortraitUrl ? { backgroundImage: `url("${activePortraitUrl}")` } : undefined}
       />
-      {stageIdleVideoUrl && (
+      {activeIdleVideoUrl && (
         <video
-          key={stageIdleVideoUrl}
+          key={activeIdleVideoUrl}
           className={`idle-avatar-video ${hasSceneSequence ? 'idle-avatar-video--scene' : ''} ${idleVideoReady ? 'idle-avatar-video--ready' : ''}`}
           data-testid="idle-avatar-video"
           data-avatar-layer="idle"
-          data-sequence-phase={hasSceneSequence ? sequencePhase : 'legacy'}
-          src={stageIdleVideoUrl}
+          data-sequence-phase={hasSceneSequence ? 'idle' : 'legacy'}
+          src={activeIdleVideoUrl}
           autoPlay
-          loop={!hasSceneSequence || sequencePhase === 'idle'}
+          loop
           muted
           playsInline
           preload="auto"
-          aria-label={sequencePhase === 'intro' ? '人物走近镜头' : sequencePhase === 'outro' ? '人物返回沙发' : '本机人物动态待机画面'}
+          aria-label="本机人物动态待机画面"
           onCanPlay={() => setIdleVideoReady(true)}
           onPlaying={() => setIdleVideoReady(true)}
-          onEnded={() => {
-            if (hasSceneSequence && sequencePhase === 'intro') {
-              setIdleVideoReady(false)
-              setSequencePhase('idle')
-            }
-          }}
           onError={() => {
             setIdleVideoReady(false)
             if (hasSceneSequence) {
               setHasSceneSequence(false)
               setSequencePhase('legacy')
             }
+          }}
+        />
+      )}
+      {sequenceOverlayVideoUrl && (
+        <video
+          key={sequenceOverlayVideoUrl}
+          className={`sequence-avatar-video idle-avatar-video--scene ${sequenceOverlayReady ? 'sequence-avatar-video--ready' : ''}`}
+          data-testid="sequence-avatar-video"
+          data-avatar-layer="sequence"
+          data-sequence-phase={sequencePhase}
+          src={sequenceOverlayVideoUrl}
+          autoPlay
+          muted
+          playsInline
+          preload="auto"
+          aria-label={sequencePhase === 'intro' ? '人物走近镜头' : '人物返回沙发'}
+          onCanPlay={() => setSequenceOverlayReady(true)}
+          onPlaying={() => setSequenceOverlayReady(true)}
+          onEnded={() => {
+            if (sequencePhase === 'intro') {
+              setSequenceOverlayReady(false)
+              setSequencePhase('idle')
+            }
+          }}
+          onError={() => {
+            setSequenceOverlayReady(false)
+            setSequencePhase('idle')
           }}
         />
       )}

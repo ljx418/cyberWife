@@ -1,14 +1,14 @@
 # V1FINAL 阶段结果
 
 **日期**：2026-10-07
-**结论**：AC-06A MACHINE PASS / HUMAN TOTAL ACCEPTANCE PENDING
+**结论**：AC-06A + UX15 MACHINE PASS / HUMAN TOTAL ACCEPTANCE PENDING
 
 ## 已完成
 
 - 新增headed Chrome人机绑定取证器及独立核心模块。
 - PowerShell入口保留显式焦点授权、运行健康预检、Narrator安全生命周期和非零失败退出码。
 - 三轮、打断、取消后接续、PCM活动轨道、当前人物、live Canvas、Idle恢复和健康前后均由机器判断。
-- 人工判断Narrator五任务、嘴型是否实际变化、口型同步、嘴部自然、Idle自然及停止后体验；`mouth_motion_observed`不为真或任一自然度低于4/5直接失败。
+- 人工判断Narrator五任务、嘴型是否实际变化、开始/结束切换连续性及停止后体验；`mouth_motion_observed`不为真，或出现黑帧、冻结、遮罩、双人物、切换闪动均直接失败。口型同步、嘴部自然度与清晰度继续如实评分，但按项目所有者2026-10-07决议作为V2-X基线，不再单独阻断V1。
 - 报告只记录路由元数据、计数和布尔/评分，不保存原始音频、字幕或回答正文。
 - Windows Node与WSL Node核心单测均3/3通过；AC06R后安装合同11/11、制品准备器3/3、焦点保护、Node语法和PowerShell AST通过。
 - 2026-10-07当前全量不抢焦点回归：后端373 passed/7 skipped；根56 passed；Avatar16 passed；前端build、Playwright24 passed；取证核心3/3。
