@@ -25,4 +25,4 @@
 
 ## 出门决定
 
-人工门 PASS 后，允许为最终候选 revision 重新生成发布冻结清单、AC07 报告和脱敏人工门 JSON，并执行 `audit_v1_completion.py`。只有三个门在同一 revision 下同时 PASS，V1 才正式关闭。
+人工门 PASS 后，为最终候选 revision 重新生成发布冻结清单、AC07 报告和脱敏人工门 JSON，并执行 `audit_v1_completion.py`。三个门已经在同一 revision 下同时 PASS，V1 正式关闭。

@@ -1,7 +1,7 @@
 # V1FINAL 阶段结果
 
 **日期**：2026-10-07
-**结论**：AUTOMATION PASS / PROJECT OWNER HUMAN ACCEPTANCE PASS / FINAL REVISION REBINDING
+**结论**：PASS — AUTOMATION + PROJECT OWNER HUMAN ACCEPTANCE + AC07 + FINAL AGGREGATION
 
 ## 已完成
 
@@ -28,4 +28,4 @@
 .\ops\acceptance\Invoke-ACC1HumanGate.ps1 -AcceptFocusChange -Operator "验收人姓名"
 ```
 
-最终文档提交后，重新生成同revision的`audit/v1/ACC1/human-gate.json`、发布冻结清单与AC07报告；只有`audit_v1_completion.py`聚合结果为`PASS`，才正式关闭V1。
+最终候选已生成同revision的`audit/v1/ACC1/human-gate.json`、发布冻结清单与AC07报告，`audit_v1_completion.py`三门聚合结果为`PASS`，V1正式关闭。
