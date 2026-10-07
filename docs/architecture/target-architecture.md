@@ -33,7 +33,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 
 | 层 | 当前仓库事实 | V1 目标 | 状态 |
 |---|---|---|---|
-| 前端 | ConversationClient/MediaSession保持主链；UX13/14实现intro→idle→同场景实时Avatar→outro；首个live帧原子隐藏Idle | 同一时刻只显示一个人物表面；视觉序列不得接管实时音频/口型时钟；失败回退Idle/静态图 | 单表面机器PASS；多实体V2待开发 |
+| 前端 | ConversationClient/MediaSession保持主链；UX13～15实现intro→idle→同场景实时Avatar→outro、常驻Idle双缓冲与Canvas延迟清理 | 同一时刻只显示一个人物表面；视觉序列不得接管实时音频/口型时钟；失败回退Idle/静态图 | 单表面与无闪动自动门PASS；多实体V2待开发 |
 | API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
@@ -327,4 +327,4 @@ App Gateway（模块化单体）
 
 ### 16.4 阶段出门
 
-V2-X必须先通过V2X-AC01～07，V2-A才可开发。V2-A通过V2A-AC01～07后才可以宣称支持多形象、多空间、导入导出或可插拔记忆。任何人物/声音/记忆串用、未授权事实固化、插件越权或V1性能回退均为P0/P1停线项。
+V2-X必须先通过V2X-AC01～08，V2-A才可开发；其中AC07只能在X8完成后签署最终组合回归。V2-A通过V2A-AC01～07后才可以宣称支持多形象、多空间、导入导出或可插拔记忆。任何人物/声音/记忆串用、未授权事实固化、插件越权或V1性能回退均为P0/P1停线项。
