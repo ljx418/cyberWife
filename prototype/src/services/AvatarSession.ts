@@ -3,6 +3,7 @@
 export type AvatarConnectionState = "stopped" | "connecting" | "ready" | "static_fallback";
 
 export type AvatarSnapshot = {
+  avatarId: string;
   state: AvatarConnectionState;
   connectionGeneration: number;
   reconnectAttempts: number;
@@ -79,6 +80,7 @@ export class AvatarSessionController {
   private mediaTimes: number[] = [];
   private listeners = new Set<Listener>();
   private current: AvatarSnapshot = {
+    avatarId: this.avatarId,
     state: "stopped",
     connectionGeneration: 0,
     reconnectAttempts: 0,
@@ -122,8 +124,17 @@ export class AvatarSessionController {
   }
 
   async start(canvas?: HTMLCanvasElement, avatarId?: string): Promise<void> {
-    if (canvas) this.canvas = canvas;
-    if (avatarId && /^[A-Za-z0-9_-]{1,80}$/.test(avatarId)) this.avatarId = avatarId;
+    const requestedAvatarId = avatarId && /^[A-Za-z0-9_-]{1,80}$/.test(avatarId)
+      ? avatarId
+      : this.avatarId;
+    const avatarChanged = requestedAvatarId !== this.avatarId;
+    const requestedCanvas = canvas ?? this.canvas ?? undefined;
+    if (avatarChanged && this.active) {
+      await this.stop();
+    }
+    if (requestedCanvas) this.canvas = requestedCanvas;
+    this.avatarId = requestedAvatarId;
+    this.current = { ...this.current, avatarId: this.avatarId };
     if (!this.canvas) {
       this.canvas = document.createElement("canvas");
       this.canvas.hidden = true;
@@ -153,6 +164,7 @@ export class AvatarSessionController {
     this.conversationSessionId = null;
     this.current = {
       ...this.current,
+      avatarId: this.avatarId,
       state: "stopped",
       reconnectAttempts: 0,
       sessionId: null,

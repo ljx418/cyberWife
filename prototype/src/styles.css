@@ -156,15 +156,20 @@ select:focus-visible {
 .avatar-video[data-avatar-layer="live"] {
   opacity: 1;
 }
-.idle-avatar-video:has(~ .avatar-video[data-avatar-layer="live"]) {
+.idle-avatar-video:has(~ .avatar-video[data-presentation="complete-scene"][data-avatar-layer="live"]) {
   opacity: 0;
 }
-.experience[data-avatar-presentation="complete-scene"] .avatar-video {
+.avatar-video[data-presentation="complete-scene"] {
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   object-position: center center;
+}
+.experience:has(.idle-avatar-video--scene) .avatar-video[data-presentation="portrait"] {
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none;
 }
 .avatar-video[hidden] {
   display: block;

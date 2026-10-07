@@ -101,6 +101,7 @@ test('主舞台使用当前 active avatar 的循环 Idle，静态图只作兜底
 })
 
 test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle', async ({ page }) => {
+  let activeReads = 0
   await page.route('http://127.0.0.1:7860/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname
     const json = (body: unknown, status = 200) => route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) })
@@ -108,7 +109,10 @@ test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle
     if (path === '/api/v1/profile') return json({ detail: 'profile_not_found' }, 404)
     if (path === '/api/v1/health') return json({ status: 'ready', components: {}, resources: {}, version: {} })
     if (path === '/api/v1/assets/portrait') return json({ kind: 'portrait', items: [{ id: 22, is_active: true }] })
-    if (path === '/api/v1/avatar/active') return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-scene', source_sha256: 'active-source', status: 'active', frame_size: [768, 432] })
+    if (path === '/api/v1/avatar/active') {
+      activeReads += 1
+      return json({ id: 12, asset_id: 22, engine: 'wav2lip', avatar_id: 'active-scene', source_sha256: 'active-source', status: 'active', frame_size: [768, 432] })
+    }
     if (path === '/api/v1/avatar-builds/12/idle-generation') return json({
       derivative_id: 12, status: 'active', phase: 'complete', progress: 100,
       has_frontal_preview: true, has_video_preview: true,
@@ -146,6 +150,14 @@ test('人工批准的完整场景序列先播放开场再进入正脸循环 Idle
   await canvas.evaluate((element) => { (element as HTMLElement).dataset.avatarLayer = 'live' })
   await expect(idle).toHaveCSS('opacity', '0')
   await expect(canvas).toHaveCSS('width', `${stage.viewport}px`)
+  await canvas.evaluate((element) => {
+    (element as HTMLElement).dataset.presentation = 'portrait'
+  })
+  await expect(idle).toHaveCSS('opacity', '1')
+  await expect(canvas).toHaveCSS('visibility', 'hidden')
+  await expect(canvas).toHaveCSS('opacity', '0')
+  await page.getByRole('button', { name: '开始对话' }).click()
+  await expect.poll(() => activeReads).toBeGreaterThanOrEqual(2)
 })
 
 test('设置、记忆删除确认和主题切换可用', async ({ page }) => {
@@ -342,10 +354,18 @@ test('Avatar 停止或降级后透明画布让写真立即恢复而非黑屏', a
       opacity: canvas.style.opacity,
       layer: canvas.dataset.avatarLayer,
       state: controller.snapshot().state,
+      avatarId: controller.snapshot().avatarId,
+    }
+    await controller.start(canvas, 'wav2lip256_idle_p_newscene_scenev1')
+    const rebound = {
+      state: controller.snapshot().state,
+      avatarId: controller.snapshot().avatarId,
+      layer: canvas.dataset.avatarLayer,
     }
     await controller.stop()
     return {
       degraded,
+      rebound,
       stopped: {
         hidden: canvas.hidden,
         opacity: canvas.style.opacity,
@@ -355,6 +375,12 @@ test('Avatar 停止或降级后透明画布让写真立即恢复而非黑屏', a
     }
   })
   expect(result.degraded).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'static_fallback' })
+  expect(result.degraded.avatarId).toBe('wav2lip256_p_deadbeefdeadbeef')
+  expect(result.rebound).toMatchObject({
+    state: 'static_fallback',
+    avatarId: 'wav2lip256_idle_p_newscene_scenev1',
+    layer: 'static',
+  })
   expect(result.stopped).toMatchObject({ hidden: true, opacity: '0', layer: 'static', state: 'stopped' })
 })
 

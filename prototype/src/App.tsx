@@ -437,9 +437,52 @@ function App() {
     }
   }
 
+  const synchronizeConversationAvatar = async (): Promise<{
+    avatarId: string
+    singleSurfaceReady: boolean
+  }> => {
+    let active: Awaited<ReturnType<typeof ConversationClient.getActiveAvatar>>
+    try {
+      active = await ConversationClient.getActiveAvatar()
+    } catch {
+      setHasSingleSceneSurface(false)
+      return { avatarId: activeAvatarId, singleSurfaceReady: false }
+    }
+    setActiveAvatarId(active.avatar_id)
+    setActiveAvatarDerivativeId(active.id ?? null)
+    if (active.face_box && active.frame_size) {
+      const [y1, y2, x1, x2] = active.face_box
+      const [width, height] = active.frame_size
+      setAvatarFocus({ x: ((x1 + x2) / 2 / width) * 100, y: ((y1 + y2) / 2 / height) * 100 })
+    }
+    if (!active.id) {
+      setHasSingleSceneSurface(false)
+      return { avatarId: active.avatar_id, singleSurfaceReady: false }
+    }
+    let job: IdleGenerationJob
+    try {
+      job = await ConversationClient.getIdleGeneration(active.id)
+    } catch {
+      setHasSceneSequence(false)
+      setHasSingleSceneSurface(false)
+      return { avatarId: active.avatar_id, singleSurfaceReady: false }
+    }
+    setIdleJob(job)
+    const sequenceReady = job.status === 'active'
+      && job.has_sequence_previews === true
+      && job.has_intro_preview === true
+      && job.has_outro_preview === true
+    const singleSurfaceReady = sequenceReady
+      && job.single_surface_ready === true
+      && job.speaking_avatar_id === active.avatar_id
+    setHasSceneSequence(sequenceReady)
+    setHasSingleSceneSurface(singleSurfaceReady)
+    if (sequenceReady) setSequencePhase('idle')
+    return { avatarId: active.avatar_id, singleSurfaceReady }
+  }
+
   const startConversation = async () => {
     if (socketRef.current) return
-    if (hasSceneSequence) setSequencePhase('idle')
     setConversationError('')
     setUserTranscript('')
     setAssistantTranscript('')
@@ -447,6 +490,12 @@ function App() {
       const health = await ConversationClient.getHealth()
       if (health.status === 'error' || ['llm', 'asr', 'tts'].some((id) => health.components[id]?.status === 'error')) {
         throw new Error('核心本机服务尚未就绪，请先在运行状态中恢复')
+      }
+      const avatarBinding = await synchronizeConversationAvatar()
+      if (avatarCanvasRef.current) {
+        avatarCanvasRef.current.dataset.presentation = avatarBinding.singleSurfaceReady
+          ? 'complete-scene'
+          : 'portrait'
       }
       await MediaSession.start()
       const created = await ConversationClient.createSession(doNotRecord ? 'none' : 'standard')
@@ -460,7 +509,7 @@ function App() {
         socket.addEventListener('open', () => { window.clearTimeout(timeout); resolve() }, { once: true })
         socket.addEventListener('error', () => { window.clearTimeout(timeout); reject(new Error('本机会话连接失败')) }, { once: true })
       })
-      void AvatarSession.start(avatarCanvasRef.current ?? undefined, activeAvatarId)
+      void AvatarSession.start(avatarCanvasRef.current ?? undefined, avatarBinding.avatarId)
       await InputAudioSession.start({
         boundaryMode: () => conversationStateRef.current === 'speaking' ? 'barge_in' : 'normal',
         onUtteranceStart: () => {
