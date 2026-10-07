@@ -1,8 +1,8 @@
 # cyberWife V1 基线与 V2 演进目标架构
 
-**版本**：3.2
+**版本**：3.3
 **日期**：2026-10-07
-**状态**：UX14单场景说话表面已接入；Idle完整帧直接构建Wav2Lip说话数据，同一人物/背景/机位原子切换；AC-06A机器门通过，浏览器音画/自然度人工门仍阻断V1FINAL
+**状态**：V1目标架构已实现；单场景同一人物Idle/实时口型原子切换、AC-06A与项目所有者人工总验收均PASS，高清与口型自然度升级进入V2-X8
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -37,15 +37,15 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | API | 二进制音频、真实事件链、session/memory/health/asset/profile API均已实现；具体仓储、资产存储和日志只在组合根注入 | 保持合同稳定与单向依赖 | 已开发/ARCH1验收通过 |
 | 会话领域 | Session/Turn 六态、event_seq、持久化和迟到判断已实现 | 领域状态不持有 GPU task | 已开发/已验收 |
 | 实时编排 | 异步TurnPipeline、分句、媒体流水线、统一取消与generation清理已实现 | 保持有界队列和取消合同 | 已开发/已验收 |
-| VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发/机器验收；物理麦克风复验待签 |
+| VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发；机器与项目所有者人工验收PASS |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
-| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口，避免Mel批次误插静音 | AC-06A机器嘴部响应4/4通过；浏览器295ms播放预留后的音画同步、嘴部自然度仍须人工≥4/5 | 机器PASS；体验WAIT HUMAN |
+| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口，避免Mel批次误插静音 | AC-06A机器嘴部响应4/4及浏览器人工体验通过；进一步高清与自然度进入V2-X8 | V1 PASS；V2质量优化待开发 |
 | 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；UX14保留768×432完整Idle帧构建`scenev1`说话Avatar，不抠图、不叠第二人物 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | `scenev1`已active；同场景实时嘴部机器PASS |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
-| 验收 | V1FINAL现场报告绑定Git revision；AC09总门复算完整源码、依赖、前端和证据SHA，并校验现场/部署报告同提交；部署策略显式区分AC07同机隔离与AC06独立机 | 现场关闭UX6主观、结构化物理麦克风、人工Narrator | AC07当前revision报告PASS；仅现场人工报告待生成 |
+| 验收 | V1FINAL报告绑定Git revision；AC09总门复算完整源码、依赖、前端和证据SHA，并校验人工/部署报告同提交；部署策略显式区分AC07同机隔离与AC06独立机 | 保持失败关闭与脱敏归并 | 项目所有者人工PASS；最终revision三门重签后关闭 |
 
 ## 3. 目标代码实体
 
@@ -264,7 +264,7 @@ Mock 测试只能让实体进入“合同通过”，不能进入“已验收”
 
 ## 13. 架构出门条件
 
-架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14、AC-04A 与 AC-06A 全部通过、开放 P0/P1=0，且 B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1、RES1与INST1-AC07当前revision报告已关闭分层、资源和最低部署红项；实时口型AC-06A及完整现场人工门仍开放。INST1-AC06独立机复现为增强保证，不再是V1最低门。
+架构实现完成并不等于 V1 出门。只有 [`acceptance-plan.md`](../acceptance-plan.md) AC-01～AC-14、AC-04A 与 AC-06A 全部通过、开放 P0/P1=0，且 B0～B5 与 B2.5 证据完整，才允许标记 V1 Go。ARCH1、RES1、实时口型AC-06A、项目所有者人工总验收与INST1-AC07均已关闭对应红项；最终revision聚合PASS后正式标记V1完成。INST1-AC06独立机复现为增强保证，不是V1最低门。
 
 ## 14. B2.5 优化扩展
 
@@ -276,7 +276,7 @@ B2.5 不改变本架构的依赖方向。新增 `WarmResponsePolicy`、`WarmResp
 
 - B3（已实现）：Gateway 已切换全双工 session runtime，并通过统一取消与 generation fence 验收。
 - B4（已实现）：记忆、隐私、保留和 sqlite-vec 真实往返已落地；运行时不以 FTS-only 或内存 fallback 冒充 ready。
-- B5（已实现、出门门重开）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；分层、资源和AC07最低部署红项已关闭。实时口型AC-06A、人工Narrator、物理麦克风与主观体验未通过前不得出门。
+- B5（已实现并验收）：授权撤销、资产版本、默认入口、组合回归和目标机生命周期均已执行；分层、资源、AC07、实时口型与项目所有者人工总验收均通过。
 - 详细计划和真实门槛见 `stages/B3～B5`；可编辑总图为 `cyberWife-b3-b5-delivery-gap.drawio`。
 
 ## 16. V2 演进边界

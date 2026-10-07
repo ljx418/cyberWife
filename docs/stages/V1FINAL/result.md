@@ -1,7 +1,7 @@
 # V1FINAL 阶段结果
 
 **日期**：2026-10-07
-**结论**：AC-06A + UX15 MACHINE PASS / HUMAN TOTAL ACCEPTANCE PENDING
+**结论**：AUTOMATION PASS / PROJECT OWNER HUMAN ACCEPTANCE PASS / FINAL REVISION REBINDING
 
 ## 已完成
 
@@ -18,9 +18,9 @@
 - PRD、架构、计划、验收、追踪矩阵、命令清单、全局状态和8页Draw.io已同步当前事实。
 - 修复Avatar实时PCM 20ms到包与10ms出队超时不匹配导致的伪静音插入；当前active avatar四段真实CosyVoice样本嘴部响应比1.132～1.279，黑帧/冻结/传输丢帧均为0，机器嘴部响应门4/4通过。
 
-## 尚未执行
+## 人工总验收
 
-本轮按约定没有擅自打开Chrome/Narrator或采集物理麦克风。AC-06A的“当前人物说话期嘴部实际响应”机器子门已经关闭；浏览器端音画同步、嘴部自然度、物理麦克风和Narrator仍必须由结构化人工总验收签署。直连Avatar相关性没有浏览器295ms播放预留，不用于冒签最终同步度。执行headed Chrome前仍需明确通知用户电脑焦点将被占用。全新Windows用户+干净WSL的AC06保留为增强项，AC07不会冒充它。
+项目所有者于2026-10-07按最终HTML报告完成实际交互体验，并明确确认人工验收通过。该结论关闭物理麦克风、听感、真人打断、同一人物口型、连续三次启停与停止后Idle等V1主观门；未提供更细评分的项目只按4/5最低通过边界记录，不推定更高质量。完整记录见[`human-acceptance.md`](human-acceptance.md)。全新Windows用户+干净WSL的AC06仍为增强项，AC07不会冒充它；高清与嘴部自然度提升转入V2-X8。
 
 ## 现场命令
 
@@ -28,4 +28,4 @@
 .\ops\acceptance\Invoke-ACC1HumanGate.ps1 -AcceptFocusChange -Operator "验收人姓名"
 ```
 
-只有`audit/v1/ACC1/human-gate.json`总结果为`PASS`且命令退出码为0，才可关闭ACC1与UX6现场门。
+最终文档提交后，重新生成同revision的`audit/v1/ACC1/human-gate.json`、发布冻结清单与AC07报告；只有`audit_v1_completion.py`聚合结果为`PASS`，才正式关闭V1。
