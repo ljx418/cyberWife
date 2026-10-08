@@ -8,6 +8,13 @@ from pathlib import Path
 from typing import Any
 
 
+V2X_FEATURE_FLAGS = (
+    "contracts", "input_calibration", "lifecycle_recovery", "output_controls",
+    "pwa", "source_pack", "stage_composition", "scene_presets", "micro_actions",
+    "visual_claims", "memory_workbench", "hd_talking", "quality_governor", "voice_styles",
+)
+
+
 def _merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
     merged = dict(base)
     for key, value in override.items():
@@ -44,4 +51,16 @@ def load_runtime_config(repo_root: Path, config_path: Path | None = None) -> dic
     for key, value in list(config.get("paths", {}).items()):
         if isinstance(value, str):
             config["paths"][key] = normalize_local_path(value)
+    feature_flags = config.get("v2x", {})
+    if not isinstance(feature_flags, dict):
+        raise ValueError("v2x configuration must be a table")
+    unknown = set(feature_flags) - set(V2X_FEATURE_FLAGS)
+    if unknown:
+        raise ValueError(f"unknown v2x feature flags: {sorted(unknown)}")
+    for name in V2X_FEATURE_FLAGS:
+        value = feature_flags.get(name, name == "contracts")
+        if not isinstance(value, bool):
+            raise ValueError(f"v2x.{name} must be boolean")
+        feature_flags[name] = value
+    config["v2x"] = feature_flags
     return config

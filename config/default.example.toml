@@ -86,3 +86,20 @@ webrtc_ice_servers   = []
 [streaming]
 # B2.5-O2 可逆A/B；4..18，未完成真实确认前保持10。
 first_playable_min_chars = 10
+
+[v2x]
+# X0只启用合同读取；其余能力必须在各自阶段验收后逐项开启。
+contracts          = true
+input_calibration  = false
+lifecycle_recovery = false
+output_controls    = false
+pwa                = false
+source_pack        = false
+stage_composition  = false
+scene_presets      = false
+micro_actions      = false
+visual_claims      = false
+memory_workbench   = false
+hd_talking         = false
+quality_governor   = false
+voice_styles       = false
