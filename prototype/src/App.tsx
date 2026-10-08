@@ -7,7 +7,7 @@ import type {
   ThemeMode,
   VisualVariant,
 } from './types'
-import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type ScenePresetCatalog, type SourceAngle, type SourcePack, type WsEnvelope } from './services/ConversationClient'
+import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type ScenePreset, type ScenePresetCatalog, type SourceAngle, type SourcePack, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession, type InputCalibration, type InputDevice, type InputMode } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { PwaBridge } from './services/PwaBridge'
@@ -167,6 +167,7 @@ function App() {
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
   const deleteReturnFocusRef = useRef<HTMLElement | null>(null)
   const avatarCanvasRef = useRef<HTMLCanvasElement>(null)
+  const idleVideoRef = useRef<HTMLVideoElement>(null)
   const conversationStateRef = useRef<ConversationState>('idle')
   const socketRef = useRef<WebSocket | null>(null)
   const sessionRef = useRef<string | null>(null)
@@ -258,6 +259,23 @@ function App() {
   }, [outputFeatureEnabled])
 
   useEffect(() => {
+    if (!scenePresetFeatureEnabled) return
+    let cancelled = false
+    void ConversationClient.getScenePresets().then((catalog) => {
+      if (cancelled) return
+      setScenePresetCatalog(catalog)
+      const active = catalog.items.find((item) => item.scene_id === catalog.active_scene_id)
+      if (active) {
+        setBackgroundId(active.slug)
+        setActiveAvatarId(active.speaking_avatar_id || activeAvatarId)
+        setHasSceneSequence(false)
+        setHasSingleSceneSurface(Boolean(active.speaking_avatar_id && active.idle_url))
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [scenePresetFeatureEnabled])
+
+  useEffect(() => {
     if (!pwaFeatureEnabled) {
       void PwaBridge.configure(false)
       return
@@ -330,6 +348,10 @@ function App() {
       const active = response.items.find((item) => Boolean(item.is_active))
       if (active) setActivePortraitRevision(Number(active.id) || Date.now())
       if (avatar.avatar_id) setActiveAvatarId(avatar.avatar_id)
+      if (avatar.scene_id && avatar.single_surface_ready) {
+        setHasSceneSequence(false)
+        setHasSingleSceneSurface(true)
+      }
       if (avatar.id) {
         setActiveAvatarDerivativeId(avatar.id)
         void ConversationClient.getIdleGeneration(avatar.id)
@@ -557,6 +579,11 @@ function App() {
       const [y1, y2, x1, x2] = active.face_box
       const [width, height] = active.frame_size
       setAvatarFocus({ x: ((x1 + x2) / 2 / width) * 100, y: ((y1 + y2) / 2 / height) * 100 })
+    }
+    if (active.scene_id && active.single_surface_ready) {
+      setHasSceneSequence(false)
+      setHasSingleSceneSurface(true)
+      return { avatarId: active.avatar_id, singleSurfaceReady: true }
     }
     if (!active.id) {
       setHasSingleSceneSurface(false)
@@ -941,14 +968,18 @@ function App() {
     ? ConversationClient.activeAssetUrl('portrait', activePortraitRevision)
     : null
   const activeBackground = sceneBackgrounds.find((item) => item.id === backgroundId) ?? sceneBackgrounds[0]
-  const activeIdleVideoUrl = activeAvatarDerivativeId !== null
+  const activeScenePreset = scenePresetCatalog?.items.find((item) => item.scene_id === scenePresetCatalog.active_scene_id)
+  const activeSceneIdleUrl = activeScenePreset
+    ? ConversationClient.sceneIdleUrl(activeScenePreset, scenePresetCatalog?.revision || 0)
+    : null
+  const activeIdleVideoUrl = activeSceneIdleUrl || (activeAvatarDerivativeId !== null
     && idleJob?.derivative_id === activeAvatarDerivativeId
     && idleJob.status === 'active'
     && idleJob.has_video_preview
       ? idleJob.has_scene_previews && idleJob.scene_ids?.includes(activeBackground.id)
         ? ConversationClient.idleScenePreviewUrl(activeAvatarDerivativeId, activeBackground.id, idleJob.updated_at)
         : ConversationClient.idlePreviewUrl(activeAvatarDerivativeId, 'video', idleJob.updated_at)
-      : null
+      : null)
   const sequenceOverlayVideoUrl = hasSceneSequence
     && (sequencePhase === 'intro' || sequencePhase === 'outro')
     && activeAvatarDerivativeId !== null
@@ -998,6 +1029,7 @@ function App() {
       />
       {activeIdleVideoUrl && (
         <video
+          ref={idleVideoRef}
           key={activeIdleVideoUrl}
           className={`idle-avatar-video ${hasSceneSequence ? 'idle-avatar-video--scene' : ''} ${idleVideoReady ? 'idle-avatar-video--ready' : ''}`}
           data-testid="idle-avatar-video"
@@ -1140,25 +1172,26 @@ function App() {
           <strong>{voiceButtonLabel}</strong>
           <span>{conversationState === 'idle' ? '点击后进入连续聆听' : '真实本机语音会话'}</span>
         </div>
-        {outputFeatureEnabled && (
-          <div className="output-controls" role="group" aria-label="声音输出控制">
-            <button type="button" aria-label={outputMuted ? '取消静音' : '静音'} onClick={() => setOutputMuted((value) => !value)}>{outputMuted ? '取消静音' : '静音'}</button>
-            <label>音量
-              <input aria-label="输出音量" type="range" min="0" max="1" step="0.05" value={outputVolume} onChange={(event) => setOutputVolume(Number(event.target.value))} />
-            </label>
-            <button type="button" onClick={async () => { const replayed = await MediaSession.replayCurrent(); setLifecycleNotice(replayed ? '正在重播本次回答。' : '当前没有可重播的回答。') }}>重播本次回答</button>
-            {outputDevices.length > 0 && <label>扬声器
-              <select aria-label="输出设备" defaultValue="" onChange={async (event) => {
-                if (!event.target.value) return
-                try {
-                  const result = await MediaSession.setOutputDevice(event.target.value)
-                  setLifecycleNotice(result === 'selected' ? '输出设备已切换。' : '当前浏览器不支持选择输出设备。')
-                } catch (error) { setLifecycleNotice(`输出设备切换失败：${String(error)}`) }
-              }}><option value="">系统默认</option>{outputDevices.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select>
-            </label>}
-          </div>
-        )}
       </section>
+
+      {outputFeatureEnabled && (
+        <div className="output-controls" role="group" aria-label="声音输出控制">
+          <button type="button" aria-label={outputMuted ? '取消静音' : '静音'} onClick={() => setOutputMuted((value) => !value)}>{outputMuted ? '取消静音' : '静音'}</button>
+          <label>音量
+            <input aria-label="输出音量" type="range" min="0" max="1" step="0.05" value={outputVolume} onChange={(event) => setOutputVolume(Number(event.target.value))} />
+          </label>
+          <button type="button" onClick={async () => { const replayed = await MediaSession.replayCurrent(); setLifecycleNotice(replayed ? '正在重播本次回答。' : '当前没有可重播的回答。') }}>重播本次回答</button>
+          {outputDevices.length > 0 && <label>扬声器
+            <select aria-label="输出设备" defaultValue="" onChange={async (event) => {
+              if (!event.target.value) return
+              try {
+                const result = await MediaSession.setOutputDevice(event.target.value)
+                setLifecycleNotice(result === 'selected' ? '输出设备已切换。' : '当前浏览器不支持选择输出设备。')
+              } catch (error) { setLifecycleNotice(`输出设备切换失败：${String(error)}`) }
+            }}><option value="">系统默认</option>{outputDevices.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select>
+          </label>}
+        </div>
+      )}
 
       {inputFeatureEnabled && inputMode === 'push_to_talk' && !['idle', 'error'].includes(conversationState) && (
         <button
@@ -1279,6 +1312,37 @@ function App() {
           sourcePack={sourcePack}
           scenePresetFeatureEnabled={scenePresetFeatureEnabled}
           scenePresetCatalog={scenePresetCatalog}
+          sceneSwitchAllowed={['idle', 'listening', 'interrupted'].includes(conversationState)}
+          onActivateScene={async (scene) => {
+            if (!scenePresetCatalog || !scene.can_activate || !scene.speaking_avatar_id || !scene.idle_url) return
+            if (!['idle', 'listening', 'interrupted'].includes(conversationStateRef.current)) {
+              setSettingsStatus('请等待当前回答结束后再切换场景')
+              return
+            }
+            setSettingsStatus(`正在切换到${scene.label}…`)
+            try {
+              const catalog = await ConversationClient.activateScene(scene.scene_id, scenePresetCatalog.revision)
+              const active = catalog.items.find((item) => item.scene_id === catalog.active_scene_id)
+              if (!active?.speaking_avatar_id || !active.idle_url) throw new Error('场景动态素材不完整')
+              setIdleVideoReady(false)
+              setScenePresetCatalog(catalog)
+              setBackgroundId(active.slug)
+              setActiveAvatarId(active.speaking_avatar_id)
+              setHasSceneSequence(false)
+              setHasSingleSceneSurface(true)
+              if (socketRef.current) {
+                const deadline = Date.now() + 3000
+                while (Date.now() < deadline && (idleVideoRef.current?.readyState || 0) < 3) {
+                  await new Promise((resolve) => window.setTimeout(resolve, 50))
+                }
+                await AvatarSession.start(avatarCanvasRef.current ?? undefined, active.speaking_avatar_id)
+              }
+              setSettingsStatus(`已切换到${active.label}；当前对话保持连接`)
+            } catch (error) {
+              try { setScenePresetCatalog(await ConversationClient.getScenePresets()) } catch { /* keep last visible state */ }
+              setSettingsStatus(`场景未切换：${String(error)}`)
+            }
+          }}
           onUploadSource={async (file, angle, appearanceLabel) => {
             setSettingsStatus(`正在导入 ${file.name}…`)
             try {
@@ -1710,6 +1774,8 @@ interface SettingsDrawerProps {
   sourcePack: SourcePack
   scenePresetFeatureEnabled: boolean
   scenePresetCatalog: ScenePresetCatalog | null
+  sceneSwitchAllowed: boolean
+  onActivateScene: (scene: ScenePreset) => Promise<void>
   onUploadSource: (file: File, angle: SourceAngle, appearanceLabel: string) => Promise<void>
   stageCompositionFeatureEnabled: boolean
   compositionMode: CompositionMode
@@ -1842,13 +1908,24 @@ function SettingsDrawer(props: SettingsDrawerProps) {
               <SectionHeader index="01" title="人物形象" description="新文件先由本机校验并创建版本，成功后原子激活；上一可用版本始终可恢复。" />
               <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><button className="secondary-button" type="button" onClick={async () => { try { const restored = await ConversationClient.restoreAsset('portrait') as AvatarBuild; props.onPortraitRestored(restored); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
               <hr />
-              <SectionHeader index="02" title="相处空间" description={props.scenePresetFeatureEnabled ? '场景已登记到本机目录；动态素材通过人工质量门后才会开放会话内切换。' : '背景与人物独立保存在本机；当前为V1本地预览选择。'} />
+              <SectionHeader index="02" title="相处空间" description={props.scenePresetFeatureEnabled ? '只显示已通过完整场景质量门的动态空间；切换不会重置当前对话。' : '背景与人物独立保存在本机；当前为V1本地预览选择。'} />
               {props.scenePresetFeatureEnabled ? (
                 <div className="background-grid" aria-label="本机场景目录" data-testid="scene-preset-catalog">
                   {(props.scenePresetCatalog?.items || []).map((scene) => (
-                    <article className="background-card scene-preset-card" key={scene.scene_id} data-scene-id={scene.scene_id}>
+                    <article className={`background-card scene-preset-card ${scene.quality_status === 'active' ? 'is-active' : ''}`} key={scene.scene_id} data-scene-id={scene.scene_id}>
                       <img src={scene.preview_url} alt="" />
-                      <span><strong>{scene.label}</strong><small>{scene.description}</small><em>动态素材待准备 · SHA {scene.asset_sha256.slice(0, 10)}</em></span>
+                      <span>
+                        <strong>{scene.label}</strong><small>{scene.description}</small>
+                        <em>{scene.quality_status === 'active' ? '当前空间' : scene.can_activate ? '动态素材已批准' : '动态素材待准备'} · SHA {scene.asset_sha256.slice(0, 10)}</em>
+                        <button
+                          className="scene-activate-button"
+                          type="button"
+                          disabled={!scene.can_activate || scene.quality_status === 'active' || !props.sceneSwitchAllowed}
+                          onClick={() => void props.onActivateScene(scene)}
+                        >
+                          {scene.quality_status === 'active' ? '正在使用' : !scene.can_activate ? '尚不可用' : props.sceneSwitchAllowed ? '切换到这里' : '回答结束后可切换'}
+                        </button>
+                      </span>
                     </article>
                   ))}
                   {!props.scenePresetCatalog && <div className="empty-state"><strong>正在读取场景目录</strong><span>不会在素材未批准前开放切换。</span></div>}

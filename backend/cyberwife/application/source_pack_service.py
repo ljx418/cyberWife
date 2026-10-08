@@ -146,3 +146,68 @@ class SourcePackService:
             expected_revision=current.revision,
             staged_sha256=staged_sha256,
         )
+
+    def register_renditions(self, renditions: list[dict]) -> SourcePackManifest:
+        """Replace the trusted rendition catalog idempotently using manifest CAS."""
+        current = self._repository.load()
+        if current is None:
+            raise ValueError("source_pack.required")
+        normalized = sorted(
+            ({
+                "rendition_id": str(item["rendition_id"]),
+                "kind": str(item["kind"]),
+                "source_ids": sorted(str(value) for value in item["source_ids"]),
+                "scene_id": str(item["scene_id"]),
+                "status": str(item["status"]),
+                "sha256": str(item["sha256"]).lower(),
+            } for item in renditions),
+            key=lambda item: item["rendition_id"],
+        )
+        existing = sorted(
+            ({**item, "source_ids": sorted(item["source_ids"])} for item in current.payload["renditions"]),
+            key=lambda item: item["rendition_id"],
+        )
+        if existing == normalized:
+            return current
+        payload = current.to_dict()
+        payload["revision"] = current.revision + 1
+        payload["renditions"] = normalized
+        manifest = SourcePackManifest.from_dict(payload)
+        staged_sha256 = self._repository.stage(manifest)
+        return self._repository.commit(
+            expected_revision=current.revision,
+            staged_sha256=staged_sha256,
+        )
+
+    def activate_scene(self, scene_id: str, *, expected_revision: int) -> SourcePackManifest:
+        """Atomically select a scene only when approved idle and talking assets exist."""
+        current = self._repository.load()
+        if current is None:
+            raise ValueError("source_pack.required")
+        if current.revision != expected_revision:
+            from cyberwife.ports.assets import ManifestRevisionConflict
+            raise ManifestRevisionConflict(
+                f"expected revision {expected_revision}, current revision {current.revision}"
+            )
+        if scene_id not in {item["scene_id"] for item in current.payload["scenes"]}:
+            raise ValueError("scene.not_found")
+        approved = {
+            item["kind"] for item in current.payload["renditions"]
+            if item["scene_id"] == scene_id and item["status"] in {"approved", "active"}
+        }
+        if not {"idle", "talking"}.issubset(approved):
+            raise ValueError("scene.renditions_incomplete")
+        if current.payload.get("active_scene_id") == scene_id:
+            return current
+        payload = current.to_dict()
+        payload["revision"] = current.revision + 1
+        payload["active_scene_id"] = scene_id
+        for item in payload["renditions"]:
+            if item["kind"] in {"idle", "talking"}:
+                item["status"] = "active" if item["scene_id"] == scene_id else "approved"
+        manifest = SourcePackManifest.from_dict(payload)
+        staged_sha256 = self._repository.stage(manifest)
+        return self._repository.commit(
+            expected_revision=current.revision,
+            staged_sha256=staged_sha256,
+        )

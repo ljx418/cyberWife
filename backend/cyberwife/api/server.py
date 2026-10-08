@@ -158,6 +158,8 @@ def main() -> None:
     scene_preset_service = ScenePresetService(
         source_pack_service,
         repo_root / "prototype" / "public" / "backgrounds",
+        binding_root=data_root / "v2x" / "scene-renditions",
+        avatar_root=data_root / "avatar" / "avatars",
     )
     avatar_asset_service = AvatarAssetService(
         repo,

@@ -91,6 +91,9 @@ export interface AvatarBuild {
   frame_size?: [number, number] | null;
   face_box?: [number, number, number, number] | null;
   error_code?: string | null;
+  scene_id?: string | null;
+  idle_url?: string | null;
+  single_surface_ready?: boolean;
 }
 
 export interface IdleGenerationJob {
@@ -151,6 +154,8 @@ export interface ScenePreset {
   safe_area: { left: number; top: number; right: number; bottom: number };
   quality_status: "preview_only" | "approved" | "active";
   can_activate: boolean;
+  idle_url: string | null;
+  speaking_avatar_id: string | null;
 }
 
 export interface ScenePresetCatalog {
@@ -236,6 +241,12 @@ export const ConversationClient = {
   async getAssets(kind: "portrait" | "voice") { return request<{ kind: string; items: Array<Record<string, unknown>> }>("GET", `/api/v1/assets/${kind}`); },
   async getSourcePack() { return request<SourcePack>("GET", "/api/v1/source-pack"); },
   async getScenePresets() { return request<ScenePresetCatalog>("GET", "/api/v1/scene-presets"); },
+  async activateScene(sceneId: string, expectedRevision: number) {
+    return request<ScenePresetCatalog>("POST", `/api/v1/scene-presets/${encodeURIComponent(sceneId)}/activate`, { expected_revision: expectedRevision });
+  },
+  sceneIdleUrl(scene: ScenePreset, revision: number) {
+    return scene.idle_url ? `${GATEWAY_BASE}${scene.idle_url}?v=${revision}` : null;
+  },
   async uploadSource(file: File, angle: SourceAngle, appearanceLabel: string) {
     const body = new FormData();
     body.append("file", file, file.name);

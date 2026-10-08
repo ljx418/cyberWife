@@ -619,6 +619,42 @@ class ApiGateway:
             except ValueError as exc:
                 raise HTTPException(status_code=422, detail=str(exc))
 
+        @app.post("/api/v1/scene-presets/{scene_id}/activate")
+        async def activate_scene_preset(scene_id: str, payload: dict):
+            if not self._experience_flags.get("scene_presets") or self._scene_preset_service is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            expected_revision = payload.get("expected_revision")
+            if not isinstance(expected_revision, int) or isinstance(expected_revision, bool):
+                raise HTTPException(status_code=422, detail="scene.expected_revision_required")
+            try:
+                return await asyncio.to_thread(
+                    self._scene_preset_service.activate,
+                    scene_id,
+                    expected_revision=expected_revision,
+                )
+            except ManifestRevisionConflict:
+                raise HTTPException(status_code=409, detail="asset.version_conflict")
+            except FileNotFoundError as exc:
+                raise HTTPException(status_code=503, detail=str(exc))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+
+        @app.get("/api/v1/scene-presets/{scene_id}/idle")
+        async def get_scene_idle(scene_id: str):
+            if not self._experience_flags.get("scene_presets") or self._scene_preset_service is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            try:
+                target = await asyncio.to_thread(self._scene_preset_service.idle_path, scene_id)
+            except FileNotFoundError:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
+            return FileResponse(
+                target,
+                media_type="video/mp4",
+                headers={"Cache-Control": "no-store, private"},
+            )
+
         @app.post("/api/v1/source-pack/sources")
         async def add_source_pack_source(
             file: UploadFile = File(...),
@@ -879,6 +915,10 @@ class ApiGateway:
         async def get_active_avatar():
             if self._avatar_asset_service is None or not self._repository:
                 raise HTTPException(status_code=503, detail="health.component_unavailable")
+            if self._experience_flags.get("scene_presets") and self._scene_preset_service is not None:
+                scene_avatar = await asyncio.to_thread(self._scene_preset_service.active_avatar)
+                if scene_avatar is not None:
+                    return scene_avatar
             row = await asyncio.to_thread(self._repository.get_active_avatar_derivative)
             if row is None:
                 return {
