@@ -40,6 +40,10 @@ models/
 *.jpg
 *.jpeg
 *.png
+!prototype/public/icons/cyberwife-192.png
+!prototype/public/icons/cyberwife-512.png
+!prototype/dist/icons/cyberwife-192.png
+!prototype/dist/icons/cyberwife-512.png
 
 # ── 本机路径与隐私文件（model-manifest §2 明确禁止 Git）──
 # 私有绝对路径、本机密码、HSM 盐值
