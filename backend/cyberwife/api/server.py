@@ -340,6 +340,7 @@ def main() -> None:
         shutdown_hooks=(pipeline.close, media_pipeline.close),
         avatar_asset_service=avatar_asset_service,
         privacy_cache_clear=getattr(tts, "clear_private_cache", None),
+        experience_flags=runtime.get("v2x", {}),
     )
     app = gateway.build_app()
 

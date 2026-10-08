@@ -163,6 +163,9 @@ export const ConversationClient = {
   async getHealth(): Promise<HealthResponse> {
     return request("GET", "/api/v1/health");
   },
+  async getExperienceSettings() {
+    return request<{ schema_version: 1; features: Record<string, boolean> }>("GET", "/api/v1/experience/settings");
+  },
   async retryComponent(component: string) { return request("POST", `/api/v1/health/${encodeURIComponent(component)}/retry`); },
   async recoverAll() { return request("POST", "/api/v1/launcher/recover", { component: "all" }); },
 

@@ -59,11 +59,12 @@ def with_revision(value: SourcePackManifest, revision: int) -> SourcePackManifes
     return SourcePackManifest.from_dict(payload)
 
 
-def test_default_flags_only_enable_contracts():
+def test_default_flags_only_enable_accepted_stages():
     config = load_runtime_config(REPO_ROOT, REPO_ROOT / "config" / "not-present.toml")
     assert set(config["v2x"]) == set(V2X_FEATURE_FLAGS)
     assert config["v2x"]["contracts"] is True
-    assert all(not value for key, value in config["v2x"].items() if key != "contracts")
+    assert config["v2x"]["input_calibration"] is True
+    assert all(not value for key, value in config["v2x"].items() if key not in {"contracts", "input_calibration"})
 
 
 @pytest.mark.parametrize("toml", ["[v2x]\nsource_pack='yes'\n", "[v2x]\nunknown=true\n"])

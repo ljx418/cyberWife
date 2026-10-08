@@ -52,6 +52,24 @@ def test_health_endpoint(client):
     assert body["version"]["app"].startswith("cyberwife-")
 
 
+def test_experience_settings_exposes_only_capability_flags(tmp_path):
+    repo_root = Path(__file__).resolve().parents[3]
+    registry = ModelRegistry(repo_root)
+    app = ApiGateway(
+        registry,
+        HealthAggregator(registry),
+        experience_flags={"contracts": True, "input_calibration": True},
+    ).build_app()
+    response = TestClient(app).get("/api/v1/experience/settings")
+    assert response.status_code == 200
+    assert response.json() == {
+        "schema_version": 1,
+        "features": {"contracts": True, "input_calibration": True},
+    }
+    serialized = response.text.lower()
+    assert "path" not in serialized and "device" not in serialized and "memory" not in serialized
+
+
 def test_health_components_have_required_fields(client):
     c, _ = client
     r = c.get("/api/v1/health")

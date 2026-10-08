@@ -8,7 +8,7 @@ export type ConversationState =
 
 export type ThemeMode = 'cinematic-dark' | 'soft-light' | 'system'
 export type VisualVariant = 'cinematic' | 'quiet' | 'signal'
-export type SettingsTab = 'profile' | 'voice' | 'persona' | 'memory' | 'privacy' | 'runtime'
+export type SettingsTab = 'profile' | 'voice' | 'input' | 'persona' | 'memory' | 'privacy' | 'runtime'
 
 export interface MemoryRecord {
   id: string

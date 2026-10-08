@@ -97,6 +97,7 @@ class ApiGateway:
         static_root: Path | None = None,
         avatar_asset_service=None,
         privacy_cache_clear=None,
+        experience_flags: dict[str, bool] | None = None,
     ) -> None:
         self._registry = registry
         self._aggregator = aggregator
@@ -111,6 +112,7 @@ class ApiGateway:
         self._shutdown_hooks = tuple(shutdown_hooks or ())
         self._avatar_asset_service = avatar_asset_service
         self._privacy_cache_clear = privacy_cache_clear
+        self._experience_flags = {key: bool(value) for key, value in (experience_flags or {}).items()}
         self._asset_store = asset_store
         self._static_root = Path(static_root) if static_root else Path(__file__).resolve().parents[3] / "prototype" / "dist"
         self._session_runtimes: dict[int, SessionRuntime] = {}
@@ -231,6 +233,11 @@ class ApiGateway:
         @app.get("/api/v1/health")
         async def health() -> dict:
             return self._aggregator.snapshot()
+
+        @app.get("/api/v1/experience/settings")
+        async def experience_settings() -> dict:
+            """Public capability flags only; private user settings never enter this response."""
+            return {"schema_version": 1, "features": dict(sorted(self._experience_flags.items()))}
 
         @app.post("/api/v1/internal/probe/tts")
         async def probe_loaded_tts() -> dict:

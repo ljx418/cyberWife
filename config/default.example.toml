@@ -88,9 +88,9 @@ webrtc_ice_servers   = []
 first_playable_min_chars = 10
 
 [v2x]
-# X0只启用合同读取；其余能力必须在各自阶段验收后逐项开启。
+# 只启用已经通过对应自动化阶段门的能力；其余能力继续关闭。
 contracts          = true
-input_calibration  = false
+input_calibration  = true
 lifecycle_recovery = false
 output_controls    = false
 pwa                = false

@@ -8,7 +8,7 @@ import type {
   VisualVariant,
 } from './types'
 import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
-import { InputAudioSession } from './services/InputAudioSession'
+import { InputAudioSession, type InputCalibration, type InputDevice, type InputMode } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { AvatarSession } from './services/AvatarSession'
 
@@ -146,6 +146,13 @@ function App() {
   const [userTranscript, setUserTranscript] = useState('')
   const [assistantTranscript, setAssistantTranscript] = useState('')
   const [conversationError, setConversationError] = useState('')
+  const [inputFeatureEnabled, setInputFeatureEnabled] = useState(false)
+  const [inputMode, setInputMode] = useState<InputMode>('automatic')
+  const [inputDevices, setInputDevices] = useState<InputDevice[]>([])
+  const [selectedInputDeviceId, setSelectedInputDeviceId] = useState<string | null>(null)
+  const [inputCalibration, setInputCalibration] = useState<InputCalibration | null>(null)
+  const [manualInputThreshold, setManualInputThreshold] = useState(0.018)
+  const [inputCalibrating, setInputCalibrating] = useState(false)
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
   const deleteReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -189,8 +196,8 @@ function App() {
 
   useEffect(() => {
     let active = true
-    void Promise.all([ConversationClient.getOnboardingDraft(), ConversationClient.getProfile(), ConversationClient.getHealth()])
-      .then(([draft, profile, health]) => {
+    void Promise.all([ConversationClient.getOnboardingDraft(), ConversationClient.getProfile(), ConversationClient.getHealth(), ConversationClient.getExperienceSettings().catch(() => ({ schema_version: 1 as const, features: {} as Record<string, boolean> }))])
+      .then(([draft, profile, health, experience]) => {
         if (!active) return
         setConsentChecked(draft.consent_granted)
         setOnboardingStep(Math.min(4, Math.max(0, draft.step_completed)))
@@ -204,6 +211,7 @@ function App() {
           if (typeof profileDraft.persona === 'string') setPersonaText(profileDraft.persona)
         }
         if (typeof draft.settings_json?.voice_transcript === 'string') setVoiceTranscript(draft.settings_json.voice_transcript)
+        setInputFeatureEnabled(experience.features.input_calibration === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
           status: toRuntimeStatus(item.status),
@@ -213,6 +221,39 @@ function App() {
       })
       .catch((error) => { if (active) setOnboardingStatus(`读取失败：${String(error)}`) })
     return () => { active = false }
+  }, [])
+
+  useEffect(() => {
+    InputAudioSession.configure({
+      mode: inputMode,
+      deviceId: selectedInputDeviceId,
+      manualThreshold: manualInputThreshold,
+      calibration: inputCalibration,
+    })
+  }, [inputMode, selectedInputDeviceId, manualInputThreshold, inputCalibration])
+
+  useEffect(() => {
+    if (!inputFeatureEnabled || !settingsOpen || settingsTab !== 'input') return
+    let cancelled = false
+    void InputAudioSession.listDevices()
+      .then((items) => { if (!cancelled) setInputDevices(items) })
+      .catch((error) => { if (!cancelled) setSettingsStatus(`无法枚举麦克风：${String(error)}`) })
+    return () => { cancelled = true }
+  }, [inputFeatureEnabled, settingsOpen, settingsTab])
+
+  useEffect(() => {
+    const release = () => InputAudioSession.setPushToTalk(false)
+    const onVisibility = () => { if (document.hidden) release() }
+    window.addEventListener('blur', release)
+    window.addEventListener('pointerup', release)
+    window.addEventListener('pointercancel', release)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('blur', release)
+      window.removeEventListener('pointerup', release)
+      window.removeEventListener('pointercancel', release)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
   }, [])
 
   useEffect(() => {
@@ -556,6 +597,11 @@ function App() {
           setConversationError(error.message)
           setConversationState('error')
         },
+      }, {
+        mode: inputFeatureEnabled ? inputMode : 'automatic',
+        deviceId: inputFeatureEnabled ? selectedInputDeviceId : null,
+        manualThreshold: manualInputThreshold,
+        calibration: inputCalibration,
       })
       setConversationState('listening')
       ;(window as typeof window & { __CYBERWIFE_SESSION__?: unknown }).__CYBERWIFE_SESSION__ = {
@@ -971,6 +1017,19 @@ function App() {
         </div>
       </section>
 
+      {inputFeatureEnabled && inputMode === 'push_to_talk' && !['idle', 'error'].includes(conversationState) && (
+        <button
+          className="push-to-talk"
+          type="button"
+          aria-label="按住说话"
+          onPointerDown={(event) => { event.currentTarget.setPointerCapture(event.pointerId); InputAudioSession.setPushToTalk(true) }}
+          onPointerUp={() => InputAudioSession.setPushToTalk(false)}
+          onPointerCancel={() => InputAudioSession.setPushToTalk(false)}
+          onKeyDown={(event) => { if (!event.repeat && (event.key === ' ' || event.key === 'Enter')) InputAudioSession.setPushToTalk(true) }}
+          onKeyUp={(event) => { if (event.key === ' ' || event.key === 'Enter') InputAudioSession.setPushToTalk(false) }}
+        >按住说话</button>
+      )}
+
       {variant === 'signal' && (
         <aside className="signal-rail" aria-label="轻量运行信息">
           <span>SESSION 00:08:42</span>
@@ -1073,6 +1132,35 @@ function App() {
           setSettingsStatus={setSettingsStatus}
           assetCounts={assetCounts}
           runtimeRows={runtimeRows}
+          inputFeatureEnabled={inputFeatureEnabled}
+          inputMode={inputMode}
+          setInputMode={setInputMode}
+          inputDevices={inputDevices}
+          selectedInputDeviceId={selectedInputDeviceId}
+          onSelectInputDevice={async (deviceId) => {
+            try {
+              await InputAudioSession.selectDevice(deviceId)
+              setSelectedInputDeviceId(deviceId)
+              setInputCalibration(null)
+              setSettingsStatus('麦克风已切换；建议重新校准')
+            } catch (error) { setSettingsStatus(`麦克风切换失败，已恢复默认输入：${String(error)}`) }
+          }}
+          inputCalibration={inputCalibration}
+          manualInputThreshold={manualInputThreshold}
+          setManualInputThreshold={setManualInputThreshold}
+          inputCalibrating={inputCalibrating}
+          onCalibrateInput={async () => {
+            setInputCalibrating(true)
+            setSettingsStatus('请保持安静约2秒，正在测量环境噪声…')
+            try {
+              const result = await InputAudioSession.calibrate(selectedInputDeviceId)
+              setInputCalibration(result)
+              setSettingsStatus('校准完成；仅保存本次会话的噪声统计，不保存录音')
+            } catch (error) {
+              setInputCalibration(null)
+              setSettingsStatus(`校准失败，已恢复默认阈值：${String(error)}`)
+            } finally { setInputCalibrating(false) }
+          }}
           idleJob={idleJob}
           onPortrait={async (file) => {
             setSettingsStatus('正在保存照片并创建安全版本…')
@@ -1457,6 +1545,17 @@ interface SettingsDrawerProps {
   setSettingsStatus: (status: string) => void
   assetCounts: { portrait: number; voice: number }
   runtimeRows: RuntimeService[]
+  inputFeatureEnabled: boolean
+  inputMode: InputMode
+  setInputMode: (mode: InputMode) => void
+  inputDevices: InputDevice[]
+  selectedInputDeviceId: string | null
+  onSelectInputDevice: (deviceId: string | null) => Promise<void>
+  inputCalibration: InputCalibration | null
+  manualInputThreshold: number
+  setManualInputThreshold: (value: number) => void
+  inputCalibrating: boolean
+  onCalibrateInput: () => Promise<void>
   idleJob: IdleGenerationJob | null
   onPortrait: (file: File) => Promise<AvatarBuild | void>
   onGenerateIdle: (derivativeId: number) => Promise<void>
@@ -1470,6 +1569,7 @@ function SettingsDrawer(props: SettingsDrawerProps) {
   const tabs: Array<{ id: SettingsTab; label: string }> = [
     { id: 'profile', label: '人物' },
     { id: 'voice', label: '声音' },
+    ...(props.inputFeatureEnabled ? [{ id: 'input' as SettingsTab, label: '输入' }] : []),
     { id: 'persona', label: '人设' },
     { id: 'memory', label: '记忆' },
     { id: 'privacy', label: '隐私' },
@@ -1532,6 +1632,44 @@ function SettingsDrawer(props: SettingsDrawerProps) {
             <section>
               <SectionHeader index="02" title="声音版本" description="参考声音只保存在本机；新版本通过校验后原子激活。" />
               <div className="profile-preview"><div><strong>CosyVoice 参考声音</strong><span>{props.assetCounts.voice} 个本机版本</span><label className="secondary-button asset-file-button">选择新声音<input type="file" accept="audio/wav,audio/mpeg" onChange={(event) => { const file = event.target.files?.[0]; if (file) void props.onAssetUploaded('voice', file) }} /></label><button className="secondary-button" type="button" onClick={() => { void props.onPreviewVoice() }}>试听当前声音</button><button className="secondary-button" type="button" onClick={async () => { try { await ConversationClient.restoreAsset('voice'); props.setSettingsStatus('已恢复上一声音版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
+            </section>
+          )}
+          {props.activeTab === 'input' && props.inputFeatureEnabled && (
+            <section>
+              <SectionHeader index="03" title="麦克风与环境" description="校准只计算本次会话的噪声数字，不保存或上传录音；高噪声时可改用按住说话。" />
+              <label className="field">输入设备
+                <select
+                  value={props.selectedInputDeviceId ?? ''}
+                  onChange={(event) => { void props.onSelectInputDevice(event.target.value || null) }}
+                >
+                  <option value="">系统默认麦克风</option>
+                  {props.inputDevices.filter((device) => device.deviceId !== 'default').map((device) => (
+                    <option key={device.deviceId} value={device.deviceId}>{device.label}</option>
+                  ))}
+                </select>
+              </label>
+              <div className="segmented" role="radiogroup" aria-label="麦克风模式">
+                {([
+                  ['automatic', '自动校准'],
+                  ['manual', '手工灵敏度'],
+                  ['push_to_talk', '按住说话'],
+                ] as Array<[InputMode, string]>).map(([mode, label]) => (
+                  <button key={mode} type="button" role="radio" aria-checked={props.inputMode === mode} className={props.inputMode === mode ? 'is-active' : ''} onClick={() => props.setInputMode(mode)}>{label}</button>
+                ))}
+              </div>
+              {props.inputMode === 'manual' && (
+                <label className="field">语音触发阈值 {props.manualInputThreshold.toFixed(3)}
+                  <input type="range" min="0.008" max="0.080" step="0.001" value={props.manualInputThreshold} onChange={(event) => props.setManualInputThreshold(Number(event.target.value))} />
+                </label>
+              )}
+              <div className="input-calibration-card">
+                <div>
+                  <strong>{props.inputCalibration ? '本次环境已校准' : '尚未校准本次环境'}</strong>
+                  <span>{props.inputCalibration ? `噪声P95 ${props.inputCalibration.noiseP95.toFixed(3)} · 触发 ${props.inputCalibration.voiceThreshold.toFixed(3)}` : '保持安静2秒即可建立噪声底；切换设备后需要重做。'}</span>
+                </div>
+                <button className="secondary-button" type="button" disabled={props.inputCalibrating} onClick={() => { void props.onCalibrateInput() }}>{props.inputCalibrating ? '校准中…' : '开始2秒校准'}</button>
+              </div>
+              {props.inputMode === 'push_to_talk' && <p className="settings-note">开始对话后按住“按住说话”按钮才会提交语音；松开、切换窗口或页面隐藏都会立即撤销许可。</p>}
             </section>
           )}
           {props.activeTab === 'persona' && (

@@ -409,6 +409,44 @@ select:focus-visible {
   color: rgba(255, 255, 255, 0.51);
   font-size: 10px;
 }
+
+.push-to-talk {
+  position: fixed;
+  z-index: 18;
+  left: 50%;
+  bottom: 34px;
+  transform: translateX(-50%);
+  min-width: 156px;
+  padding: 13px 24px;
+  border: 1px solid rgba(230, 186, 120, .72);
+  border-radius: 999px;
+  background: rgba(24, 17, 14, .82);
+  color: #fff3df;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 14px 40px rgba(0, 0, 0, .28);
+  touch-action: none;
+}
+
+.push-to-talk:active {
+  background: rgba(131, 50, 39, .9);
+  transform: translateX(-50%) scale(.98);
+}
+
+.input-calibration-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: 20px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+}
+
+.input-calibration-card div { display: grid; gap: 6px; }
+.input-calibration-card span,
+.settings-note { color: var(--muted); font-size: 13px; line-height: 1.6; }
 .simulate-button {
   margin-top: 12px;
   border: 0;
