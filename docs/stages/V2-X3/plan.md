@@ -33,4 +33,4 @@
 
 ## 开发前审计发现的阶段门冲突
 
-当前没有两套同时覆盖Idle与说话态的已批准外观rendition，因此本计划尚未获准进入实现。推荐拆为`X3A场景预设 → X4生成并批准两套外观rendition → X3B外观激活`。详见`pre-development-audit.md`；在用户批准阶段门修正前，X3保持BLOCKED。
+当前没有两套同时覆盖Idle与说话态的已批准外观rendition。项目所有者已批准拆为`X3A场景预设 → X4生成并批准两套外观rendition → X3B外观激活`；但后续真实数据复核发现其余三个场景同样缺少说话态完整场景rendition。为避免开口时跳回旧背景，推荐细化为`X3A0目录/CAS → X4S场景rendition → X3A1激活 → X4A外观rendition → X3B组合`。详见`scene-speaking-surface-audit.md`；批准细化前X3保持BLOCKED。
