@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "cyberWife V2-X 体验增强目标架构",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1280, 760],
+    "views": [
+      { "id": "realtime", "label": "实时对话主链", "focus": ["browser", "gateway", "turn", "speech", "llm", "avatar"], "note": "V2-X沿用V1单一TurnPipeline与generation token，不建立第二套会话链。" },
+      { "id": "experience", "label": "体验增强旁路", "focus": ["device", "quality", "assets", "browser", "avatar"], "note": "校准、质量治理和场景资产通过独立开关接入，失败时回退V1路径。" },
+      { "id": "memory", "label": "记忆与来源", "focus": ["browser", "gateway", "memory", "assets"], "note": "用户确认后才写入权威SQLite；图谱为带来源的只读派生视图。" }
+    ]
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "单一成人用户", "sublabel": "麦克风 / 键盘 / 浏览器", "pos": [35, 299.5], "size": [150, 76] },
+    { "id": "browser", "type": "frontend", "label": "沉浸式浏览器舞台", "sublabel": "React · Web Audio · WebCodecs · PWA", "pos": [235, 285], "size": [205, 105], "tag": "V2-X增强" },
+    { "id": "device", "type": "frontend", "label": "输入与生命周期控制", "sublabel": "校准 · PTT · visibility · reconnect", "pos": [235, 90], "size": [205, 82], "tag": "X0.1 / X0.2" },
+    { "id": "quality", "type": "frontend", "label": "音画质量治理器", "sublabel": "audio clock · frame age · hysteresis", "pos": [235, 520], "size": [205, 82], "tag": "X8.1" },
+    { "id": "gateway", "type": "backend", "label": "App Gateway", "sublabel": "REST + WebSocket :7860", "pos": [505, 285], "size": [175, 105], "tag": "loopback" },
+    { "id": "turn", "type": "backend", "label": "TurnPipeline", "sublabel": "六态 · generation token · cancel", "pos": [750, 285], "size": [190, 105], "tag": "V1权威主链" },
+    { "id": "speech", "type": "backend", "label": "Speech Worker", "sublabel": "VAD · ASR · CosyVoice", "pos": [1010, 105], "size": [190, 92], "tag": "X8.2预设" },
+    { "id": "llm", "type": "backend", "label": "llama.cpp", "sublabel": "Windows loopback :8090", "pos": [1010, 300], "size": [190, 82] },
+    { "id": "avatar", "type": "backend", "label": "Avatar Runtime", "sublabel": "音频驱动口型 · 同场景单人物", "pos": [1010, 500], "size": [190, 100], "tag": "X4 / X4.1 / X8" },
+    { "id": "memory", "type": "database", "label": "SQLite记忆工作台", "sublabel": "FTS · vector · 来源 · 聚类派生", "pos": [750, 530], "size": [190, 92], "tag": "X6" },
+    { "id": "assets", "type": "database", "label": "版本化私有资产", "sublabel": "source-pack · appearance · scene", "pos": [505, 530], "size": [175, 92], "tag": "X1-X5" }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "Windows 11 本机", "wraps": ["browser", "device", "quality", "llm"], "pad": 22 },
+    { "kind": "region", "label": "WSL2 本机私有运行域", "wraps": ["gateway", "turn", "speech", "avatar", "memory", "assets"], "pad": 24 },
+    { "kind": "security-group", "label": "仅loopback / 不上传私人数据", "wraps": ["browser", "gateway", "turn", "speech", "llm", "avatar", "memory", "assets"], "pad": 12 }
+  ],
+  "connections": [
+    { "id": "use-stage", "from": "user", "to": "browser", "label": "语音与操作", "variant": "emphasis", "fromSide": "right", "toSide": "left", "route": "straight", "labelAt": [210, 410] },
+    { "id": "calibrate", "from": "device", "to": "browser", "label": "设备/阈值/恢复事件", "fromSide": "bottom", "toSide": "top", "labelAt": [338, 228] },
+    { "id": "browser-gateway", "from": "browser", "to": "gateway", "label": "REST + WebSocket", "variant": "emphasis", "labelAt": [473, 410] },
+    { "id": "gateway-turn", "from": "gateway", "to": "turn", "label": "session / turn / cancel", "variant": "emphasis", "labelAt": [715, 410] },
+    { "id": "turn-speech", "from": "turn", "to": "speech", "label": "PCM ↔ ASR/TTS", "labelAt": [972, 226] },
+    { "id": "turn-llm", "from": "turn", "to": "llm", "label": "流式文本", "labelAt": [920, 270] },
+    { "id": "turn-avatar", "from": "turn", "to": "avatar", "label": "PCM + generation", "labelAt": [972, 459] },
+    { "id": "avatar-quality", "from": "avatar", "to": "quality", "label": "H.264帧 / 时间戳", "fromSide": "bottom", "toSide": "bottom", "via": [[1105, 672], [337.5, 672]], "labelAt": [720, 692] },
+    { "id": "quality-browser", "from": "quality", "to": "browser", "label": "丢弃过期帧 / 稳定分级", "fromSide": "top", "toSide": "bottom", "labelAt": [205, 450] },
+    { "id": "turn-memory", "from": "turn", "to": "memory", "label": "检索 / 候选确认", "fromSide": "bottom", "toSide": "top", "labelAt": [845, 458] },
+    { "id": "gateway-assets", "from": "gateway", "to": "assets", "label": "清单 / 授权 / 哈希", "fromSide": "bottom", "toSide": "top", "labelAt": [593, 458] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "体验目标", "items": ["输入更稳、恢复更可靠、动态更自然", "高清口型与CosyVoice预设独立验收"] },
+    { "dot": "emerald", "title": "架构约束", "items": ["单人物、单TurnPipeline、模块化单体", "每项增强均可关闭并回退V1"] },
+    { "dot": "amber", "title": "硬件与隐私", "items": ["约16GB空闲内存、24GB显存", "重型生成与实时栈不双常驻；私有数据不出机"] }
+  ]
+}
