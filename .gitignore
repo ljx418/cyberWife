@@ -13,8 +13,7 @@ prototype/playwright-report/
 *.swp
 .idea/
 .vscode/
-.v2x-review-chrome/
-.v2x-review-chrome-2/
+.v2x-review-chrome*/
 
 # ── 日志与构建产物 ──────────────────────────────────────
 *.log
@@ -93,3 +92,4 @@ docs/.*.bkp
 # V2-X D0 非私密浏览器审查证据（只含公开占位图与架构图）
 !docs/review/v2-x-experience-review-target.png
 !docs/review/v2-x-experience-review-architecture.png
+!docs/review/v2-x-experience-review-module-lab.png

@@ -11,8 +11,9 @@
 - 交付archify目标架构JSON/HTML；showcase验证9/9、0错误、0警告。
 - 目标架构规格SHA-256：`911d3087e60201136745aa8abf56eed2db7ef111d3fcf6103c49c5dd69df3516`。
 - 目标架构HTML SHA-256：`50f1fe4f2736c04322fde92c11d8b1c03584174d1dbee8af9e9e48c444567004`。
-- Windows无头Chrome在1440×900执行状态、质量档、组件标签、审查门交互，全部PASS；页面`scrollWidth=clientWidth=1425`。
-- 已检查`docs/review/v2-x-experience-review-target.png`与`docs/review/v2-x-experience-review-architecture.png`：单人物、面部无遮挡、控制列可读、架构边与标签无明显冲突；两图只含公开占位图与架构信息，不含私人素材。
+- Windows无头Chrome在1440×900执行状态、质量档、组件标签、审查门、多素材批准、场景应用、图像描述确认、语气预设和记忆增删交互，全部PASS。
+- 1440×900与420×720均无横向溢出：桌面`1425=1425`，移动`405=405`。
+- 已检查`docs/review/v2-x-experience-review-target.png`、`docs/review/v2-x-experience-review-module-lab.png`与`docs/review/v2-x-experience-review-architecture.png`：单人物、面部无遮挡、控制列可读、记忆工作台可读、架构边与标签无明显冲突；三图只含公开占位图与架构信息，不含私人素材。
 - 专用无头Chrome实例清理后剩余0个。
 
 ## 证据边界
