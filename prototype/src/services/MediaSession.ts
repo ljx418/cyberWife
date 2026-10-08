@@ -60,6 +60,8 @@ export const AVATAR_AUDIO_PREROLL_SECONDS = 0.295;
 
 let context: AudioContext | null = null;
 let meter: AudioWorkletNode | null = null;
+let outputGain: GainNode | null = null;
+let outputCompressor: DynamicsCompressorNode | null = null;
 let outputPromise: Promise<AudioContext> | null = null;
 let nextStartAt = 0;
 let lastFirstChunkLeadSeconds = 0;
@@ -72,6 +74,32 @@ const cancelledGenerations = new Set<string>();
 const latestGenerations = new Map<string, number>();
 const playbackComplete = new Set<string>();
 const playbackEndedSent = new Set<string>();
+const replaySources = new Set<AudioBufferSourceNode>();
+let replayKey = "";
+let replayChunks: Array<{ pcm: Int16Array; sampleRate: number }> = [];
+let replayBytes = 0;
+let replayOverflowed = false;
+let outputVolume = 1;
+let outputMuted = false;
+let compressionEnabled = true;
+const MAX_REPLAY_BYTES = 16 * 1024 * 1024;
+
+export function appendBoundedReplayChunk(
+  chunks: Array<{ pcm: Int16Array; sampleRate: number }>,
+  currentBytes: number,
+  pcm: Int16Array,
+  sampleRate: number,
+  maxBytes = MAX_REPLAY_BYTES,
+): { chunks: Array<{ pcm: Int16Array; sampleRate: number }>; bytes: number; overflowed: boolean } {
+  if (currentBytes + pcm.byteLength > maxBytes) {
+    return { chunks: [], bytes: 0, overflowed: true };
+  }
+  return {
+    chunks: [...chunks, { pcm: pcm.slice(), sampleRate }],
+    bytes: currentBytes + pcm.byteLength,
+    overflowed: false,
+  };
+}
 
 function generationKey(sessionId: string, generation: number): string {
   return `${sessionId}:${generation}`;
@@ -138,7 +166,15 @@ async function ensureOutput(): Promise<AudioContext> {
       numberOfOutputs: 1,
       outputChannelCount: [1],
     });
-    meter.connect(created.destination);
+    outputGain = created.createGain();
+    outputCompressor = created.createDynamicsCompressor();
+    outputCompressor.threshold.value = -18;
+    outputCompressor.knee.value = 18;
+    outputCompressor.ratio.value = compressionEnabled ? 3 : 1;
+    outputCompressor.attack.value = 0.003;
+    outputCompressor.release.value = 0.18;
+    outputGain.gain.value = outputMuted ? 0 : outputVolume;
+    outputGain.connect(outputCompressor).connect(meter).connect(created.destination);
     meter.port.onmessage = (event: MessageEvent<{ type: string; key: string }>) => {
       if (event.data?.type === "first-non-silent") confirmRendered(event.data.key);
     };
@@ -170,11 +206,13 @@ export const MediaSession = {
   async handleServerEvent(env: PlaybackEnvelope, ws: WebSocket): Promise<boolean> {
     if (env.type === "barge_in.detected") {
       this.cancelGeneration(undefined, env.session_id);
+      this.clearReplay();
       return true;
     }
     if (env.type === "turn.cancelled") {
       const cancelled = Number(env.payload.cancelled_generation);
       this.cancelGeneration(Number.isFinite(cancelled) ? cancelled : undefined, env.session_id);
+      this.clearReplay();
       return true;
     }
     if (env.type === "reply.audio.complete" && env.turn_id !== null) {
@@ -209,6 +247,10 @@ export const MediaSession = {
     const key = `${env.session_id}:${env.turn_id}:${generation}:${traceId}`;
     const firstChunkForTurn = armedKey !== key;
     if (firstChunkForTurn) {
+      if (replayKey !== key) {
+        this.clearReplay();
+        replayKey = key;
+      }
       armedKey = key;
       markers.set(key, {
         key,
@@ -229,7 +271,19 @@ export const MediaSession = {
     for (let i = 0; i < pcm.length; i += 1) channel[i] = pcm[i] / 32768;
     const source = audioContext.createBufferSource();
     source.buffer = buffer;
-    source.connect(meter);
+    if (!outputGain) return false;
+    source.connect(outputGain);
+    if (!replayOverflowed) {
+      const buffered = appendBoundedReplayChunk(
+        replayChunks,
+        replayBytes,
+        pcm,
+        Number(payload.sample_rate) || 16000,
+      );
+      replayChunks = buffered.chunks;
+      replayBytes = buffered.bytes;
+      replayOverflowed = buffered.overflowed;
+    }
     const hasNonSilent = pcm.some((sample) => Math.abs(sample) >= 66);
     const sources = activeSources.get(generationId) ?? new Set<AudioBufferSourceNode>();
     sources.add(source);
@@ -251,6 +305,7 @@ export const MediaSession = {
   },
 
   cancelGeneration(generation?: number, sessionId?: string): number {
+    this.clearReplay();
     const targets = [...activeSources.keys()].filter((key) => {
       const separator = key.lastIndexOf(":");
       const keySession = key.slice(0, separator);
@@ -292,13 +347,83 @@ export const MediaSession = {
       cancelledGenerationKeys: [...cancelledGenerations],
       latestGenerationBySession: Object.fromEntries(latestGenerations),
       lastFirstChunkLeadSeconds,
+      outputVolume,
+      outputMuted,
+      compressionEnabled,
+      replayBytes,
+      replayAvailable: replayChunks.length > 0 && !replayOverflowed,
+      replayOverflowed,
+      replaySources: replaySources.size,
+      outputDeviceSelectionSupported: Boolean(context && "setSinkId" in context),
     };
+  },
+
+  setVolume(value: number): void {
+    outputVolume = Math.max(0, Math.min(1, Number.isFinite(value) ? value : 1));
+    if (outputGain) outputGain.gain.value = outputMuted ? 0 : outputVolume;
+  },
+
+  setMuted(muted: boolean): void {
+    outputMuted = Boolean(muted);
+    if (outputGain) outputGain.gain.value = outputMuted ? 0 : outputVolume;
+  },
+
+  setCompression(enabled: boolean): void {
+    compressionEnabled = Boolean(enabled);
+    if (outputCompressor) outputCompressor.ratio.value = compressionEnabled ? 3 : 1;
+  },
+
+  async setOutputDevice(deviceId: string): Promise<"selected" | "unsupported"> {
+    const audioContext = await ensureOutput();
+    const selectable = audioContext as AudioContext & { setSinkId?: (sinkId: string) => Promise<void> };
+    if (typeof selectable.setSinkId !== "function") return "unsupported";
+    await selectable.setSinkId(deviceId);
+    return "selected";
+  },
+
+  async replayCurrent(): Promise<boolean> {
+    if (!replayChunks.length || replayOverflowed) return false;
+    const audioContext = await ensureOutput();
+    if (!outputGain) return false;
+    for (const source of replaySources) {
+      try { source.stop(); } catch { /* already ended */ }
+      source.disconnect();
+    }
+    replaySources.clear();
+    let cursor = audioContext.currentTime + 0.01;
+    for (const item of replayChunks) {
+      const buffer = audioContext.createBuffer(1, item.pcm.length, item.sampleRate);
+      const channel = buffer.getChannelData(0);
+      for (let index = 0; index < item.pcm.length; index += 1) channel[index] = item.pcm[index] / 32768;
+      const source = audioContext.createBufferSource();
+      source.buffer = buffer;
+      source.connect(outputGain);
+      replaySources.add(source);
+      source.onended = () => replaySources.delete(source);
+      source.start(cursor);
+      cursor += buffer.duration;
+    }
+    return true;
+  },
+
+  clearReplay(): void {
+    for (const source of replaySources) {
+      try { source.stop(); } catch { /* already ended */ }
+      source.disconnect();
+    }
+    replaySources.clear();
+    replayKey = "";
+    replayChunks = [];
+    replayBytes = 0;
+    replayOverflowed = false;
   },
 
   async stop(): Promise<void> {
     const current = context;
     context = null;
     meter = null;
+    outputGain = null;
+    outputCompressor = null;
     outputPromise = null;
     nextStartAt = 0;
     lastFirstChunkLeadSeconds = 0;
@@ -311,6 +436,7 @@ export const MediaSession = {
     activeSources.clear();
     cancelledGenerations.clear();
     latestGenerations.clear();
+    this.clearReplay();
     if (current && current.state !== "closed") await current.close();
   },
 };

@@ -67,6 +67,13 @@ async function installLocalContracts(page: Page) {
       createBufferSource() { return { buffer: null, onended: null, connect() { return this }, disconnect() {}, start() {}, stop() {} } }
       createMediaStreamSource() { return { connect() { return this }, disconnect() {} } }
       createGain() { return { gain: { value: 1 }, connect() { return this }, disconnect() {} } }
+      createDynamicsCompressor() {
+        return {
+          threshold: { value: 0 }, knee: { value: 0 }, ratio: { value: 1 },
+          attack: { value: 0 }, release: { value: 0 },
+          connect() { return this }, disconnect() {},
+        }
+      }
       async resume() { this.state = 'running' }
       async close() { this.state = 'closed' }
     }

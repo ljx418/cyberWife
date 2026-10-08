@@ -230,6 +230,8 @@ test('浏览器媒体合同只为首个非静音 PCM 回传一次播放确认', 
           stop() { this.onended?.() },
         }
       }
+      createGain() { return { gain: { value: 1 }, connect(destination: unknown) { return destination }, disconnect() {} } }
+      createDynamicsCompressor() { return { threshold: { value: 0 }, knee: { value: 0 }, ratio: { value: 1 }, attack: { value: 0 }, release: { value: 0 }, connect(destination: unknown) { return destination }, disconnect() {} } }
       async resume() { this.state = 'running' }
       async close() { this.state = 'closed' }
     }

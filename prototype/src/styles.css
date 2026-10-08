@@ -465,6 +465,39 @@ select:focus-visible {
   font-size: 13px;
   text-align: center;
 }
+
+.output-controls {
+  position: fixed;
+  right: 20px;
+  bottom: 18px;
+  z-index: 16;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, .25);
+  backdrop-filter: blur(14px);
+}
+
+.output-controls button,
+.output-controls select {
+  min-height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--soft);
+  color: var(--ink);
+}
+
+.output-controls label { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
+.output-controls input[type="range"] { width: 82px; }
+
+@media (max-width: 700px) {
+  .output-controls { right: 8px; bottom: 8px; display: grid; width: 132px; }
+  .output-controls label { justify-content: space-between; }
+}
 .simulate-button {
   margin-top: 12px;
   border: 0;

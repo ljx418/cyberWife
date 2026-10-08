@@ -156,6 +156,10 @@ function App() {
   const [inputCalibrating, setInputCalibrating] = useState(false)
   const [lifecycleFeatureEnabled, setLifecycleFeatureEnabled] = useState(false)
   const [lifecycleNotice, setLifecycleNotice] = useState('')
+  const [outputFeatureEnabled, setOutputFeatureEnabled] = useState(false)
+  const [outputVolume, setOutputVolume] = useState(1)
+  const [outputMuted, setOutputMuted] = useState(false)
+  const [outputDevices, setOutputDevices] = useState<Array<{ deviceId: string; label: string }>>([])
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
   const deleteReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -217,6 +221,7 @@ function App() {
         if (typeof draft.settings_json?.voice_transcript === 'string') setVoiceTranscript(draft.settings_json.voice_transcript)
         setInputFeatureEnabled(experience.features.input_calibration === true)
         setLifecycleFeatureEnabled(experience.features.lifecycle_recovery === true)
+        setOutputFeatureEnabled(experience.features.output_controls === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
           status: toRuntimeStatus(item.status),
@@ -227,6 +232,19 @@ function App() {
       .catch((error) => { if (active) setOnboardingStatus(`读取失败：${String(error)}`) })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    if (!outputFeatureEnabled) return
+    MediaSession.setVolume(outputVolume)
+    MediaSession.setMuted(outputMuted)
+  }, [outputFeatureEnabled, outputVolume, outputMuted])
+
+  useEffect(() => {
+    if (!outputFeatureEnabled || !navigator.mediaDevices?.enumerateDevices) return
+    void navigator.mediaDevices.enumerateDevices().then((devices) => {
+      setOutputDevices(devices.filter((item) => item.kind === 'audiooutput').map((item, index) => ({ deviceId: item.deviceId, label: item.label || `输出设备 ${index + 1}` })))
+    }).catch(() => setOutputDevices([]))
+  }, [outputFeatureEnabled])
 
   useEffect(() => {
     InputAudioSession.configure({
@@ -1053,6 +1071,24 @@ function App() {
           <strong>{voiceButtonLabel}</strong>
           <span>{conversationState === 'idle' ? '点击后进入连续聆听' : '真实本机语音会话'}</span>
         </div>
+        {outputFeatureEnabled && (
+          <div className="output-controls" role="group" aria-label="声音输出控制">
+            <button type="button" aria-label={outputMuted ? '取消静音' : '静音'} onClick={() => setOutputMuted((value) => !value)}>{outputMuted ? '取消静音' : '静音'}</button>
+            <label>音量
+              <input aria-label="输出音量" type="range" min="0" max="1" step="0.05" value={outputVolume} onChange={(event) => setOutputVolume(Number(event.target.value))} />
+            </label>
+            <button type="button" onClick={async () => { const replayed = await MediaSession.replayCurrent(); setLifecycleNotice(replayed ? '正在重播本次回答。' : '当前没有可重播的回答。') }}>重播本次回答</button>
+            {outputDevices.length > 0 && <label>扬声器
+              <select aria-label="输出设备" defaultValue="" onChange={async (event) => {
+                if (!event.target.value) return
+                try {
+                  const result = await MediaSession.setOutputDevice(event.target.value)
+                  setLifecycleNotice(result === 'selected' ? '输出设备已切换。' : '当前浏览器不支持选择输出设备。')
+                } catch (error) { setLifecycleNotice(`输出设备切换失败：${String(error)}`) }
+              }}><option value="">系统默认</option>{outputDevices.filter((item) => item.deviceId !== 'default').map((item) => <option key={item.deviceId} value={item.deviceId}>{item.label}</option>)}</select>
+            </label>}
+          </div>
+        )}
       </section>
 
       {inputFeatureEnabled && inputMode === 'push_to_talk' && !['idle', 'error'].includes(conversationState) && (
