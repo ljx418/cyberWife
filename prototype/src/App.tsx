@@ -10,6 +10,7 @@ import type {
 import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession, type InputCalibration, type InputDevice, type InputMode } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
+import { PwaBridge } from './services/PwaBridge'
 import { AvatarSession } from './services/AvatarSession'
 import { SessionLifecycleController } from './services/SessionLifecycle'
 
@@ -160,6 +161,10 @@ function App() {
   const [outputVolume, setOutputVolume] = useState(1)
   const [outputMuted, setOutputMuted] = useState(false)
   const [outputDevices, setOutputDevices] = useState<Array<{ deviceId: string; label: string }>>([])
+  const [pwaFeatureEnabled, setPwaFeatureEnabled] = useState(false)
+  const [installAvailable, setInstallAvailable] = useState(false)
+  const [fullscreenActive, setFullscreenActive] = useState(Boolean(document.fullscreenElement))
+  const [desktopStatus, setDesktopStatus] = useState('')
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
   const deleteReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -222,6 +227,7 @@ function App() {
         setInputFeatureEnabled(experience.features.input_calibration === true)
         setLifecycleFeatureEnabled(experience.features.lifecycle_recovery === true)
         setOutputFeatureEnabled(experience.features.output_controls === true)
+        setPwaFeatureEnabled(experience.features.pwa === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
           status: toRuntimeStatus(item.status),
@@ -245,6 +251,21 @@ function App() {
       setOutputDevices(devices.filter((item) => item.kind === 'audiooutput').map((item, index) => ({ deviceId: item.deviceId, label: item.label || `输出设备 ${index + 1}` })))
     }).catch(() => setOutputDevices([]))
   }, [outputFeatureEnabled])
+
+  useEffect(() => {
+    if (!pwaFeatureEnabled) {
+      void PwaBridge.configure(false)
+      return
+    }
+    const unsubscribe = PwaBridge.subscribeInstallAvailability(setInstallAvailable)
+    const onFullscreen = () => setFullscreenActive(Boolean(document.fullscreenElement))
+    document.addEventListener('fullscreenchange', onFullscreen)
+    void PwaBridge.configure(true).catch(() => setDesktopStatus('桌面安装暂不可用，浏览器模式不受影响'))
+    return () => {
+      unsubscribe()
+      document.removeEventListener('fullscreenchange', onFullscreen)
+    }
+  }, [pwaFeatureEnabled])
 
   useEffect(() => {
     InputAudioSession.configure({
@@ -1023,6 +1044,29 @@ function App() {
         </div>
         <div className="topbar__actions">
           <span className="local-status" role="status" aria-live="polite" data-testid="local-status"><i />{runtimeHeadline}</span>
+          {pwaFeatureEnabled && installAvailable && (
+            <button
+              className="text-button desktop-mode-button"
+              type="button"
+              onClick={() => void PwaBridge.requestInstall().then((result) => {
+                setDesktopStatus(result === 'accepted' ? '已添加到桌面' : result === 'dismissed' ? '已取消安装' : '当前浏览器暂不支持安装')
+              })}
+            >
+              安装到桌面
+            </button>
+          )}
+          {pwaFeatureEnabled && (
+            <button
+              className="text-button desktop-mode-button"
+              type="button"
+              aria-pressed={fullscreenActive}
+              onClick={() => void PwaBridge.toggleFullscreen()
+                .then((result) => setDesktopStatus(result === 'unsupported' ? '当前浏览器不支持全屏，仍可继续使用' : ''))
+                .catch(() => setDesktopStatus('无法切换全屏，仍可继续使用'))}
+            >
+              {fullscreenActive ? '退出全屏' : '进入全屏'}
+            </button>
+          )}
           <button
             ref={settingsTriggerRef}
             className="text-button"
@@ -1033,6 +1077,8 @@ function App() {
           </button>
         </div>
       </header>
+
+      {desktopStatus && <p className="desktop-mode-status" role="status">{desktopStatus}</p>}
 
       <section className="conversation-copy" aria-live="polite" aria-atomic="true">
         <p className="eyebrow">{content.eyebrow}</p>

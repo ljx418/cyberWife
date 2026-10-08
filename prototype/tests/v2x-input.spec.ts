@@ -84,7 +84,10 @@ test('X0.1 活动中换麦先停旧track，校准只返回统计摘要', async (
     await controller.selectDevice('mic-2')
     const switched = controller.snapshot()
     await controller.stop()
-    const calibration = await controller.calibrate('mic-2', 500)
+    // Keep ample wall-clock margin above the 20-sample minimum. Under the
+    // full parallel suite a 400-500ms deadline can legitimately lose a timer
+    // tick even though the production default calibration window is 2s.
+    const calibration = await controller.calibrate('mic-2', 800)
     const after = controller.snapshot()
     return { maxActive, requestedDevice, switched, calibration, after, activeCount: active.size }
   })
