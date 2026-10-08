@@ -27,6 +27,7 @@ import time
 import cv2
 import glob
 import pickle
+import json
 
 import queue
 from queue import Queue
@@ -85,8 +86,13 @@ def load_avatar(avatar_id):
     input_face_list = glob.glob(os.path.join(face_imgs_path, '*.[jpJP][pnPN]*[gG]'))
     input_face_list = sorted(input_face_list, key=lambda x: int(os.path.splitext(os.path.basename(x))[0]))
     face_list_cycle = read_imgs(input_face_list)
+    manifest_path = os.path.join(avatar_path, "manifest.json")
+    manifest = {}
+    if os.path.isfile(manifest_path):
+        with open(manifest_path, 'r', encoding='utf-8') as stream:
+            manifest = json.load(stream)
 
-    return frame_list_cycle,face_list_cycle,coord_list_cycle
+    return frame_list_cycle,face_list_cycle,coord_list_cycle,manifest
 
 @torch.no_grad()
 def warm_up(batch_size,model,modelres):
@@ -109,7 +115,14 @@ class LipReal(BaseAvatar):
         # self.res_frame_queue = Queue(self.batch_size*2)
         self.model = model
 
-        self.frame_list_cycle,self.face_list_cycle,self.coord_list_cycle = avatar
+        if len(avatar) == 4:
+            self.frame_list_cycle,self.face_list_cycle,self.coord_list_cycle,self.avatar_manifest = avatar
+        else:  # Compatibility for old tests and third-party callers.
+            self.frame_list_cycle,self.face_list_cycle,self.coord_list_cycle = avatar
+            self.avatar_manifest = {}
+        self.blend_profile = str(self.avatar_manifest.get("blend_profile", "lower"))
+        if self.blend_profile not in {"lower", "mouth_oval_v1", "full"}:
+            raise ValueError(f"unsupported avatar blend profile: {self.blend_profile}")
 
         self.asr = MelASR(opt,self)
         self.asr.warm_up()
@@ -145,5 +158,7 @@ class LipReal(BaseAvatar):
         y1, y2, x1, x2 = bbox
         res_frame = cv2.resize(pred_frame.astype(np.uint8),(x2-x1,y2-y1))
         original_face = combine_frame[y1:y2, x1:x2]
-        combine_frame[y1:y2, x1:x2] = composite_wav2lip_face(original_face, res_frame)
+        combine_frame[y1:y2, x1:x2] = composite_wav2lip_face(
+            original_face, res_frame, mode=self.blend_profile,
+        )
         return combine_frame

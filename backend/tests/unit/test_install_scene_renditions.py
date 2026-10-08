@@ -61,14 +61,22 @@ def test_installer_registers_four_complete_scene_pairs_idempotently(tmp_path, mo
     }), encoding="utf-8")
 
     builds = []
-    def fake_build(source, idle, output_root, avatar_id, *, preserve_frame):
+    def fake_build(
+        source, idle, output_root, avatar_id, *,
+        preserve_frame, target_fps, blend_profile,
+    ):
+        assert preserve_frame is True
+        assert target_fps == 25.0
+        assert blend_profile == "mouth_oval_v1"
         builds.append(avatar_id)
         target = output_root / avatar_id
         target.mkdir(parents=True)
         (target / "manifest.json").write_text(json.dumps({
             "avatar_id": avatar_id, "source_sha256": sha(source),
             "idle_video_sha256": sha(idle), "presentation": "complete_scene",
-            "frame_count": 160, "frame_size": [768, 432],
+            "frame_count": 250, "frame_size": [768, 432],
+            "runtime_fps": 25.0, "temporal_resample": "linear",
+            "blend_profile": "mouth_oval_v1",
             "coordinates": [80, 320, 100, 300],
         }), encoding="utf-8")
         return target
@@ -84,7 +92,8 @@ def test_installer_registers_four_complete_scene_pairs_idempotently(tmp_path, mo
     assert first["result"] == second["result"] == "PASS"
     assert first["revision"] == second["revision"] == 3
     assert len(first["bindings"]) == 4
-    assert len(builds) == 3
+    assert len(builds) == 4
+    assert all(avatar_id.endswith("_scenev2_mouth") for avatar_id in builds)
     manifest = source_pack.load()
     assert manifest is not None and len(manifest.payload["renditions"]) == 8
     catalog = ScenePresetService(

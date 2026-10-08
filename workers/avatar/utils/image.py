@@ -56,6 +56,28 @@ def blend_lower_face(original, generated):
     return np.clip(mixed, 0, 255).astype(np.uint8)
 
 
+def blend_mouth_oval(original, generated):
+    """Blend the generated mouth/jaw without softening both cheek contours.
+
+    Wav2Lip predicts a complete face crop, but only its mouth and lower-jaw
+    region is required here.  A compact elliptical alpha mask keeps the
+    identity-bearing eyes and outer cheek contour from the source frame while
+    retaining a soft internal transition around the moving mouth.
+    """
+    if original.shape != generated.shape or original.ndim != 3:
+        raise ValueError("face blend inputs must have identical HxWxC shapes")
+    height, width = original.shape[:2]
+    mask = np.zeros((height, width), dtype=np.float32)
+    center = (width // 2, int(height * 0.73))
+    axes = (max(2, int(width * 0.39)), max(2, int(height * 0.36)))
+    cv2.ellipse(mask, center, axes, 0, 0, 360, 1.0, thickness=-1)
+    edge = max(3, int(min(height, width) * 0.022))
+    kernel = edge * 2 + 1
+    mask = cv2.GaussianBlur(mask, (kernel, kernel), 0)[:, :, None]
+    mixed = original.astype(np.float32) * (1.0 - mask) + generated.astype(np.float32) * mask
+    return np.clip(mixed, 0, 255).astype(np.uint8)
+
+
 def composite_wav2lip_face(original, generated, mode=None):
     """Composite a generated face with an explicit, auditable mode.
 
@@ -70,4 +92,6 @@ def composite_wav2lip_face(original, generated, mode=None):
         return generated.astype(np.uint8, copy=False)
     if selected == "lower":
         return blend_lower_face(original, generated)
+    if selected == "mouth_oval_v1":
+        return blend_mouth_oval(original, generated)
     raise ValueError(f"unsupported Wav2Lip blend mode: {selected}")

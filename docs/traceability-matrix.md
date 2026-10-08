@@ -16,7 +16,7 @@
 | FR-07 六态状态机 | ConversationOrchestrator、TurnPipeline | B1/B3 | AC-03/11 | 已实现并验收：真实事件链、状态播报与打断状态转换PASS |
 | FR-08 连续对话 | ApiGateway、SpeechRuntime、TurnPipeline、MandarinTranscriptNormalizer、UtteranceBoundaryDetector、各 adapter | B1/B2/B2.5/B3/UX8/V1FINAL | AC-03/04/UX8-AC01～07/VF-AC03 | 主链已验收：20/20连续链、普通链30/30、60分钟组合及项目所有者物理麦克风人工总验收PASS |
 | FR-09 插话取消 | InterruptionController、CancellationToken | B3 | AC-05 | 已实现并验收：早/中/晚30/30，旧generation零泄漏PASS |
-| FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、BaseASR实时抖动缓冲、AvatarSession、AvatarAssetService、build_video_avatar(scenev1)、App双缓冲单表面状态机 | B2/UX5/UX6/UX13/UX14/UX15/V1FINAL | AC-06/AC-06A/UX14单表面门/UX15连续性门/VF-AC05/06 | 同一批准Idle完整帧用于实时口型，live时Idle隐藏且同屏一人；嘴部响应、无闪动机器门及项目所有者人工总验收PASS；高清/同步/嘴部自然度提升转V2-X8 |
+| FR-10 口型/静态降级 | LiveTalkingAdapter、H264WebSocketOutput、BaseASR实时抖动缓冲、AvatarSession、AvatarAssetService、build_video_avatar(scenev1/scenev2候选)、manifest融合profile、App双缓冲单表面状态机 | B2/UX5/UX6/UX13/UX14/UX15/V1FINAL/V2-X3.3-R1 | AC-06/AC-06A/UX14单表面门/UX15连续性门/VF-AC05/06/R1-AC01～07 | V1同一完整场景人物与无闪动门PASS；R1四场景动作速率、连续性、边界、嘴部响应和性能自动门PASS，人工A/B未签前仍使用scenev1；高清/音素自然度继续由V2-X8承担 |
 | FR-11 设置持久化 | Gateway application services、repositories | B0/B4/B5 | AC-01/02/08 | 已实现并验收：六页签真实API与跨重启持久化PASS |
 | FR-12 记忆 CRUD/来源 | MemoryService、SqliteMemoryRepository、VectorIndex | B4/UX10 | AC-07/08/UX10-AC05～07 | 已实现并验收：真实手工新增/编辑/删除；语音会话候选确认前0召回、确认后命中、重复确认幂等、删除后0命中 |
 | FR-13 本次不记录 | TurnPipeline、persistence policy | B4 | AC-09 | 已实现并验收：会话中启用后整场业务写入0，原始音频0落盘PASS |

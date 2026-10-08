@@ -25,6 +25,38 @@ except ModuleNotFoundError:
 WAV2LIP_FACE_SIZE = 256
 AVATAR_BUILD_REVISION = "cropv2"
 SCENE_AVATAR_BUILD_REVISION = "scenev1"
+SMOOTH_SCENE_AVATAR_BUILD_REVISION = "scenev2"
+
+
+def _resample_frames_and_boxes(
+    frames: list[np.ndarray],
+    boxes: np.ndarray,
+    source_fps: float,
+    target_fps: float,
+) -> tuple[list[np.ndarray], np.ndarray]:
+    """Sample the complete source duration on the runtime frame clock.
+
+    Linear interpolation is intentional for the low-motion approved idles: it
+    removes the 16->25fps speed-up without introducing a new optical-flow
+    model or a runtime dependency.  Geometry follows the same time weights.
+    """
+    if source_fps <= 0 or target_fps <= 0 or not frames:
+        raise ValueError("source/target fps and frames must be positive")
+    duration = len(frames) / source_fps
+    count = round(duration * target_fps)
+    sampled_frames: list[np.ndarray] = []
+    sampled_boxes: list[np.ndarray] = []
+    for target_index in range(count):
+        position = target_index * source_fps / target_fps
+        left = min(int(np.floor(position)), len(frames) - 1)
+        right = min(left + 1, len(frames) - 1)
+        alpha = float(position - left)
+        if left == right or alpha < 1e-9:
+            sampled_frames.append(frames[left].copy())
+        else:
+            sampled_frames.append(cv2.addWeighted(frames[left], 1.0 - alpha, frames[right], alpha, 0))
+        sampled_boxes.append(boxes[left] * (1.0 - alpha) + boxes[right] * alpha)
+    return sampled_frames, np.rint(np.asarray(sampled_boxes)).astype(np.int32)
 
 
 def _sha256(path: Path) -> str:
@@ -143,9 +175,13 @@ def build(
     avatar_id: str,
     *,
     preserve_frame: bool = False,
+    target_fps: float | None = None,
+    blend_profile: str = "lower",
 ) -> Path:
     if not source_portrait.is_file() or not idle_video.is_file():
         raise FileNotFoundError("source portrait or idle video is missing")
+    if blend_profile not in {"lower", "mouth_oval_v1", "full"}:
+        raise ValueError(f"unsupported blend profile: {blend_profile}")
     model_path = Path(os.environ.get(
         "CW_FACE_DETECTOR_ONNX",
         "/mnt/c/ComfyUI-aki-v2/ComfyUI/models/insightface/models/buffalo_l/det_10g.onnx",
@@ -202,6 +238,14 @@ def build(
         or motion_metrics["face_area_cv_percent"] > 3.0
     ):
         raise RuntimeError(f"idle motion exceeds low-motion gate: {motion_metrics}")
+    source_frame_count = len(frames)
+    if target_fps is not None:
+        if not 12 <= target_fps <= 30:
+            raise ValueError("target_fps must be within 12-30")
+        frames, boxes = _resample_frames_and_boxes(
+            frames, boxes.astype(np.float32), source_fps, target_fps,
+        )
+    runtime_fps = float(target_fps or source_fps)
     target = output_root / avatar_id
     if target.exists():
         raise FileExistsError(f"target exists; refusing overwrite: {target}")
@@ -233,7 +277,12 @@ def build(
         median_box = np.median(boxes, axis=0).astype(int).tolist()
         manifest = {
             "schema": 2,
-            "build_revision": SCENE_AVATAR_BUILD_REVISION if preserve_frame else AVATAR_BUILD_REVISION,
+            "build_revision": (
+                SMOOTH_SCENE_AVATAR_BUILD_REVISION
+                if preserve_frame and target_fps is not None
+                else SCENE_AVATAR_BUILD_REVISION if preserve_frame
+                else AVATAR_BUILD_REVISION
+            ),
             "avatar_id": avatar_id,
             "source_sha256": _sha256(source_portrait),
             "idle_video_sha256": _sha256(idle_video),
@@ -243,6 +292,10 @@ def build(
             "coordinates": median_box,
             "frame_count": len(frames),
             "source_fps": round(source_fps, 3),
+            "source_frame_count": source_frame_count,
+            "runtime_fps": round(runtime_fps, 3),
+            "temporal_resample": "linear" if target_fps is not None else "none",
+            "blend_profile": blend_profile,
             "duration_seconds": round(duration, 3),
             "loop_mode": loop_metrics["mode"],
             "loop_seam": {
@@ -273,6 +326,12 @@ def main() -> None:
         action="store_true",
         help="retain the complete generated scene as the speaking surface",
     )
+    parser.add_argument("--target-fps", type=float)
+    parser.add_argument(
+        "--blend-profile",
+        choices=("lower", "mouth_oval_v1", "full"),
+        default="lower",
+    )
     args = parser.parse_args()
     print(build(
         args.source,
@@ -280,6 +339,8 @@ def main() -> None:
         args.output_root,
         args.avatar_id,
         preserve_frame=args.preserve_frame,
+        target_fps=args.target_fps,
+        blend_profile=args.blend_profile,
     ))
 
 

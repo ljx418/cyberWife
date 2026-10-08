@@ -13,7 +13,7 @@ from uuid import UUID, uuid5
 from cyberwife.application.scene_preset_service import DEFAULT_SCENES, ScenePresetService
 from cyberwife.application.source_pack_service import SourcePackService
 from cyberwife.infrastructure.json_manifest_repository import JsonManifestRepository
-from ops.build_video_avatar import SCENE_AVATAR_BUILD_REVISION, build
+from ops.build_video_avatar import SMOOTH_SCENE_AVATAR_BUILD_REVISION, build
 
 
 RENDITION_NAMESPACE = UUID("857184e6-617f-4e39-9238-c4f54a642f59")
@@ -38,7 +38,10 @@ def _approve_avatar_manifest(target: Path, *, source_sha: str, idle_sha: str) ->
         payload.get("source_sha256") != source_sha
         or payload.get("idle_video_sha256") != idle_sha
         or payload.get("presentation") != "complete_scene"
-        or payload.get("frame_count") != 160
+        or payload.get("frame_count") != 250
+        or payload.get("runtime_fps") != 25.0
+        or payload.get("temporal_resample") != "linear"
+        or payload.get("blend_profile") != "mouth_oval_v1"
     ):
         raise RuntimeError(f"scene.avatar_manifest_mismatch:{target.name}")
     if payload.get("visual_approved") is not True:
@@ -92,7 +95,6 @@ def install(
         scene_id = ScenePresetService.scene_id(definition.slug)
         if definition.slug == "blue-hour-living":
             video_source = default_video
-            avatar_id = default_avatar_id
         else:
             record = generated.get("records", {}).get(definition.slug)
             if definition.slug not in GENERATED_SCENES or not isinstance(record, dict):
@@ -100,21 +102,25 @@ def install(
             video_source = Path(str(record.get("output", ""))).resolve()
             if not video_source.is_file() or _sha256(video_source) != record.get("output_sha256"):
                 raise ValueError(f"scene.generated_output_mismatch:{definition.slug}")
-            video_sha = _sha256(video_source)
-            avatar_id = (
-                f"wav2lip256_idle_p_{source_sha[:16]}_{video_sha[:8]}_"
-                f"{SCENE_AVATAR_BUILD_REVISION}"
-            )
         if not video_source.is_file():
             raise FileNotFoundError(f"scene.idle_missing:{definition.slug}")
         video_sha = _sha256(video_source)
+        avatar_id = (
+            f"wav2lip256_idle_p_{source_sha[:16]}_{video_sha[:8]}_"
+            f"{SMOOTH_SCENE_AVATAR_BUILD_REVISION}_mouth"
+        )
         idle_target = binding_root / "assets" / f"{scene_id}-idle.mp4"
         if not idle_target.is_file() or _sha256(idle_target) != video_sha:
             _atomic_copy(video_source, idle_target)
 
         avatar_target = avatar_root / avatar_id
         if not avatar_target.is_dir():
-            build(source_path, idle_target, avatar_root, avatar_id, preserve_frame=True)
+            build(
+                source_path, idle_target, avatar_root, avatar_id,
+                preserve_frame=True,
+                target_fps=25.0,
+                blend_profile="mouth_oval_v1",
+            )
         avatar_payload = _approve_avatar_manifest(
             avatar_target, source_sha=source_sha, idle_sha=video_sha
         )

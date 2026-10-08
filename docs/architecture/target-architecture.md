@@ -1,8 +1,8 @@
 # cyberWife V1 基线与 V2 演进目标架构
 
-**版本**：3.3
-**日期**：2026-10-07
-**状态**：V1目标架构已实现；V2-X的D0/D1/X0、X0.1～X0.3、X9、X1、X2、X3.1、X3.2已PASS；X3按`X3.1→X3.2→X3.3→X3.4→X3.5`连续执行，下一阶段X3.3场景激活
+**版本**：3.4
+**日期**：2026-10-08
+**状态**：V1目标架构已实现；V2-X的D0/D1/X0、X0.1～X0.3、X9、X1、X2、X3.1、X3.2已PASS；X3.3功能门已实现，R1的25fps动作取样与口周融合候选自动门PASS、等待人工A/B，批准前不进入X3.4
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -40,8 +40,8 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发；机器与项目所有者人工验收PASS |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
-| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口，避免Mel批次误插静音 | AC-06A机器嘴部响应4/4及浏览器人工体验通过；进一步高清与自然度进入V2-X8 | V1 PASS；V2质量优化待开发 |
-| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；UX14保留768×432完整Idle帧构建`scenev1`说话Avatar，不抠图、不叠第二人物 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | `scenev1`已active；同场景实时嘴部机器PASS |
+| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口；X3.3-R1候选把16fps源动作按25fps运行时钟扩展为250帧，并以manifest选择口周融合profile | R1自动连续性/边界/嘴部响应/性能门全绿后再由人工A/B；进一步高清和音素自然度进入V2-X8 | V1 PASS；R1候选WAITING HUMAN，未激活 |
+| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；UX14的`scenev1`仍是活动工件；R1新增不覆盖旧工件的`scenev2`候选，不抠图、不叠第二人物 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | `scenev1`已active；四个`scenev2`候选机器PASS、人工待审 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |
@@ -108,7 +108,10 @@ ops/scene_sequence_pipeline.py               [已开发/UX13] 开场、严格正
 ops/install_scene_sequence.py                [已开发/UX13] 人工批准令牌、哈希校验和版本化私有安装
 backend/cyberwife/application/avatar_asset_service.py [已开发/UX13] 序列清单验证和私有媒体路径门
 prototype/src/App.tsx                        [已开发/UX13] 宽高比舞台、记忆工作台与intro/idle/live/outro状态机
-ops/build_video_avatar.py                     [已开发/UX14] 保留完整场景帧构建scenev1说话Avatar
+ops/build_video_avatar.py                     [已开发/UX14+X3.3-R1] scenev1兼容；可按25fps构建250帧scenev2候选并记录融合profile
+ops/install_scene_renditions.py               [已开发/X3.3-R1] 人工批准后才以四场景原子绑定安装scenev2_mouth；当前尚未执行
+workers/avatar/utils/image.py                 [已开发/X3.3-R1] manifest驱动lower或mouth_oval_v1融合；旧工件缺字段时兼容lower
+tests/ux5/{analyze_lipsync,compare_render_quality}.py [已开发/X3.3-R1] 动作速率、二阶连续性、编码噪声归一边界、清晰度和嘴部响应门
 prototype/src/styles.css                      [已开发/UX14] live首帧原子替换Idle、单人物全舞台表面
 ```
 

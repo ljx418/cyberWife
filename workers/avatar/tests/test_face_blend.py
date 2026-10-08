@@ -1,6 +1,6 @@
 import numpy as np
 
-from utils.image import blend_lower_face, composite_wav2lip_face
+from utils.image import blend_lower_face, blend_mouth_oval, composite_wav2lip_face
 
 
 def test_lower_face_blend_preserves_glasses_region_and_feathers_edges():
@@ -39,3 +39,22 @@ def test_face_composite_rejects_unknown_mode():
         assert "unsupported" in str(exc)
     else:
         raise AssertionError("unknown mode must be rejected")
+
+
+def test_mouth_oval_preserves_outer_cheeks_and_changes_mouth_center():
+    original = np.zeros((100, 100, 3), dtype=np.uint8)
+    generated = np.full_like(original, 255)
+    result = blend_mouth_oval(original, generated)
+
+    assert int(result[72, 50, 0]) > 245
+    assert int(result[72, 2, 0]) == 0
+    assert int(result[15, 50, 0]) == 0
+    assert 0 < int(result[35, 50, 0]) < 255
+
+
+def test_composite_selects_manifest_mouth_profile():
+    original = np.zeros((100, 100, 3), dtype=np.uint8)
+    generated = np.full_like(original, 255)
+    result = composite_wav2lip_face(original, generated, mode="mouth_oval_v1")
+    assert int(result[72, 50, 0]) > 245
+    assert int(result[72, 2, 0]) == 0
