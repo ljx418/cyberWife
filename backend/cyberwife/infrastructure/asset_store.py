@@ -123,6 +123,10 @@ class AssetStore:
         mime = detect_magic(head)
         if mime is None:
             raise ValueError(f"asset_invalid: unknown magic bytes")
+        if kind == "portrait" and mime not in {"image/jpeg", "image/png"}:
+            raise ValueError(f"asset_invalid: portrait requires JPEG or PNG, received {mime}")
+        if kind == "voice" and not mime.startswith("audio/"):
+            raise ValueError(f"asset_invalid: voice requires audio, received {mime}")
         sha = sha256_file(source)
         target = self.resolve(f"{kind}/{safe_filename}")
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -135,6 +139,11 @@ class AssetStore:
             "sha256": sha,
             "mime": mime,
         }
+
+    def delete(self, relative_path: str) -> None:
+        """Delete one validated private asset; never accepts an absolute path."""
+        target = self.resolve(relative_path)
+        target.unlink(missing_ok=True)
 
     def ingest_temporary(self, suffix: str = ".tmp") -> "TemporaryAsset":
         """返回一个 context manager，临时目录内写入资产，退出时自动清理。

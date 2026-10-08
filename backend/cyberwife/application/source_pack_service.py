@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from uuid import UUID, uuid5
+from uuid import UUID, uuid4, uuid5
 
 from cyberwife.domain.source_pack import SourcePackManifest
 from cyberwife.ports.assets import ExperienceManifestRepository
@@ -15,6 +15,9 @@ _SOURCE_NAMESPACE = UUID("e77e6bfa-0b68-4e8d-bc30-600b97af85e2")
 class SourcePackService:
     def __init__(self, repository: ExperienceManifestRepository) -> None:
         self._repository = repository
+
+    def load(self) -> SourcePackManifest | None:
+        return self._repository.load()
 
     def bootstrap_from_v1(
         self,
@@ -55,3 +58,62 @@ class SourcePackService:
         })
         staged_sha256 = self._repository.stage(manifest)
         return self._repository.commit(expected_revision=None, staged_sha256=staged_sha256)
+
+    def add_source(
+        self,
+        *,
+        sha256: str,
+        relative_path: str,
+        angle: str,
+        appearance_label: str,
+        consent_id: str,
+        provenance: str = "local_upload",
+        created_at: str | None = None,
+    ) -> tuple[SourcePackManifest, dict, bool]:
+        """Append one source with a revision CAS; identical bytes are idempotent."""
+        current = self._repository.load()
+        if current is not None:
+            existing = next(
+                (item for item in current.payload["sources"] if item["sha256"] == sha256.lower()),
+                None,
+            )
+            if existing is not None:
+                return current, dict(existing), False
+            payload = current.to_dict()
+            payload["revision"] = current.revision + 1
+            expected_revision: int | None = current.revision
+            pack_id = str(payload["pack_id"])
+        else:
+            pack_id = str(uuid4())
+            payload = {
+                "schema_version": 1,
+                "pack_id": pack_id,
+                "revision": 1,
+                "legacy_asset_id": None,
+                "active_appearance_id": None,
+                "active_scene_id": None,
+                "sources": [],
+                "appearances": [],
+                "scenes": [],
+                "renditions": [],
+            }
+            expected_revision = None
+        source_id = str(uuid5(_SOURCE_NAMESPACE, f"source-pack:{pack_id}:{sha256.lower()}"))
+        source = {
+            "source_id": source_id,
+            "sha256": sha256.lower(),
+            "relative_path": relative_path,
+            "angle": angle,
+            "appearance_label": appearance_label,
+            "consent_id": consent_id,
+            "provenance": provenance,
+            "created_at": created_at or datetime.now(timezone.utc).isoformat(),
+        }
+        payload["sources"].append(source)
+        manifest = SourcePackManifest.from_dict(payload)
+        staged_sha256 = self._repository.stage(manifest)
+        committed = self._repository.commit(
+            expected_revision=expected_revision,
+            staged_sha256=staged_sha256,
+        )
+        return committed, dict(source), True

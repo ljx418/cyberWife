@@ -8,10 +8,7 @@ from pathlib import Path
 from contextlib import contextmanager
 
 from cyberwife.domain.source_pack import SourcePackManifest
-
-
-class ManifestRevisionConflict(RuntimeError):
-    pass
+from cyberwife.ports.assets import ManifestRevisionConflict
 
 
 class JsonManifestRepository:

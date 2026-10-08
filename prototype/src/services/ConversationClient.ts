@@ -120,6 +120,26 @@ export interface MemoryCandidate {
   reason: string;
 }
 
+export type SourceAngle = "front" | "left" | "right" | "full_body" | "unknown";
+
+export interface SourcePackSource {
+  source_id: string;
+  sha256: string;
+  angle: SourceAngle;
+  appearance_label: string;
+  consent_id: string;
+  provenance: "local_upload" | "v1_active_asset" | string;
+  created_at: string;
+  content_url: string;
+}
+
+export interface SourcePack {
+  schema_version: 1;
+  pack_id: string | null;
+  revision: number;
+  sources: SourcePackSource[];
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${GATEWAY_BASE}${path}`, {
     method,
@@ -194,6 +214,22 @@ export const ConversationClient = {
   async grantConsent(scope: "portrait" | "voice" | "all") { return request("POST", "/api/v1/consents", { scope, policy_version: "v1" }); },
   async revokeConsent(scope: "portrait" | "voice" | "all") { return request("DELETE", `/api/v1/consents/${scope}`); },
   async getAssets(kind: "portrait" | "voice") { return request<{ kind: string; items: Array<Record<string, unknown>> }>("GET", `/api/v1/assets/${kind}`); },
+  async getSourcePack() { return request<SourcePack>("GET", "/api/v1/source-pack"); },
+  async uploadSource(file: File, angle: SourceAngle, appearanceLabel: string) {
+    const body = new FormData();
+    body.append("file", file, file.name);
+    body.append("angle", angle);
+    body.append("appearance_label", appearanceLabel);
+    const response = await fetch(`${GATEWAY_BASE}/api/v1/source-pack/sources`, { method: "POST", body, cache: "no-store" });
+    if (!response.ok) {
+      const error: ErrorEnvelope = await response.json().catch(() => ({
+        code: "internal.error", message: `HTTP ${response.status}`, user_action: "retry_later", trace_id: "", retryable: true,
+      }));
+      throw new Error(`${error.code}: ${error.message} (trace=${error.trace_id})`);
+    }
+    return response.json() as Promise<SourcePack & { source: SourcePackSource; created: boolean }>;
+  },
+  sourceContentUrl(source: SourcePackSource) { return `${GATEWAY_BASE}${source.content_url}?v=${encodeURIComponent(source.sha256.slice(0, 12))}`; },
   async uploadAsset(kind: "portrait" | "voice", file: File) {
     return upload<{ id: number; entity_id_hash: string; mime: string; size_bytes: number }>(`/api/v1/assets/${kind}/preview`, file);
   },

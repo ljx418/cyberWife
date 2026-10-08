@@ -7,7 +7,7 @@ import type {
   ThemeMode,
   VisualVariant,
 } from './types'
-import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type WsEnvelope } from './services/ConversationClient'
+import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type SourceAngle, type SourcePack, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession, type InputCalibration, type InputDevice, type InputMode } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { PwaBridge } from './services/PwaBridge'
@@ -162,6 +162,8 @@ function App() {
   const [outputMuted, setOutputMuted] = useState(false)
   const [outputDevices, setOutputDevices] = useState<Array<{ deviceId: string; label: string }>>([])
   const [pwaFeatureEnabled, setPwaFeatureEnabled] = useState(false)
+  const [sourcePackFeatureEnabled, setSourcePackFeatureEnabled] = useState(false)
+  const [sourcePack, setSourcePack] = useState<SourcePack>({ schema_version: 1, pack_id: null, revision: 0, sources: [] })
   const [installAvailable, setInstallAvailable] = useState(false)
   const [fullscreenActive, setFullscreenActive] = useState(Boolean(document.fullscreenElement))
   const [desktopStatus, setDesktopStatus] = useState('')
@@ -228,6 +230,7 @@ function App() {
         setLifecycleFeatureEnabled(experience.features.lifecycle_recovery === true)
         setOutputFeatureEnabled(experience.features.output_controls === true)
         setPwaFeatureEnabled(experience.features.pwa === true)
+        setSourcePackFeatureEnabled(experience.features.source_pack === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
           status: toRuntimeStatus(item.status),
@@ -385,6 +388,8 @@ function App() {
           const kind = settingsTab === 'profile' ? 'portrait' : 'voice'
           const response = await ConversationClient.getAssets(kind)
           setAssetCounts((value) => ({ ...value, [kind]: response.items.length }))
+        } else if (settingsTab === 'sources' && sourcePackFeatureEnabled) {
+          setSourcePack(await ConversationClient.getSourcePack())
         } else if (settingsTab === 'persona') {
           const profile = await ConversationClient.getProfile()
           if (profile) {
@@ -1252,6 +1257,19 @@ function App() {
           setSettingsStatus={setSettingsStatus}
           assetCounts={assetCounts}
           runtimeRows={runtimeRows}
+          sourcePackFeatureEnabled={sourcePackFeatureEnabled}
+          sourcePack={sourcePack}
+          onUploadSource={async (file, angle, appearanceLabel) => {
+            setSettingsStatus(`正在导入 ${file.name}…`)
+            try {
+              const result = await ConversationClient.uploadSource(file, angle, appearanceLabel)
+              setSourcePack({ schema_version: result.schema_version, pack_id: result.pack_id, revision: result.revision, sources: result.sources })
+              setSettingsStatus(result.created ? '素材已保存到当前人物的私有素材包' : '相同素材已存在，没有重复保存')
+            } catch (error) {
+              setSettingsStatus(`素材未导入：${String(error)}`)
+              throw error
+            }
+          }}
           inputFeatureEnabled={inputFeatureEnabled}
           inputMode={inputMode}
           setInputMode={setInputMode}
@@ -1665,6 +1683,9 @@ interface SettingsDrawerProps {
   setSettingsStatus: (status: string) => void
   assetCounts: { portrait: number; voice: number }
   runtimeRows: RuntimeService[]
+  sourcePackFeatureEnabled: boolean
+  sourcePack: SourcePack
+  onUploadSource: (file: File, angle: SourceAngle, appearanceLabel: string) => Promise<void>
   inputFeatureEnabled: boolean
   inputMode: InputMode
   setInputMode: (mode: InputMode) => void
@@ -1685,9 +1706,88 @@ interface SettingsDrawerProps {
   onPreviewVoice: () => Promise<void>
 }
 
+type PendingSource = {
+  id: string
+  file: File
+  angle: SourceAngle
+  appearanceLabel: string
+  state: 'pending' | 'uploading' | 'done' | 'failed'
+}
+
+function SourcePackPanel(props: { sourcePack: SourcePack; onUpload: (file: File, angle: SourceAngle, appearanceLabel: string) => Promise<void> }) {
+  const [pending, setPending] = useState<PendingSource[]>([])
+  const [busy, setBusy] = useState(false)
+  const update = (id: string, patch: Partial<PendingSource>) => setPending((items) => items.map((item) => item.id === id ? { ...item, ...patch } : item))
+  const importAll = async () => {
+    setBusy(true)
+    for (const item of pending.filter((value) => value.state !== 'done')) {
+      update(item.id, { state: 'uploading' })
+      try {
+        await props.onUpload(item.file, item.angle, item.appearanceLabel.trim())
+        update(item.id, { state: 'done' })
+      } catch {
+        update(item.id, { state: 'failed' })
+      }
+    }
+    setBusy(false)
+  }
+  return (
+    <section>
+      <SectionHeader index="02" title="多角度素材" description="这些照片只属于当前人物的输入素材包；导入不会自动替换正在说话的人物，也不会推断照片外的身体或穿着事实。" />
+      <label className="asset-file-button source-pack-picker">
+        选择多张授权照片
+        <input
+          type="file"
+          accept="image/jpeg,image/png"
+          multiple
+          onChange={(event) => {
+            const files = Array.from(event.target.files || [])
+            setPending(files.map((file, index) => ({
+              id: `${file.name}-${file.size}-${file.lastModified}-${index}`,
+              file,
+              angle: 'unknown',
+              appearanceLabel: '',
+              state: 'pending',
+            })))
+          }}
+        />
+      </label>
+      {pending.length > 0 && <div className="source-import-list" aria-label="待导入素材">
+        {pending.map((item) => <article key={item.id}>
+          <div><strong>{item.file.name}</strong><small>{(item.file.size / 1024 / 1024).toFixed(2)} MiB · {item.state === 'done' ? '已导入' : item.state === 'failed' ? '失败，可重试' : item.state === 'uploading' ? '正在导入' : '等待标注'}</small></div>
+          <label>拍摄角度
+            <select aria-label={`${item.file.name} 拍摄角度`} value={item.angle} disabled={item.state === 'done'} onChange={(event) => update(item.id, { angle: event.target.value as SourceAngle })}>
+              <option value="unknown">未分类</option><option value="front">正面</option><option value="left">左侧</option><option value="right">右侧</option><option value="full_body">全身</option>
+            </select>
+          </label>
+          <label>穿着标签
+            <input aria-label={`${item.file.name} 穿着标签`} value={item.appearanceLabel} disabled={item.state === 'done'} maxLength={120} placeholder="由你确认，例如：蓝白碎花上衣" onChange={(event) => update(item.id, { appearanceLabel: event.target.value })} />
+          </label>
+        </article>)}
+        <button className="primary-button" type="button" disabled={busy || pending.some((item) => item.state !== 'done' && !item.appearanceLabel.trim())} onClick={() => { void importAll() }}>
+          {busy ? '正在逐张导入…' : `导入 ${pending.filter((item) => item.state !== 'done').length} 张素材`}
+        </button>
+      </div>}
+      <div className="source-pack-summary">
+        <strong>当前素材包 · revision {props.sourcePack.revision}</strong>
+        <span>{props.sourcePack.sources.length} 张已授权源图；原图不进入前端缓存</span>
+      </div>
+      <div className="source-pack-grid" aria-label="当前人物素材">
+        {props.sourcePack.sources.length === 0 ? <div className="empty-state"><strong>尚未导入多角度素材</strong><span>可先选择正面、侧面、全身或不同穿着照片。</span></div> : props.sourcePack.sources.map((source) => (
+          <article key={source.source_id}>
+            <img src={ConversationClient.sourceContentUrl(source)} alt={`${source.angle} · ${source.appearance_label}`} />
+            <div><strong>{source.appearance_label}</strong><span>{source.angle} · {source.provenance === 'local_upload' ? '本机上传' : source.provenance}</span><small>{source.consent_id} · SHA {source.sha256.slice(0, 12)}</small></div>
+          </article>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 function SettingsDrawer(props: SettingsDrawerProps) {
   const tabs: Array<{ id: SettingsTab; label: string }> = [
     { id: 'profile', label: '人物' },
+    ...(props.sourcePackFeatureEnabled ? [{ id: 'sources' as SettingsTab, label: '素材' }] : []),
     { id: 'voice', label: '声音' },
     ...(props.inputFeatureEnabled ? [{ id: 'input' as SettingsTab, label: '输入' }] : []),
     { id: 'persona', label: '人设' },
@@ -1753,6 +1853,9 @@ function SettingsDrawer(props: SettingsDrawerProps) {
               <SectionHeader index="02" title="声音版本" description="参考声音只保存在本机；新版本通过校验后原子激活。" />
               <div className="profile-preview"><div><strong>CosyVoice 参考声音</strong><span>{props.assetCounts.voice} 个本机版本</span><label className="secondary-button asset-file-button">选择新声音<input type="file" accept="audio/wav,audio/mpeg" onChange={(event) => { const file = event.target.files?.[0]; if (file) void props.onAssetUploaded('voice', file) }} /></label><button className="secondary-button" type="button" onClick={() => { void props.onPreviewVoice() }}>试听当前声音</button><button className="secondary-button" type="button" onClick={async () => { try { await ConversationClient.restoreAsset('voice'); props.setSettingsStatus('已恢复上一声音版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
             </section>
+          )}
+          {props.activeTab === 'sources' && props.sourcePackFeatureEnabled && (
+            <SourcePackPanel sourcePack={props.sourcePack} onUpload={props.onUploadSource} />
           )}
           {props.activeTab === 'input' && props.inputFeatureEnabled && (
             <section>

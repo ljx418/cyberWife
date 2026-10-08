@@ -7,6 +7,10 @@ from typing import Protocol
 from cyberwife.domain.source_pack import SourcePackManifest
 
 
+class ManifestRevisionConflict(RuntimeError):
+    """A staged manifest no longer matches the active revision or writer."""
+
+
 class AssetStorePort(Protocol):
     """Store private user assets without exposing infrastructure details."""
 
@@ -20,6 +24,8 @@ class AssetStorePort(Protocol):
         *,
         max_bytes: int = 50 * 1024 * 1024,
     ) -> dict: ...
+
+    def delete(self, relative_path: str) -> None: ...
 
 
 class ExperienceManifestRepository(Protocol):

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from typing import AsyncIterator
 
 from pathlib import Path
-from fastapi import BackgroundTasks, FastAPI, File, HTTPException, Request, UploadFile, status, WebSocket, WebSocketDisconnect
+from fastapi import BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile, status, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
@@ -26,7 +26,7 @@ from cyberwife.application.model_registry import ModelRegistry
 from cyberwife.application.conversation_orchestrator import ConversationOrchestrator
 from cyberwife.application.session_runtime import SessionRuntime
 from cyberwife.domain.conversation import RecordingPolicy, SessionState
-from cyberwife.ports.assets import AssetStorePort
+from cyberwife.ports.assets import AssetStorePort, ManifestRevisionConflict
 from cyberwife.ports.repositories import ApplicationRepositoryPort
 
 
@@ -98,6 +98,7 @@ class ApiGateway:
         avatar_asset_service=None,
         privacy_cache_clear=None,
         experience_flags: dict[str, bool] | None = None,
+        source_pack_service=None,
     ) -> None:
         self._registry = registry
         self._aggregator = aggregator
@@ -113,6 +114,7 @@ class ApiGateway:
         self._avatar_asset_service = avatar_asset_service
         self._privacy_cache_clear = privacy_cache_clear
         self._experience_flags = {key: bool(value) for key, value in (experience_flags or {}).items()}
+        self._source_pack_service = source_pack_service
         self._asset_store = asset_store
         self._static_root = Path(static_root) if static_root else Path(__file__).resolve().parents[3] / "prototype" / "dist"
         self._session_runtimes: dict[int, SessionRuntime] = {}
@@ -545,6 +547,144 @@ class ApiGateway:
             if not self._repository:
                 raise HTTPException(status_code=503, detail="health.component_unavailable")
             return {"kind": kind, "items": await asyncio.to_thread(self._repository.list_asset_versions, kind)}
+
+        def source_pack_public(manifest):
+            if manifest is None:
+                return {"schema_version": 1, "pack_id": None, "revision": 0, "sources": []}
+            payload = manifest.to_dict()
+            return {
+                "schema_version": 1,
+                "pack_id": payload["pack_id"],
+                "revision": payload["revision"],
+                "sources": [{
+                    "source_id": item["source_id"],
+                    "sha256": item["sha256"],
+                    "angle": item["angle"],
+                    "appearance_label": item["appearance_label"],
+                    "consent_id": item["consent_id"],
+                    "provenance": item["provenance"],
+                    "created_at": item["created_at"],
+                    "content_url": f"/api/v1/source-pack/sources/{item['source_id']}/content",
+                } for item in payload["sources"]],
+            }
+
+        def require_source_pack():
+            if not self._experience_flags.get("source_pack") or self._source_pack_service is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            return self._source_pack_service
+
+        def ensure_source_pack(service):
+            manifest = service.load()
+            if manifest is not None or self._repository is None or not self._repository.consent_active("portrait"):
+                return manifest
+            active = self._repository.get_active_asset("portrait")
+            if active is None:
+                return None
+            consents = [
+                row for row in self._repository.list_consents()
+                if row.get("granted") and row.get("scope") in {"portrait", "all"}
+            ]
+            if not consents:
+                return None
+            return service.bootstrap_from_v1(
+                legacy_asset_id=int(active["id"]),
+                sha256=str(active["sha256"]),
+                relative_path=str(active["relative_path"]),
+                consent_id=f"consent-{max(int(row['id']) for row in consents)}",
+                created_at=str(active["created_at"]),
+            )
+
+        @app.get("/api/v1/source-pack")
+        async def get_source_pack():
+            service = require_source_pack()
+            manifest = await asyncio.to_thread(ensure_source_pack, service)
+            return source_pack_public(manifest)
+
+        @app.post("/api/v1/source-pack/sources")
+        async def add_source_pack_source(
+            file: UploadFile = File(...),
+            angle: str = Form(...),
+            appearance_label: str = Form(...),
+        ):
+            service = require_source_pack()
+            if self._repository is None or not self._repository.consent_active("portrait"):
+                raise HTTPException(status_code=403, detail="auth.consent_required")
+            if self._asset_store is None or not file.filename:
+                raise HTTPException(status_code=422, detail="asset.invalid")
+            await asyncio.to_thread(ensure_source_pack, service)
+            content = await file.read(20 * 1024 * 1024 + 1)
+            if len(content) > 20 * 1024 * 1024:
+                raise HTTPException(status_code=413, detail="asset.too_large")
+            import tempfile
+            from pathlib import Path as _P
+            suffix = _P(file.filename).suffix.lower()
+            if suffix not in {".jpg", ".jpeg", ".png"}:
+                raise HTTPException(status_code=422, detail="asset.invalid: portrait extension")
+            stored_name = f"source-{uuid.uuid4().hex}{suffix}"
+            relative_path = ""
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(content)
+                tmp_path = _P(tmp.name)
+            try:
+                metadata = self._asset_store.ingest("portrait", stored_name, tmp_path, max_bytes=20 * 1024 * 1024)
+                relative_path = str(metadata["relative_path"])
+                consents = [
+                    row for row in self._repository.list_consents()
+                    if row.get("granted") and row.get("scope") in {"portrait", "all"}
+                ]
+                if not consents:
+                    raise PermissionError("auth.consent_required")
+                consent_id = f"consent-{max(int(row['id']) for row in consents)}"
+                manifest, source, created = await asyncio.to_thread(
+                    service.add_source,
+                    sha256=str(metadata["sha256"]),
+                    relative_path=relative_path,
+                    angle=angle,
+                    appearance_label=appearance_label,
+                    consent_id=consent_id,
+                )
+                if not created:
+                    self._asset_store.delete(relative_path)
+                public = source_pack_public(manifest)
+                public["source"] = next(item for item in public["sources"] if item["source_id"] == source["source_id"])
+                public["created"] = created
+                return public
+            except PermissionError:
+                if relative_path:
+                    self._asset_store.delete(relative_path)
+                raise HTTPException(status_code=403, detail="auth.consent_required")
+            except ValueError as exc:
+                if relative_path:
+                    self._asset_store.delete(relative_path)
+                raise HTTPException(status_code=422, detail=f"asset.invalid: {exc}")
+            except ManifestRevisionConflict:
+                if relative_path:
+                    self._asset_store.delete(relative_path)
+                raise HTTPException(status_code=409, detail="asset.version_conflict")
+            except Exception:
+                if relative_path:
+                    self._asset_store.delete(relative_path)
+                raise
+            finally:
+                tmp_path.unlink(missing_ok=True)
+
+        @app.get("/api/v1/source-pack/sources/{source_id}/content")
+        async def get_source_pack_source_content(source_id: str):
+            service = require_source_pack()
+            if self._repository is None or not self._repository.consent_active("portrait"):
+                raise HTTPException(status_code=403, detail="auth.consent_required")
+            manifest = await asyncio.to_thread(service.load)
+            source = next((item for item in manifest.payload["sources"] if item["source_id"] == source_id), None) if manifest else None
+            if source is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            try:
+                target = self._asset_store.resolve(str(source["relative_path"])) if self._asset_store else None
+            except ValueError:
+                raise HTTPException(status_code=422, detail="asset.invalid")
+            if target is None or not target.is_file():
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            media_type = "image/png" if target.suffix.lower() == ".png" else "image/jpeg"
+            return FileResponse(target, media_type=media_type, headers={"Cache-Control": "no-store, private"})
 
         @app.get("/api/v1/assets/{kind}/active/content")
         async def active_asset_content(kind: str):

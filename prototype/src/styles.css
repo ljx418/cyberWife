@@ -505,6 +505,77 @@ select:focus-visible {
   backdrop-filter: blur(14px);
 }
 
+.source-pack-picker {
+  display: inline-flex;
+  margin: 6px 0 18px;
+}
+.source-import-list {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+.source-import-list article {
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(130px, 0.7fr) minmax(220px, 1.4fr);
+  gap: 12px;
+  align-items: end;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+}
+.source-import-list article > div,
+.source-import-list label,
+.source-pack-summary,
+.source-pack-grid article > div {
+  display: grid;
+  gap: 5px;
+}
+.source-import-list label,
+.source-import-list small,
+.source-pack-summary span,
+.source-pack-grid span,
+.source-pack-grid small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.source-import-list input,
+.source-import-list select {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+}
+.source-pack-summary {
+  margin: 8px 0 14px;
+}
+.source-pack-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 14px;
+}
+.source-pack-grid article {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--soft);
+}
+.source-pack-grid img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  background: rgba(0, 0, 0, 0.16);
+}
+.source-pack-grid article > div {
+  padding: 12px;
+}
+@media (max-width: 760px) {
+  .source-import-list article { grid-template-columns: 1fr; }
+}
+
 .output-controls button,
 .output-controls select {
   min-height: 32px;

@@ -53,6 +53,8 @@ from cyberwife.application.avatar_asset_service import AvatarAssetService  # noq
 from cyberwife.application.runtime_metrics import RuntimeMetrics  # noqa: E402
 from cyberwife.application.voice_reference_quality import validate_voice_reference  # noqa: E402
 from cyberwife.infrastructure.asset_store import AssetStore  # noqa: E402
+from cyberwife.infrastructure.json_manifest_repository import JsonManifestRepository  # noqa: E402
+from cyberwife.application.source_pack_service import SourcePackService  # noqa: E402
 from cyberwife.infrastructure.structured_logger import StructuredLogger  # noqa: E402
 
 
@@ -151,6 +153,7 @@ def main() -> None:
     retention_service = RetentionService(repo, data_root=data_root)
     launcher_service = LauncherService(repo_root)
     asset_store = AssetStore(assets_root)
+    source_pack_service = SourcePackService(JsonManifestRepository(data_root))
     avatar_asset_service = AvatarAssetService(
         repo,
         asset_store=asset_store,
@@ -341,6 +344,7 @@ def main() -> None:
         avatar_asset_service=avatar_asset_service,
         privacy_cache_clear=getattr(tts, "clear_private_cache", None),
         experience_flags=runtime.get("v2x", {}),
+        source_pack_service=source_pack_service,
     )
     app = gateway.build_app()
 
