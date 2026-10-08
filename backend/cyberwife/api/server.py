@@ -55,6 +55,7 @@ from cyberwife.application.voice_reference_quality import validate_voice_referen
 from cyberwife.infrastructure.asset_store import AssetStore  # noqa: E402
 from cyberwife.infrastructure.json_manifest_repository import JsonManifestRepository  # noqa: E402
 from cyberwife.application.source_pack_service import SourcePackService  # noqa: E402
+from cyberwife.application.scene_preset_service import ScenePresetService  # noqa: E402
 from cyberwife.infrastructure.structured_logger import StructuredLogger  # noqa: E402
 
 
@@ -154,6 +155,10 @@ def main() -> None:
     launcher_service = LauncherService(repo_root)
     asset_store = AssetStore(assets_root)
     source_pack_service = SourcePackService(JsonManifestRepository(data_root))
+    scene_preset_service = ScenePresetService(
+        source_pack_service,
+        repo_root / "prototype" / "public" / "backgrounds",
+    )
     avatar_asset_service = AvatarAssetService(
         repo,
         asset_store=asset_store,
@@ -345,6 +350,7 @@ def main() -> None:
         privacy_cache_clear=getattr(tts, "clear_private_cache", None),
         experience_flags=runtime.get("v2x", {}),
         source_pack_service=source_pack_service,
+        scene_preset_service=scene_preset_service,
     )
     app = gateway.build_app()
 

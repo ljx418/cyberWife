@@ -117,3 +117,32 @@ class SourcePackService:
             staged_sha256=staged_sha256,
         )
         return committed, dict(source), True
+
+    def register_scenes(self, scenes: list[dict]) -> SourcePackManifest:
+        """Idempotently register the trusted scene catalog using manifest CAS."""
+        current = self._repository.load()
+        if current is None:
+            raise ValueError("source_pack.required")
+        normalized = sorted(
+            ({
+                "scene_id": str(item["scene_id"]),
+                "label": str(item["label"]),
+                "asset_sha256": str(item["asset_sha256"]).lower(),
+            } for item in scenes),
+            key=lambda item: item["scene_id"],
+        )
+        existing = sorted(current.payload["scenes"], key=lambda item: item["scene_id"])
+        if existing == normalized:
+            return current
+        payload = current.to_dict()
+        payload["revision"] = current.revision + 1
+        payload["scenes"] = normalized
+        active_scene_id = payload.get("active_scene_id")
+        if active_scene_id is not None and active_scene_id not in {item["scene_id"] for item in normalized}:
+            raise ValueError("scene.active_reference_missing")
+        manifest = SourcePackManifest.from_dict(payload)
+        staged_sha256 = self._repository.stage(manifest)
+        return self._repository.commit(
+            expected_revision=current.revision,
+            staged_sha256=staged_sha256,
+        )

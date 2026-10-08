@@ -1,0 +1,13 @@
+{
+  "1": {"class_type": "LoadImage", "inputs": {"image": "cw_scene_identity.png"}},
+  "2": {"class_type": "LoadImage", "inputs": {"image": "cw_scene_background.webp"}},
+  "3": {"class_type": "UnetLoaderGGUF", "inputs": {"unet_name": "qwen-image-2.1-Q6_K.gguf"}},
+  "4": {"class_type": "CLIPLoader", "inputs": {"clip_name": "qwen3vl_8b_bf16.safetensors", "type": "qwen_image", "device": "default"}},
+  "5": {"class_type": "VAELoader", "inputs": {"vae_name": "qwen_image_2.1_vae_bf16.safetensors"}},
+  "6": {"class_type": "TextEncodeQwenImage21", "inputs": {"clip": ["4", 0], "images.image_1": ["1", 0], "images.image_2": ["2", 0], "vae": ["5", 0], "prompt": "Create a direct complete-scene photograph using the exact woman from image 1 and the exact room from image 2.", "negative_prompt": "different person, identity drift, outfit change, side profile, looking away, head tilt, open mouth, teeth, talking, extra person, duplicate person, collage, cutout, matte edge, transparent background, mismatched light, text, watermark, blur, low resolution", "resolution": 1024}},
+  "7": {"class_type": "QwenImage21Cache", "inputs": {"model": ["3", 0], "device": "auto", "dtype": "default"}},
+  "8": {"class_type": "EmptyLatentImage", "inputs": {"width": 1536, "height": 864, "batch_size": 1}},
+  "9": {"class_type": "KSampler", "inputs": {"model": ["7", 0], "positive": ["6", 0], "negative": ["6", 1], "latent_image": ["8", 0], "seed": 271828, "steps": 25, "cfg": 1.0, "sampler_name": "euler", "scheduler": "simple", "denoise": 1.0}},
+  "10": {"class_type": "VAEDecode", "inputs": {"samples": ["9", 0], "vae": ["5", 0]}},
+  "11": {"class_type": "SaveImage", "inputs": {"images": ["10", 0], "filename_prefix": "cyberWife/scenes/keyframe"}}
+}

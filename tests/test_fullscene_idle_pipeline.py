@@ -56,3 +56,42 @@ def test_first_last_cycle_stretches_without_midpoint_join_or_reversal():
     assert int(loop[80][0, 0, 0]) in {40, 41}
     assert np.array_equal(loop[0], loop[-1])
     assert int(loop[-2][0, 0, 0]) <= 2
+
+
+def test_idle_motion_gate_accepts_small_complete_frame_motion(monkeypatch, tmp_path):
+    detector = tmp_path / "det.onnx"
+    detector.write_bytes(b"offline")
+    detections = iter([
+        [(100 + offset, 80, 300 + offset, 320, 0.99)]
+        for offset in (0, 1, -1, 1, 0)
+    ])
+    monkeypatch.setattr(
+        fullscene_idle_pipeline,
+        "detect_faces",
+        lambda _frame, _model: next(detections),
+    )
+    frames = [np.zeros((432, 768, 3), dtype=np.uint8) for _ in range(5)]
+
+    metrics = fullscene_idle_pipeline._validate_idle_motion(
+        frames, model_path=detector
+    )
+
+    assert metrics["face_center_p95_percent_diagonal"] < 1
+    assert metrics["face_area_cv_percent"] == 0
+
+
+def test_idle_motion_gate_rejects_large_face_translation(monkeypatch, tmp_path):
+    detector = tmp_path / "det.onnx"
+    detector.write_bytes(b"offline")
+    detections = iter([
+        [(x, 80, x + 200, 320, 0.99)] for x in (40, 80, 120, 160, 200)
+    ])
+    monkeypatch.setattr(
+        fullscene_idle_pipeline,
+        "detect_faces",
+        lambda _frame, _model: next(detections),
+    )
+    frames = [np.zeros((432, 768, 3), dtype=np.uint8) for _ in range(5)]
+
+    with np.testing.assert_raises_regex(RuntimeError, "idle_motion_validation_failed"):
+        fullscene_idle_pipeline._validate_idle_motion(frames, model_path=detector)

@@ -21,7 +21,7 @@
     { "id": "turn", "type": "backend", "label": "TurnPipeline", "sublabel": "六态 · generation token · cancel", "pos": [750, 285], "size": [190, 105], "tag": "V1权威主链" },
     { "id": "speech", "type": "backend", "label": "Speech Worker", "sublabel": "VAD · ASR · CosyVoice", "pos": [1010, 105], "size": [190, 92], "tag": "X8.2预设" },
     { "id": "llm", "type": "backend", "label": "llama.cpp", "sublabel": "Windows loopback :8090", "pos": [1010, 300], "size": [190, 82] },
-    { "id": "avatar", "type": "backend", "label": "Avatar Runtime", "sublabel": "音频驱动口型 · 同场景单人物", "pos": [1010, 500], "size": [190, 100], "tag": "X4 / X4.1 / X8" },
+    { "id": "avatar", "type": "backend", "label": "Avatar Runtime", "sublabel": "音频驱动口型 · 同场景单人物", "pos": [1010, 500], "size": [190, 100], "tag": "X3.2～X4 / X8" },
     { "id": "memory", "type": "database", "label": "SQLite记忆工作台", "sublabel": "FTS · vector · 来源 · 聚类派生", "pos": [750, 530], "size": [190, 92], "tag": "X6" },
     { "id": "assets", "type": "database", "label": "版本化私有资产", "sublabel": "source-pack · appearance · scene", "pos": [505, 530], "size": [175, 92], "tag": "X1-X5" }
   ],

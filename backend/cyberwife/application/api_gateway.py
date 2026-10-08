@@ -99,6 +99,7 @@ class ApiGateway:
         privacy_cache_clear=None,
         experience_flags: dict[str, bool] | None = None,
         source_pack_service=None,
+        scene_preset_service=None,
     ) -> None:
         self._registry = registry
         self._aggregator = aggregator
@@ -115,6 +116,7 @@ class ApiGateway:
         self._privacy_cache_clear = privacy_cache_clear
         self._experience_flags = {key: bool(value) for key, value in (experience_flags or {}).items()}
         self._source_pack_service = source_pack_service
+        self._scene_preset_service = scene_preset_service
         self._asset_store = asset_store
         self._static_root = Path(static_root) if static_root else Path(__file__).resolve().parents[3] / "prototype" / "dist"
         self._session_runtimes: dict[int, SessionRuntime] = {}
@@ -599,6 +601,23 @@ class ApiGateway:
             service = require_source_pack()
             manifest = await asyncio.to_thread(ensure_source_pack, service)
             return source_pack_public(manifest)
+
+        @app.get("/api/v1/scene-presets")
+        async def get_scene_presets():
+            if not self._experience_flags.get("scene_presets") or self._scene_preset_service is None:
+                raise HTTPException(status_code=404, detail="audit.entity_not_found")
+            source_pack = require_source_pack()
+            manifest = await asyncio.to_thread(ensure_source_pack, source_pack)
+            if manifest is None:
+                raise HTTPException(status_code=409, detail="source_pack.required")
+            try:
+                return await asyncio.to_thread(self._scene_preset_service.ensure_registered)
+            except ManifestRevisionConflict:
+                raise HTTPException(status_code=409, detail="asset.version_conflict")
+            except FileNotFoundError as exc:
+                raise HTTPException(status_code=503, detail=str(exc))
+            except ValueError as exc:
+                raise HTTPException(status_code=422, detail=str(exc))
 
         @app.post("/api/v1/source-pack/sources")
         async def add_source_pack_source(

@@ -140,6 +140,26 @@ export interface SourcePack {
   sources: SourcePackSource[];
 }
 
+export interface ScenePreset {
+  scene_id: string;
+  slug: string;
+  label: string;
+  description: string;
+  asset_sha256: string;
+  preview_url: string;
+  focus: { x: number; y: number };
+  safe_area: { left: number; top: number; right: number; bottom: number };
+  quality_status: "preview_only" | "approved" | "active";
+  can_activate: boolean;
+}
+
+export interface ScenePresetCatalog {
+  schema_version: 1;
+  revision: number;
+  active_scene_id: string | null;
+  items: ScenePreset[];
+}
+
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const r = await fetch(`${GATEWAY_BASE}${path}`, {
     method,
@@ -215,6 +235,7 @@ export const ConversationClient = {
   async revokeConsent(scope: "portrait" | "voice" | "all") { return request("DELETE", `/api/v1/consents/${scope}`); },
   async getAssets(kind: "portrait" | "voice") { return request<{ kind: string; items: Array<Record<string, unknown>> }>("GET", `/api/v1/assets/${kind}`); },
   async getSourcePack() { return request<SourcePack>("GET", "/api/v1/source-pack"); },
+  async getScenePresets() { return request<ScenePresetCatalog>("GET", "/api/v1/scene-presets"); },
   async uploadSource(file: File, angle: SourceAngle, appearanceLabel: string) {
     const body = new FormData();
     body.append("file", file, file.name);

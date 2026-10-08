@@ -7,7 +7,7 @@ import type {
   ThemeMode,
   VisualVariant,
 } from './types'
-import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type SourceAngle, type SourcePack, type WsEnvelope } from './services/ConversationClient'
+import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGenerationJob, type MemoryCandidate, type Profile as ApiProfile, type ScenePresetCatalog, type SourceAngle, type SourcePack, type WsEnvelope } from './services/ConversationClient'
 import { InputAudioSession, type InputCalibration, type InputDevice, type InputMode } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { PwaBridge } from './services/PwaBridge'
@@ -158,6 +158,8 @@ function App() {
   const [pwaFeatureEnabled, setPwaFeatureEnabled] = useState(false)
   const [sourcePackFeatureEnabled, setSourcePackFeatureEnabled] = useState(false)
   const [sourcePack, setSourcePack] = useState<SourcePack>({ schema_version: 1, pack_id: null, revision: 0, sources: [] })
+  const [scenePresetFeatureEnabled, setScenePresetFeatureEnabled] = useState(false)
+  const [scenePresetCatalog, setScenePresetCatalog] = useState<ScenePresetCatalog | null>(null)
   const [installAvailable, setInstallAvailable] = useState(false)
   const [fullscreenActive, setFullscreenActive] = useState(Boolean(document.fullscreenElement))
   const [desktopStatus, setDesktopStatus] = useState('')
@@ -229,6 +231,7 @@ function App() {
         setOutputFeatureEnabled(experience.features.output_controls === true)
         setPwaFeatureEnabled(experience.features.pwa === true)
         setSourcePackFeatureEnabled(experience.features.source_pack === true)
+        setScenePresetFeatureEnabled(experience.features.scene_presets === true)
         setStageCompositionFeatureEnabled(experience.features.stage_composition === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
@@ -383,8 +386,15 @@ function App() {
     const load = async () => {
       setSettingsStatus('正在读取本机数据…')
       try {
-        if (settingsTab === 'profile' || settingsTab === 'voice') {
-          const kind = settingsTab === 'profile' ? 'portrait' : 'voice'
+        if (settingsTab === 'profile') {
+          const [response, scenes] = await Promise.all([
+            ConversationClient.getAssets('portrait'),
+            scenePresetFeatureEnabled ? ConversationClient.getScenePresets() : Promise.resolve(null),
+          ])
+          setAssetCounts((value) => ({ ...value, portrait: response.items.length }))
+          setScenePresetCatalog(scenes)
+        } else if (settingsTab === 'voice') {
+          const kind = 'voice'
           const response = await ConversationClient.getAssets(kind)
           setAssetCounts((value) => ({ ...value, [kind]: response.items.length }))
         } else if (settingsTab === 'sources' && sourcePackFeatureEnabled) {
@@ -417,7 +427,7 @@ function App() {
       }
     }
     void load()
-  }, [settingsOpen, settingsTab])
+  }, [settingsOpen, settingsTab, sourcePackFeatureEnabled, scenePresetFeatureEnabled, memoryQuery])
 
   useEffect(() => {
     if (!settingsOpen || settingsTab !== 'runtime') return
@@ -1267,6 +1277,8 @@ function App() {
           runtimeRows={runtimeRows}
           sourcePackFeatureEnabled={sourcePackFeatureEnabled}
           sourcePack={sourcePack}
+          scenePresetFeatureEnabled={scenePresetFeatureEnabled}
+          scenePresetCatalog={scenePresetCatalog}
           onUploadSource={async (file, angle, appearanceLabel) => {
             setSettingsStatus(`正在导入 ${file.name}…`)
             try {
@@ -1696,6 +1708,8 @@ interface SettingsDrawerProps {
   runtimeRows: RuntimeService[]
   sourcePackFeatureEnabled: boolean
   sourcePack: SourcePack
+  scenePresetFeatureEnabled: boolean
+  scenePresetCatalog: ScenePresetCatalog | null
   onUploadSource: (file: File, angle: SourceAngle, appearanceLabel: string) => Promise<void>
   stageCompositionFeatureEnabled: boolean
   compositionMode: CompositionMode
@@ -1828,25 +1842,37 @@ function SettingsDrawer(props: SettingsDrawerProps) {
               <SectionHeader index="01" title="人物形象" description="新文件先由本机校验并创建版本，成功后原子激活；上一可用版本始终可恢复。" />
               <div className="profile-preview"><div className="profile-preview__image" /><div><strong>{props.characterName}</strong><span>{props.assetCounts.portrait} 个本机版本</span><button className="secondary-button" type="button" onClick={async () => { try { const restored = await ConversationClient.restoreAsset('portrait') as AvatarBuild; props.onPortraitRestored(restored); props.setSettingsStatus('已恢复上一人物版本') } catch (error) { props.setSettingsStatus(`恢复失败：${String(error)}`) } }}>恢复上一版</button></div></div>
               <hr />
-              <SectionHeader index="02" title="相处空间" description="背景与人物独立保存在本机；切换空间不会替换当前人物或中断对话。" />
-              <div className="background-grid" role="radiogroup" aria-label="本地背景">
-                {sceneBackgrounds.map((background) => (
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={props.backgroundId === background.id}
-                    className={props.backgroundId === background.id ? 'background-card is-active' : 'background-card'}
-                    key={background.id}
-                    onClick={() => {
-                      props.setBackgroundId(background.id)
-                      props.setSettingsStatus(`已切换到${background.label}，选择只保存在本机`)
-                    }}
-                  >
-                    <img src={background.src} alt="" />
-                    <span><strong>{background.label}</strong><small>{background.description}</small></span>
-                  </button>
-                ))}
-              </div>
+              <SectionHeader index="02" title="相处空间" description={props.scenePresetFeatureEnabled ? '场景已登记到本机目录；动态素材通过人工质量门后才会开放会话内切换。' : '背景与人物独立保存在本机；当前为V1本地预览选择。'} />
+              {props.scenePresetFeatureEnabled ? (
+                <div className="background-grid" aria-label="本机场景目录" data-testid="scene-preset-catalog">
+                  {(props.scenePresetCatalog?.items || []).map((scene) => (
+                    <article className="background-card scene-preset-card" key={scene.scene_id} data-scene-id={scene.scene_id}>
+                      <img src={scene.preview_url} alt="" />
+                      <span><strong>{scene.label}</strong><small>{scene.description}</small><em>动态素材待准备 · SHA {scene.asset_sha256.slice(0, 10)}</em></span>
+                    </article>
+                  ))}
+                  {!props.scenePresetCatalog && <div className="empty-state"><strong>正在读取场景目录</strong><span>不会在素材未批准前开放切换。</span></div>}
+                </div>
+              ) : (
+                <div className="background-grid" role="radiogroup" aria-label="本地背景">
+                  {sceneBackgrounds.map((background) => (
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={props.backgroundId === background.id}
+                      className={props.backgroundId === background.id ? 'background-card is-active' : 'background-card'}
+                      key={background.id}
+                      onClick={() => {
+                        props.setBackgroundId(background.id)
+                        props.setSettingsStatus(`已切换到${background.label}，选择只保存在本机`)
+                      }}
+                    >
+                      <img src={background.src} alt="" />
+                      <span><strong>{background.label}</strong><small>{background.description}</small></span>
+                    </button>
+                  ))}
+                </div>
+              )}
               <hr />
               {props.stageCompositionFeatureEnabled && <>
                 <SectionHeader index="03" title="人物构图" description="选择希望的人物占幅；极窄条幅会明确降级近景，以保住面部和主操作。" />

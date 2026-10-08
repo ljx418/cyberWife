@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -24,10 +25,17 @@ from ops.avatar_idle_pipeline import (
     _windows_path,
 )
 from ops.make_seamless_idle import encode, mean_absolute_error, read_frames
+from ops.build_video_avatar import _idle_motion_metrics, _wav2lip_box
+from ops.scrfd_detector import detect_faces
 
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / "ops/comfy_avatar_fullscene_idle_api.json"
+DEFAULT_FACE_DETECTOR = Path(
+    "/mnt/c/ComfyUI-aki-v2/ComfyUI/models/insightface/models/buffalo_l/det_10g.onnx"
+)
+MAX_FACE_CENTER_P95_PERCENT = 2.5
+MAX_FACE_AREA_CV_PERCENT = 3.0
 
 NEGATIVE = (
     "talking, speech, phoneme, lip movement, mouth corner movement, open mouth, teeth, "
@@ -108,8 +116,52 @@ def _stretch_first_last_loop(frames):
     return output
 
 
-def run(keyframes: dict[str, Path], output_dir: Path) -> dict:
-    if not keyframes or not set(keyframes).issubset(POSE_PROMPTS):
+def _validate_idle_motion(
+    frames: list[np.ndarray],
+    *,
+    model_path: Path | None = None,
+) -> dict[str, float]:
+    """Reject large avatar motion while keeping naturalness as a human gate."""
+    if not frames:
+        raise RuntimeError("idle_motion_validation_failed:no_frames")
+    detector = model_path or Path(os.environ.get("CW_FACE_DETECTOR_ONNX", DEFAULT_FACE_DETECTOR))
+    if not detector.is_file():
+        raise FileNotFoundError(f"offline SCRFD model missing: {detector}")
+    frame_height, frame_width = frames[0].shape[:2]
+    boxes: list[list[int]] = []
+    for index, frame in enumerate(frames):
+        faces = detect_faces(frame, detector)
+        if len(faces) != 1:
+            raise RuntimeError(
+                f"idle_motion_validation_failed:frame={index}:faces={len(faces)}"
+            )
+        x1, y1, x2, y2, _ = faces[0]
+        boxes.append(
+            _wav2lip_box(
+                (x1, y1, x2, y2),
+                frame_width=frame_width,
+                frame_height=frame_height,
+            )
+        )
+    metrics = _idle_motion_metrics(
+        np.asarray(boxes), frame_width=frame_width, frame_height=frame_height
+    )
+    if (
+        metrics["face_center_p95_percent_diagonal"] > MAX_FACE_CENTER_P95_PERCENT
+        or metrics["face_area_cv_percent"] > MAX_FACE_AREA_CV_PERCENT
+    ):
+        raise RuntimeError(f"idle_motion_validation_failed:{metrics}")
+    return metrics
+
+
+def run(
+    keyframes: dict[str, Path],
+    output_dir: Path,
+    *,
+    prompts: dict[str, str] | None = None,
+) -> dict:
+    prompt_map = POSE_PROMPTS if prompts is None else prompts
+    if not keyframes or not set(keyframes).issubset(prompt_map):
         raise ValueError("one or more approved pose keyframes are required")
     output_dir.mkdir(parents=True, exist_ok=True)
     stopped: list[str] = []
@@ -152,7 +204,7 @@ def run(keyframes: dict[str, Path], output_dir: Path) -> dict:
             copied_inputs.append(input_path)
             graph = json.loads(WORKFLOW.read_text(encoding="utf-8"))
             graph["1"]["inputs"]["image"] = input_path.name
-            graph["10"]["inputs"]["text"] = POSE_PROMPTS[pose]
+            graph["10"]["inputs"]["text"] = prompt_map[pose]
             graph["11"]["inputs"]["text"] = NEGATIVE
             seed = 104729 + index * 1009
             graph["13"]["inputs"]["noise_seed"] = seed
@@ -167,6 +219,7 @@ def run(keyframes: dict[str, Path], output_dir: Path) -> dict:
             encode(loop, target, fps=16)
             decoded, fps = read_frames(target)
             black_frames = sum(float(frame.mean()) < 2.0 for frame in decoded)
+            motion_metrics = _validate_idle_motion(decoded)
             record = {
                 "pose": pose,
                 "keyframe": str(source),
@@ -181,6 +234,11 @@ def run(keyframes: dict[str, Path], output_dir: Path) -> dict:
                 "first_last_mae": round(mean_absolute_error(decoded[0], decoded[-1]), 4),
                 "midpoint_mae": round(mean_absolute_error(decoded[79], decoded[80]), 4),
                 "black_frames": black_frames,
+                "motion_metrics": motion_metrics,
+                "motion_limits": {
+                    "face_center_p95_percent_diagonal": MAX_FACE_CENTER_P95_PERCENT,
+                    "face_area_cv_percent": MAX_FACE_AREA_CV_PERCENT,
+                },
                 "construction": "complete_scene_first_last_conditioned_timescale_2x",
                 "matting": False,
             }
