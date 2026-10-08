@@ -291,6 +291,53 @@ V2采用ADR-013的“先体验、后扩容”，详细任务和验收只在 [`..
 - 记忆图谱先作为内置SQLite记忆的只读派生视图；任何边必须能回到源记忆或用户确认事件。
 - 生成模型与实时模型串行调度，不双常驻；V1的RAM、VRAM、首响、打断和稳定性门保持不变。
 
+#### 16.1.1 D1锁定的运行实体
+
+```text
+React AppShell（复用）
+  ├─ DevicePanel → InputAudioSessionController（修改：校准/device/PTT）
+  ├─ OutputControls → MediaSession（修改：gain/compressor/内存重播）
+  ├─ SourcePackPanel / StageControls（新增）
+  ├─ MemoryWorkbench（从Settings拆分）
+  └─ ConversationScreen
+       ├─ SessionLifecycleController（新增：visibility/network/health generation）
+       ├─ StagePresentationController（新增：单表面状态机）
+       └─ AvatarSessionController（修改：帧年龄/漂移/质量档）
+                 │ REST + 既有6字段WS envelope
+                 ▼
+Gateway api/server.py（修改，仅校验/路由）
+  ├─ 既有 TurnPipeline / SessionRuntime / MemoryService
+  ├─ ExperienceSettingsService / QualityGovernor / VoiceStylePolicy（新增）
+  ├─ SourcePackService / ScenePresetService / VisualClaimService（新增）
+  └─ MemoryGraphService（新增、只读派生）
+          │ ports
+          ├─ JsonManifestRepository（新增，原子revision）
+          ├─ SqliteMemoryRepository（修改，派生边删除传播）
+          └─ VisualDescriptionPort（新增，本地实现）
+```
+
+依赖仍为`UI/API → application → domain + ports ← infrastructure/adapters`。`App.tsx`只做组合，不允许新增manifest、质量分级或确认策略。完整文件、API、状态机和schema以[`../stages/V2-X-D1/implementation-contracts.md`](../stages/V2-X-D1/implementation-contracts.md)为唯一实现合同。
+
+#### 16.1.2 权威数据与一致性
+
+- V1的`asset_versions/active_assets/avatar_derivatives`在X0～X1迁移期间保持活动事实源；V2-X manifest通过旧asset id建立一次性、幂等映射，完成相应子阶段验收后才成为舞台选择事实源。
+- 原图与派生媒体在私有资产根分开存放；manifest采用同目录临时文件、fsync和原子替换，`revision`CAS失败时不改变active。
+- SQLite `memories`继续是长期记忆权威。聚类、节点和边均为可重建派生索引，必须携带`source_memory_ids`并和源删除同事务传播。
+- `VisualClaim`只有`confirmed`状态可供`PromptCompiler`读取；候选或模型推断不得写Profile/Memory。
+
+#### 16.1.3 实时控制与降级
+
+- `SessionLifecycleController`和现有conversation generation分别管理页面资源代际和对话轮代际；任何异步回调必须同时通过相关代际检查。
+- 音频是质量降级的主时钟。`QualityGovernor`可丢弃过期视频帧、降低视频档或回退Idle/静态图，但不得暂停/拉伸音频追帧。
+- `StagePresentationController`执行`intro→idle→listening/thinking/pre-speech→live→recovery→idle→outro`，任一时刻只有一个可见人物表面；`prefers-reduced-motion`直接回退低幅Idle或静态图。
+- X0.1～X9每项使用独立`v2x.*` flag；关闭单项只恢复对应V1行为，不删除用户素材或重写稳定ID。
+
+#### 16.1.4 资源与部署不变量
+
+- 浏览器、WSL2 Gateway/Speech/Avatar和Windows LLM拓扑不变；PWA是浏览器渐进增强，不引入Electron/Tauri前置条件。
+- Service Worker只允许缓存带内容哈希的前端静态壳，`/api/`、`/ws/`、私有媒体和用户数据统一network-only/no-store。
+- 重型素材/视频生成开始前必须停止实时模型并确认资源余量；生成结束释放显存后才允许恢复对话。项目不可回收RAM峰值≤14GB、VRAM≤22GB、宿主/WSL余量≥2GB。
+
 ### 16.2 V2-A：正式领域扩容
 
 ```text
