@@ -11,6 +11,7 @@ import { ConversationClient, type AvatarBuild, type HealthResponse, type IdleGen
 import { InputAudioSession, type InputCalibration, type InputDevice, type InputMode } from './services/InputAudioSession'
 import { MediaSession } from './services/MediaSession'
 import { AvatarSession } from './services/AvatarSession'
+import { SessionLifecycleController } from './services/SessionLifecycle'
 
 const stateContent: Record<ConversationState, { eyebrow: string; title: string; subtitle: string }> = {
   idle: {
@@ -153,6 +154,8 @@ function App() {
   const [inputCalibration, setInputCalibration] = useState<InputCalibration | null>(null)
   const [manualInputThreshold, setManualInputThreshold] = useState(0.018)
   const [inputCalibrating, setInputCalibrating] = useState(false)
+  const [lifecycleFeatureEnabled, setLifecycleFeatureEnabled] = useState(false)
+  const [lifecycleNotice, setLifecycleNotice] = useState('')
   const settingsTriggerRef = useRef<HTMLButtonElement>(null)
   const drawerCloseRef = useRef<HTMLButtonElement>(null)
   const deleteReturnFocusRef = useRef<HTMLElement | null>(null)
@@ -161,6 +164,7 @@ function App() {
   const socketRef = useRef<WebSocket | null>(null)
   const sessionRef = useRef<string | null>(null)
   const nextTurnRef = useRef(1)
+  const lifecycleControllerRef = useRef<SessionLifecycleController | null>(null)
 
   const requestDelete = (target: string | 'all') => {
     deleteReturnFocusRef.current = document.activeElement as HTMLElement | null
@@ -212,6 +216,7 @@ function App() {
         }
         if (typeof draft.settings_json?.voice_transcript === 'string') setVoiceTranscript(draft.settings_json.voice_transcript)
         setInputFeatureEnabled(experience.features.input_calibration === true)
+        setLifecycleFeatureEnabled(experience.features.lifecycle_recovery === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
           status: toRuntimeStatus(item.status),
@@ -474,7 +479,7 @@ function App() {
       try { await ConversationClient.endSession(ref) } catch { /* server may already be gone */ }
     }
     socket?.close()
-    await Promise.allSettled([InputAudioSession.stop(), MediaSession.stop(), AvatarSession.stop()])
+      await Promise.allSettled([InputAudioSession.stop(), MediaSession.stop(), AvatarSession.stop()])
     setConversationState('idle')
     if (hasSceneSequence && playOutro) {
       setSequenceOverlayReady(false)
@@ -604,13 +609,18 @@ function App() {
         calibration: inputCalibration,
       })
       setConversationState('listening')
+      lifecycleControllerRef.current?.markSessionActive()
       ;(window as typeof window & { __CYBERWIFE_SESSION__?: unknown }).__CYBERWIFE_SESSION__ = {
-        input: () => InputAudioSession.snapshot(), avatar: () => AvatarSession.snapshot(), sessionRef: created.session_ref,
+        input: () => InputAudioSession.snapshot(),
+        avatar: () => AvatarSession.snapshot(),
+        lifecycle: () => lifecycleControllerRef.current?.snapshot() ?? null,
+        sessionRef: created.session_ref,
       }
     } catch (value) {
       await stopConversation(false, false)
       setConversationError(value instanceof Error ? value.message : String(value))
       setConversationState('error')
+      lifecycleControllerRef.current?.markIdle()
     }
   }
 
@@ -620,7 +630,10 @@ function App() {
       const socket = socketRef.current
       const turn = currentServerTurnRef.current
       if (socket?.readyState === WebSocket.OPEN && turn !== null) socket.send(JSON.stringify({ type: 'barge_in.detected', turn_id: turn }))
-    } else void stopConversation()
+    } else {
+      lifecycleControllerRef.current?.markIdle()
+      void stopConversation()
+    }
   }
 
   const simulateError = () => {
@@ -629,6 +642,29 @@ function App() {
   }
 
   useEffect(() => () => { void stopConversation(false, false) }, [])
+
+  useEffect(() => {
+    if (!lifecycleFeatureEnabled) return
+    const controller = new SessionLifecycleController({
+      stopResources: async () => { await stopConversation(false, false) },
+      probeGateway: async () => {
+        const health = await ConversationClient.getHealth()
+        return health.status !== 'error' && !['llm', 'asr', 'tts'].some((id) => health.components[id]?.status === 'error')
+      },
+      onState: (snapshot) => {
+        if (snapshot.state === 'recovering') setLifecycleNotice('页面或连接刚刚恢复，正在安全清理旧会话…')
+        else if (snapshot.state === 'idle' && snapshot.recoveryCount > 0) setLifecycleNotice('本机连接已恢复，请点击“开始对话”继续。')
+        else if (snapshot.state === 'error') setLifecycleNotice('本机服务尚未恢复；网络或服务恢复后页面会自动复检。')
+        else if (snapshot.state === 'active') setLifecycleNotice('')
+      },
+    })
+    lifecycleControllerRef.current = controller
+    controller.start()
+    return () => {
+      controller.stop()
+      if (lifecycleControllerRef.current === controller) lifecycleControllerRef.current = null
+    }
+  }, [lifecycleFeatureEnabled])
 
   const filteredMemories = memories.filter((memory) =>
     memory.content.toLowerCase().includes(memoryQuery.toLowerCase()),
@@ -996,6 +1032,8 @@ function App() {
           <button type="button" onClick={() => void startConversation()}>重新连接</button>
         </section>
       )}
+
+      {lifecycleNotice && <p className="lifecycle-notice" role="status" data-testid="lifecycle-notice">{lifecycleNotice}</p>}
 
       <section className="voice-dock" aria-label="对话控制">
         <div className={`voice-orbit voice-orbit--${conversationState}`} aria-hidden="true">

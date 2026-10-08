@@ -91,7 +91,7 @@ first_playable_min_chars = 10
 # 只启用已经通过对应自动化阶段门的能力；其余能力继续关闭。
 contracts          = true
 input_calibration  = true
-lifecycle_recovery = false
+lifecycle_recovery = true
 output_controls    = false
 pwa                = false
 source_pack        = false

@@ -64,7 +64,8 @@ def test_default_flags_only_enable_accepted_stages():
     assert set(config["v2x"]) == set(V2X_FEATURE_FLAGS)
     assert config["v2x"]["contracts"] is True
     assert config["v2x"]["input_calibration"] is True
-    assert all(not value for key, value in config["v2x"].items() if key not in {"contracts", "input_calibration"})
+    assert config["v2x"]["lifecycle_recovery"] is True
+    assert all(not value for key, value in config["v2x"].items() if key not in {"contracts", "input_calibration", "lifecycle_recovery"})
 
 
 @pytest.mark.parametrize("toml", ["[v2x]\nsource_pack='yes'\n", "[v2x]\nunknown=true\n"])
