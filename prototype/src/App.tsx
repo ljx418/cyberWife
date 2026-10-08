@@ -13,6 +13,7 @@ import { MediaSession } from './services/MediaSession'
 import { PwaBridge } from './services/PwaBridge'
 import { AvatarSession } from './services/AvatarSession'
 import { SessionLifecycleController } from './services/SessionLifecycle'
+import { classifyStageLayout, resolveStagePresentation, type CompositionMode, type LayoutMode } from './services/StagePresentation'
 
 const stateContent: Record<ConversationState, { eyebrow: string; title: string; subtitle: string }> = {
   idle: {
@@ -64,16 +65,7 @@ const sceneBackgrounds = [
   { id: 'garden-sunroom', label: '花园阳光房', description: '自然绿意与午后光', src: '/backgrounds/garden-sunroom.webp' },
 ] as const
 
-type LayoutMode = 'standard' | 'portrait' | 'ultratall' | 'strip'
 type AvatarSequencePhase = 'legacy' | 'intro' | 'idle' | 'outro'
-
-const classifyLayout = (width: number, height: number): LayoutMode => {
-  const ratio = width / Math.max(1, height)
-  if (height <= 260 && ratio >= 4) return 'strip'
-  if (ratio <= 0.72) return 'ultratall'
-  if (ratio < 1) return 'portrait'
-  return 'standard'
-}
 
 const toMemoryRecord = (item: Record<string, any>): MemoryRecord => ({
   id: String(item.id),
@@ -141,7 +133,9 @@ function App() {
   const [sequencePhase, setSequencePhase] = useState<AvatarSequencePhase>('legacy')
   const [avatarFocus, setAvatarFocus] = useState({ x: 50, y: 32 })
   const [backgroundId, setBackgroundId] = useState(() => localStorage.getItem('cyberwife-background') || sceneBackgrounds[0].id)
-  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => classifyLayout(window.innerWidth, window.innerHeight))
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => classifyStageLayout(window.innerWidth, window.innerHeight))
+  const [stageCompositionFeatureEnabled, setStageCompositionFeatureEnabled] = useState(false)
+  const [compositionMode, setCompositionMode] = useState<CompositionMode>(() => (localStorage.getItem('cyberwife-composition') as CompositionMode | null) || 'half')
   const [runtimeRows, setRuntimeRows] = useState<RuntimeService[]>(runtimeServices)
   const [onboardingStatus, setOnboardingStatus] = useState('正在读取本机设置…')
   const [voiceTranscript, setVoiceTranscript] = useState('')
@@ -199,7 +193,7 @@ function App() {
   useEffect(() => { conversationStateRef.current = conversationState }, [conversationState])
 
   useEffect(() => {
-    const update = () => setLayoutMode(classifyLayout(window.innerWidth, window.innerHeight))
+    const update = () => setLayoutMode(classifyStageLayout(window.innerWidth, window.innerHeight))
     window.addEventListener('resize', update)
     update()
     return () => window.removeEventListener('resize', update)
@@ -208,6 +202,10 @@ function App() {
   useEffect(() => {
     localStorage.setItem('cyberwife-background', backgroundId)
   }, [backgroundId])
+
+  useEffect(() => {
+    if (stageCompositionFeatureEnabled) localStorage.setItem('cyberwife-composition', compositionMode)
+  }, [stageCompositionFeatureEnabled, compositionMode])
 
   useEffect(() => {
     let active = true
@@ -231,6 +229,7 @@ function App() {
         setOutputFeatureEnabled(experience.features.output_controls === true)
         setPwaFeatureEnabled(experience.features.pwa === true)
         setSourcePackFeatureEnabled(experience.features.source_pack === true)
+        setStageCompositionFeatureEnabled(experience.features.stage_composition === true)
         setRuntimeRows(Object.entries(health.components).map(([id, item]) => ({
           id, name: id.toUpperCase(), detail: item.logical_id || '本机组件',
           status: toRuntimeStatus(item.status),
@@ -950,11 +949,19 @@ function App() {
       `${idleJob.updated_at}-${sequencePhase}`,
     )
     : null
+  const stagePresentation = resolveStagePresentation(
+    stageCompositionFeatureEnabled ? compositionMode : 'half',
+    window.innerWidth,
+    window.innerHeight,
+    avatarFocus,
+  )
 
   return (
     <main
       className={`experience experience--${variant} ${compact ? 'experience--compact' : ''}`}
       data-layout={layoutMode}
+      data-requested-composition={stagePresentation.requested}
+      data-composition={stagePresentation.effective}
       data-background={activeBackground.id}
       data-avatar-presentation={hasSingleSceneSurface ? 'complete-scene' : 'portrait'}
       aria-label="cyberWife 交互原型"
@@ -1084,6 +1091,7 @@ function App() {
       </header>
 
       {desktopStatus && <p className="desktop-mode-status" role="status">{desktopStatus}</p>}
+      {stagePresentation.degradedReason && <p className="composition-notice" role="status">{stagePresentation.degradedReason}</p>}
 
       <section className="conversation-copy" aria-live="polite" aria-atomic="true">
         <p className="eyebrow">{content.eyebrow}</p>
@@ -1270,6 +1278,9 @@ function App() {
               throw error
             }
           }}
+          stageCompositionFeatureEnabled={stageCompositionFeatureEnabled}
+          compositionMode={compositionMode}
+          setCompositionMode={setCompositionMode}
           inputFeatureEnabled={inputFeatureEnabled}
           inputMode={inputMode}
           setInputMode={setInputMode}
@@ -1686,6 +1697,9 @@ interface SettingsDrawerProps {
   sourcePackFeatureEnabled: boolean
   sourcePack: SourcePack
   onUploadSource: (file: File, angle: SourceAngle, appearanceLabel: string) => Promise<void>
+  stageCompositionFeatureEnabled: boolean
+  compositionMode: CompositionMode
+  setCompositionMode: (mode: CompositionMode) => void
   inputFeatureEnabled: boolean
   inputMode: InputMode
   setInputMode: (mode: InputMode) => void
@@ -1834,6 +1848,15 @@ function SettingsDrawer(props: SettingsDrawerProps) {
                 ))}
               </div>
               <hr />
+              {props.stageCompositionFeatureEnabled && <>
+                <SectionHeader index="03" title="人物构图" description="选择希望的人物占幅；极窄条幅会明确降级近景，以保住面部和主操作。" />
+                <div className="segmented" role="radiogroup" aria-label="人物构图">
+                  {([['close', '近景'], ['half', '半身'], ['full', '全身']] as Array<[CompositionMode, string]>).map(([mode, label]) => (
+                    <button key={mode} type="button" role="radio" aria-checked={props.compositionMode === mode} className={props.compositionMode === mode ? 'is-active' : ''} onClick={() => props.setCompositionMode(mode)}>{label}</button>
+                  ))}
+                </div>
+                <hr />
+              </>}
               <PortraitSetup onPortrait={props.onPortrait} idleJob={props.idleJob} onGenerateIdle={props.onGenerateIdle} onApproveIdle={props.onApproveIdle} compact />
               <hr />
               <SectionHeader index="03" title="界面主题" description="默认使用电影感深色，也可选择柔和浅色或跟随系统。" />
