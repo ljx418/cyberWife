@@ -67,6 +67,14 @@ class LiveTalkingAdapter(AvatarPort):
         if self._session_id is not None:
             self._json("POST", f"/api/v1/media/{self._session_id}/cancel", {})
 
+    def complete_audio(self) -> None:
+        if self._session_id is not None:
+            self._json(
+                "POST",
+                f"/api/v1/media/{self._session_id}/complete?generation={self._generation}",
+                {},
+            )
+
     def health(self) -> dict:
         return self._json("GET", "/health")
 

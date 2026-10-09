@@ -493,6 +493,9 @@ class TurnPipeline:
                         if event:
                             yield event
                 if cached_audio_emitted:
+                    complete_avatar = getattr(self._media, "complete_avatar", None)
+                    if complete_avatar is not None:
+                        await complete_avatar()
                     complete = self._orchestrator.emit(
                         session_id,
                         "reply.audio.complete",
@@ -729,6 +732,10 @@ class TurnPipeline:
                             yield event
             token.raise_if_cancelled()
             if audio_emitted:
+                if self._media is not None:
+                    complete_avatar = getattr(self._media, "complete_avatar", None)
+                    if complete_avatar is not None:
+                        await complete_avatar()
                 complete = self._orchestrator.emit(
                     session_id,
                     "reply.audio.complete",

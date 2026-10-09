@@ -7,6 +7,7 @@ import asyncio
 import csv
 import hashlib
 import json
+import math
 import statistics
 import struct
 import subprocess
@@ -58,6 +59,7 @@ async def capture(args: argparse.Namespace) -> dict:
     have_decoder_keyframe = False
     config: dict = {}
     first_send = 0.0
+    completion_ack = False
 
     async with websockets.connect(
         ws_url,
@@ -135,7 +137,11 @@ async def capture(args: argparse.Namespace) -> dict:
                         headers={"content-type": "application/octet-stream"},
                     ) as response:
                         body = await response.json()
-                        if response.status != 200 or body.get("code") != 0:
+                        if (
+                            response.status != 200
+                            or body.get("code") != 0
+                            or not body.get("data", {}).get("accepted")
+                        ):
                             raise RuntimeError(f"PCM rejected at frame {index}: {body}")
                     audio_rows.append({
                         "index": index,
@@ -143,6 +149,19 @@ async def capture(args: argparse.Namespace) -> dict:
                         "sent_relative_ms": round((sent - first_send) * 1000, 3),
                         "bytes": len(frame),
                     })
+                async with client.post(
+                    f"{args.http_base}/api/v1/media/{session_id}/complete",
+                    params={"generation": generation},
+                    json={},
+                ) as response:
+                    body = await response.json()
+                    completion_ack = bool(
+                        response.status == 200
+                        and body.get("code") == 0
+                        and body.get("data", {}).get("completed")
+                    )
+                    if not completion_ack:
+                        raise RuntimeError(f"PCM completion rejected: {body}")
                 drain_seconds = args.tail_seconds
                 if args.send_mode == "burst":
                     drain_seconds += float(wav_meta["duration_seconds"])
@@ -167,13 +186,14 @@ async def capture(args: argparse.Namespace) -> dict:
         writer.writerows(audio_rows)
 
     mp4 = output / "lipsync-review.mp4"
+    review_frames = math.ceil(float(wav_meta["duration_seconds"]) * int(config["fps"]))
     command = [
         "ffmpeg", "-hide_banner", "-loglevel", "error", "-y",
         "-r", str(config["fps"]), "-i", str(h264), "-i", str(args.wav),
         "-filter_complex",
-        f"[0:v]trim=start_frame={target_start_index},setpts=PTS-STARTPTS[v];"
-        f"[1:a]apad=pad_dur={args.tail_seconds}[a]",
-        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", "veryfast",
+        f"[0:v]trim=start_frame={target_start_index}:"
+        f"end_frame={target_start_index + review_frames},setpts=PTS-STARTPTS[v]",
+        "-map", "[v]", "-map", "1:a", "-c:v", "libx264", "-preset", "veryfast",
         "-crf", "18", "-c:a", "aac", "-shortest",
         "-movflags", "+faststart", str(mp4),
     ]
@@ -192,8 +212,10 @@ async def capture(args: argparse.Namespace) -> dict:
         "input": wav_meta,
         "protocol": {key: config.get(key) for key in ("version", "codec", "format", "fps", "audio")},
         "audio_packets": len(audio_rows),
+        "audio_completion_ack": completion_ack,
         "send_mode": args.send_mode,
         "video_packets": len(packet_rows),
+        "review_video_frames": review_frames,
         "keyframes": sum(row["keyframe"] for row in packet_rows),
         "decoder_preroll_frames": target_start_index,
         "first_video_after_first_audio_ms": round(

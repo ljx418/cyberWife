@@ -36,7 +36,7 @@ def audio_energy(path: Path, count: int, fps: int = 25) -> np.ndarray:
     return np.asarray(values, dtype=np.float64)
 
 
-def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[np.ndarray, dict]:
+def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[np.ndarray, dict, dict]:
     coords = pickle.loads((dataset / "coords.pkl").read_bytes())
     manifest_path = dataset / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
@@ -59,6 +59,10 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
     frame_motion: list[float] = []
     second_order_motion: list[float] = []
     sharpness: list[float] = []
+    mouth_frame_motion: list[float] = []
+    mouth_second_order_motion: list[float] = []
+    previous_mouth = None
+    previous_previous_mouth = None
     for frame_index, sequence in enumerate(sequences):
         ok, frame = capture.read()
         if not ok:
@@ -120,6 +124,15 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
             previous_previous_face = previous_face
             previous_face = face_gray
         gray = cv2.cvtColor(actual_roi, cv2.COLOR_BGR2GRAY)
+        mouth = cv2.resize(gray, (128, 64), interpolation=cv2.INTER_AREA).astype(np.float32)
+        if previous_mouth is not None:
+            mouth_frame_motion.append(float(np.mean(np.abs(mouth - previous_mouth))))
+        if previous_mouth is not None and previous_previous_mouth is not None:
+            mouth_second_order_motion.append(
+                float(np.mean(np.abs(mouth - 2 * previous_mouth + previous_previous_mouth)))
+            )
+        previous_previous_mouth = previous_mouth
+        previous_mouth = mouth
         if previous_roi is not None:
             comparison = cv2.resize(previous_roi, (gray.shape[1], gray.shape[0]))
             if float(np.mean(cv2.absdiff(gray, comparison))) < 0.05:
@@ -149,6 +162,58 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
         "face_frame_motion": summary(frame_motion),
         "face_second_order_motion": summary(second_order_motion),
         "face_sharpness": summary(sharpness),
+        "mouth_frame_motion": summary(mouth_frame_motion),
+        "mouth_second_order_motion": summary(mouth_second_order_motion),
+    }, {
+        "mouth_frame_motion": np.asarray(mouth_frame_motion, dtype=np.float64),
+        "mouth_second_order_motion": np.asarray(mouth_second_order_motion, dtype=np.float64),
+    }
+
+
+def post_speech_metrics(
+    energy: np.ndarray,
+    mouth_delta: np.ndarray,
+    mouth_second_order: np.ndarray,
+    *,
+    fps: int = 25,
+) -> dict:
+    """Measure the local tail after the final audible phoneme."""
+    count = min(len(energy), len(mouth_delta))
+    energy = energy[:count]
+    mouth_delta = mouth_delta[:count]
+    voiced = energy >= 0.005
+    voiced_indices = np.flatnonzero(voiced)
+    if not len(voiced_indices):
+        return {"evaluable": False, "reason": "no_voiced_audio"}
+    grace_frames = max(1, round(0.16 * fps))
+    tail_start = int(voiced_indices[-1]) + 1 + grace_frames
+    tail = mouth_delta[tail_start:count]
+    if len(tail) < round(0.4 * fps):
+        return {
+            "evaluable": False,
+            "reason": "less_than_400ms_post_speech_silence",
+            "last_voiced_ms": int((voiced_indices[-1] + 1) * 1000 / fps),
+        }
+    voiced_delta = mouth_delta[voiced]
+    second_tail = mouth_second_order[max(0, tail_start - 2):max(0, count - 2)]
+    voiced_second = mouth_second_order[:max(0, int(voiced_indices[-1]) - 1)]
+    delta_mean = float(tail.mean())
+    voiced_mean = float(voiced_delta.mean()) if len(voiced_delta) else 0.0
+    second_mean = float(second_tail.mean()) if len(second_tail) else 0.0
+    voiced_second_mean = float(voiced_second.mean()) if len(voiced_second) else 0.0
+    return {
+        "evaluable": True,
+        "last_voiced_ms": int((voiced_indices[-1] + 1) * 1000 / fps),
+        "tail_start_ms": int(tail_start * 1000 / fps),
+        "tail_duration_ms": int(len(tail) * 1000 / fps),
+        "mouth_delta_mean": round(delta_mean, 6),
+        "voiced_mouth_delta_mean": round(voiced_mean, 6),
+        "mouth_delta_ratio": round(delta_mean / voiced_mean, 6) if voiced_mean else math.inf,
+        "second_order_mean": round(second_mean, 6),
+        "voiced_second_order_mean": round(voiced_second_mean, 6),
+        "second_order_ratio": (
+            round(second_mean / voiced_second_mean, 6) if voiced_second_mean else math.inf
+        ),
     }
 
 
@@ -170,6 +235,26 @@ def correlation_at_shift(audio: np.ndarray, motion: np.ndarray, shift_frames: in
     return float(np.corrcoef(standardize(a), standardize(m))[0, 1])
 
 
+def max_consecutive_voiced_freeze(
+    energy: np.ndarray,
+    mouth_frame_motion: np.ndarray,
+    *,
+    threshold: float = 0.05,
+) -> int:
+    """Count freezes only while either side of a frame pair is voiced."""
+    longest = 0
+    current = 0
+    usable = min(len(mouth_frame_motion), max(0, len(energy) - 1))
+    for index in range(usable):
+        voiced_pair = energy[index] >= 0.005 or energy[index + 1] >= 0.005
+        if voiced_pair and mouth_frame_motion[index] < threshold:
+            current += 1
+            longest = max(longest, current)
+        else:
+            current = 0
+    return longest
+
+
 def mouth_motion_pass(report: dict) -> bool:
     """Return the machine gate for visible, audio-responsive mouth motion.
 
@@ -186,13 +271,17 @@ def mouth_motion_pass(report: dict) -> bool:
         gates["mouth_responds_during_voice"]
         and gates["no_black_frames"]
         and freeze_ok
+        and gates.get("post_speech_mouth_settles", True)
+        and gates.get("post_speech_jitter_not_above_voice", True)
     )
 
 
 def analyze(args: argparse.Namespace) -> dict:
     rows = list(csv.DictReader((args.capture / "video-timeline.csv").open(encoding="utf-8")))
     sequences = [int(row["sequence"]) for row in rows]
-    motion, visual = generated_delta(args.capture / "lipsync-review.mp4", args.dataset, sequences)
+    motion, visual, temporal = generated_delta(
+        args.capture / "lipsync-review.mp4", args.dataset, sequences
+    )
     energy = audio_energy(args.wav, len(motion))
     usable = min(len(motion), len(energy))
     motion, energy = motion[:usable], energy[:usable]
@@ -208,6 +297,15 @@ def analyze(args: argparse.Namespace) -> dict:
     source_fps = float(manifest.get("source_fps", 25.0))
     runtime_fps = float(manifest.get("runtime_fps", 25.0))
     playback_rate = 1.0 if temporal_resample != "none" else runtime_fps / source_fps
+    tail = post_speech_metrics(
+        energy,
+        motion,
+        temporal["mouth_second_order_motion"],
+    )
+    voiced_freeze_run = max_consecutive_voiced_freeze(
+        energy, temporal["mouth_frame_motion"]
+    )
+    visual["max_consecutive_voiced_frozen_pairs"] = voiced_freeze_run
     report = {
         "schema_version": 1,
         "method": "lower-face generated-delta versus 40ms RMS; relative diagnostic only",
@@ -219,6 +317,7 @@ def analyze(args: argparse.Namespace) -> dict:
         "silent_motion_mean": round(silent_motion, 6),
         "voiced_to_silent_ratio": round(voiced_motion / silent_motion, 6) if silent_motion > 0 else math.inf,
         "visual": visual,
+        "post_speech": tail,
         "dataset_timing": {
             "source_fps": source_fps,
             "runtime_fps": runtime_fps,
@@ -235,13 +334,20 @@ def analyze(args: argparse.Namespace) -> dict:
             "no_black_frames": visual["black_frames"] == 0,
             "no_frozen_frames": visual["frozen_pairs"] == 0,
             "no_sustained_freeze": (
-                visual["max_consecutive_frozen_pairs"] <= 2
+                voiced_freeze_run <= 2
+            ),
+            "post_speech_mouth_settles": bool(
+                tail.get("evaluable") and tail.get("mouth_delta_ratio", math.inf) <= 0.78
+            ),
+            "post_speech_jitter_not_above_voice": bool(
+                tail.get("evaluable") and tail.get("second_order_ratio", math.inf) <= 1.0
             ),
         },
         "limitations": [
             "This is not the unpublished Wav2Lip evaluation SyncNet.",
             "Direct Avatar capture excludes the browser playback lead and cannot sign end-user A/V offset.",
             "Automated motion correlation cannot replace human phoneme/naturalness review.",
+            "The post-speech gate requires at least 400 ms of measurable trailing silence.",
         ],
     }
     report["mouth_motion_pass"] = mouth_motion_pass(report)

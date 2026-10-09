@@ -55,16 +55,79 @@ class BaseASR:
             0.20,
             self.chunk / self.sample_rate * self.batch_size * 2 + 0.10,
         )
+        # External PCM is audio-clock data, not an assertion that every sample
+        # contains speech.  CosyVoice may emit a quiet tail after its final
+        # phoneme.  Keep a short release window for quiet consonants, then mark
+        # sustained low-energy PCM as silence so the renderer can return to
+        # the approved Idle instead of asking the lip model to hallucinate.
+        self._external_speech_rms = 0.003
+        self._external_silence_release_frames = max(
+            3, round(0.12 / (self.chunk / self.sample_rate)),
+        )
+        self._external_silence_run = 0
+        self._external_speaking = False
+        self._active_generation = 0
+        self._completed_generation: int | None = None
 
         #self.warm_up()
 
     def flush_talk(self):
         self.queue.queue.clear()
         self._last_external_audio_at = 0.0
+        self._external_silence_run = 0
+        self._external_speaking = False
 
-    def put_audio_frame(self,audio_chunk:NDArray[np.float32],datainfo:dict): #16khz 20ms pcm
+    def put_audio_frame(self,audio_chunk:NDArray[np.float32],datainfo:dict) -> bool: #16khz 20ms pcm
+        generation = int(datainfo.get("generation", 0))
+        if generation and self._active_generation and generation < self._active_generation:
+            return False
+        if generation > self._active_generation:
+            self._active_generation = generation
+            self._completed_generation = None
+            self._external_silence_run = 0
+            self._external_speaking = False
+        if self._completed_generation == generation:
+            return False
         self._last_external_audio_at = time.monotonic()
-        self.queue.put(AudioFrameData(data=audio_chunk,type=0,userdata=datainfo))
+        explicit_speech = datainfo.get("speech")
+        if explicit_speech is None:
+            rms = float(np.sqrt(np.mean(np.square(audio_chunk, dtype=np.float64))))
+            if rms >= self._external_speech_rms:
+                self._external_silence_run = 0
+                self._external_speaking = True
+            else:
+                self._external_silence_run += 1
+                if self._external_silence_run >= self._external_silence_release_frames:
+                    self._external_speaking = False
+            speaking = self._external_speaking
+        else:
+            speaking = bool(explicit_speech)
+            self._external_silence_run = 0 if speaking else self._external_silence_release_frames
+            self._external_speaking = speaking
+        frame_type = 0 if speaking else 1
+        self.queue.put(AudioFrameData(data=audio_chunk,type=frame_type,userdata=datainfo))
+        return True
+
+    def complete_audio(self, generation: int = 0) -> bool:
+        """Append one immediate silent drain batch without discarding speech."""
+        generation = int(generation)
+        if self._active_generation not in {0, generation}:
+            return False
+        if self._completed_generation == generation:
+            return False
+        self._active_generation = generation
+        self._completed_generation = generation
+        self._last_external_audio_at = 0.0
+        self._external_silence_run = self._external_silence_release_frames
+        self._external_speaking = False
+        metadata = {"generation": int(generation), "complete": True}
+        for _ in range(self.batch_size * 2):
+            self.queue.put(AudioFrameData(
+                data=np.zeros(self.chunk, dtype=np.float32),
+                type=1,
+                userdata=metadata,
+            ))
+        return True
 
     def _audio_queue_timeout(self, now: float | None = None) -> float:
         observed = time.monotonic() if now is None else now

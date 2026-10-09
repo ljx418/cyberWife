@@ -60,6 +60,16 @@ class AudioFrameData:
     type: int = 0  # 默认值
     userdata: dict = field(default_factory=dict)
 
+
+def frame_speaking_mask(audio_frames: list[AudioFrameData]) -> list[bool]:
+    """Map each pair of 20 ms PCM frames to one 25 FPS video frame."""
+    if len(audio_frames) % 2:
+        raise ValueError("audio frame count must be even")
+    return [
+        any(item.type == 0 for item in audio_frames[index:index + 2])
+        for index in range(0, len(audio_frames), 2)
+    ]
+
 class BaseAvatar:
     def __init__(self, opt):
         self.opt = opt
@@ -93,6 +103,7 @@ class BaseAvatar:
             "video_frames": 0,
             "video_started_at": None,
             "late_video_frames_dropped": 0,
+            "audio_completions": 0,
         }
 
         _tts_modules = {
@@ -141,11 +152,23 @@ class BaseAvatar:
     
     def put_audio_frame(self, audio_chunk:NDArray[np.float32], datainfo:dict={}): # 16khz 20ms pcm
         if hasattr(self, 'asr'):
-            self.media_metrics["audio_frames_received"] += 1
-            self.media_metrics["audio_clock_ms"] = int(datainfo.get(
-                "clock_ms", self.media_metrics["audio_clock_ms"]
-            ))
-            self.asr.put_audio_frame(audio_chunk, datainfo)
+            accepted = self.asr.put_audio_frame(audio_chunk, datainfo)
+            if accepted:
+                self.media_metrics["audio_frames_received"] += 1
+                self.media_metrics["audio_clock_ms"] = int(datainfo.get(
+                    "clock_ms", self.media_metrics["audio_clock_ms"]
+                ))
+            return accepted
+        return False
+
+    def complete_audio(self, generation: int = 0):
+        """Finish queued PCM and schedule an explicit return to Idle."""
+        if hasattr(self, 'asr'):
+            accepted = self.asr.complete_audio(generation)
+            if accepted:
+                self.media_metrics["audio_completions"] += 1
+            return accepted
+        return False
 
     def put_audio_file(self, filebyte, datainfo:dict={}): 
         input_stream = BytesIO(filebyte)
@@ -357,13 +380,13 @@ class BaseAvatar:
             except queue.Empty:
                 continue
                 
-            is_all_silence = True
             audio_frames: list[AudioFrameData] = []
             for _ in range(self.batch_size * 2):
                 audioframe:AudioFrameData = self.asr.output_queue.get()
-                if audioframe.type == 0:
-                    is_all_silence = False               
                 audio_frames.append(audioframe)
+
+            frame_speaking = frame_speaking_mask(audio_frames)
+            is_all_silence = not any(frame_speaking)
 
              # 检测状态变化
             current_speaking = not is_all_silence
@@ -390,7 +413,11 @@ class BaseAvatar:
                     count = 0
                     counttime = 0
                 for i, res_frame in enumerate(pred):
-                    self.res_frame_queue.put((res_frame, audio_frames[i*2:i*2+2], mirror_index(length, index)))
+                    # Inference remains batched for throughput, but a voiced
+                    # frame may no longer contaminate silent neighbours in the
+                    # same batch.  Silent frames render the approved Idle.
+                    selected = res_frame if frame_speaking[i] else None
+                    self.res_frame_queue.put((selected, audio_frames[i*2:i*2+2], mirror_index(length, index)))
                     index = index + 1
                     
             if current_speaking != last_speaking:
@@ -404,7 +431,11 @@ class BaseAvatar:
         _last_speaking = False
         _transition_start = time.time()
         if enable_transition:
-            _transition_duration = 0.12
+            # Re-enter generated speech within one video frame so sentence
+            # pauses do not accumulate visible A/V lag.  Returning to Idle may
+            # remain softer because it happens after the phoneme has ended.
+            _speech_transition_duration = 0.0
+            _idle_transition_duration = 0.12
             _last_silent_frame = None  # 静音帧缓存
             _last_speaking_frame = None  # 说话帧缓存
 
@@ -436,8 +467,8 @@ class BaseAvatar:
                 
                 if enable_transition:
                     # 说话→静音过渡
-                    if time.time() - _transition_start < _transition_duration and _last_speaking_frame is not None:
-                        alpha = min(1.0, (time.time() - _transition_start) / _transition_duration)
+                    if time.time() - _transition_start < _idle_transition_duration and _last_speaking_frame is not None:
+                        alpha = min(1.0, (time.time() - _transition_start) / _idle_transition_duration)
                         combine_frame = cv2.addWeighted(_last_speaking_frame, 1-alpha, target_frame, alpha, 0)
                     else:
                         combine_frame = target_frame
@@ -454,8 +485,12 @@ class BaseAvatar:
                     continue
                 if enable_transition:
                     # 静音→说话过渡
-                    if time.time() - _transition_start < _transition_duration and _last_silent_frame is not None:
-                        alpha = min(1.0, (time.time() - _transition_start) / _transition_duration)
+                    if (
+                        _speech_transition_duration > 0
+                        and time.time() - _transition_start < _speech_transition_duration
+                        and _last_silent_frame is not None
+                    ):
+                        alpha = min(1.0, (time.time() - _transition_start) / _speech_transition_duration)
                         combine_frame = cv2.addWeighted(_last_silent_frame, 1-alpha, current_frame, alpha, 0)
                     else:
                         combine_frame = current_frame

@@ -192,6 +192,7 @@ async def media_open(request):
             "video_frames": 0,
             "video_started_at": None,
             "late_video_frames_dropped": 0,
+            "audio_completions": 0,
         })
     return json_ok(data={"session_id": sessionid, "mode": "audio_master"})
 
@@ -210,8 +211,10 @@ async def media_audio(request):
     clock_ms = int(request.query.get("clock_ms", "0"))
     generation = int(request.query.get("generation", "0"))
     samples = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
-    avatar_session.put_audio_frame(samples, {"clock_ms": clock_ms, "generation": generation})
-    return json_ok(data={"accepted": True, "clock_ms": clock_ms, "generation": generation})
+    accepted = avatar_session.put_audio_frame(
+        samples, {"clock_ms": clock_ms, "generation": generation}
+    )
+    return json_ok(data={"accepted": accepted, "clock_ms": clock_ms, "generation": generation})
 
 
 async def media_cancel(request):
@@ -221,6 +224,17 @@ async def media_cancel(request):
         return json_error("session not found")
     avatar_session.flush_talk()
     return json_ok(data={"cancelled": True})
+
+
+async def media_complete(request):
+    """Mark one generation complete without discarding queued PCM."""
+    sessionid = request.match_info["sessionid"]
+    avatar_session = get_session(request, sessionid)
+    if avatar_session is None:
+        return json_error("session not found")
+    generation = int(request.query.get("generation", "0"))
+    completed = avatar_session.complete_audio(generation)
+    return json_ok(data={"completed": completed, "generation": generation})
 
 
 async def media_metrics(request):
@@ -435,6 +449,7 @@ def setup_routes(app):
         app.router.add_post("/is_speaking", is_speaking)
         app.router.add_post("/api/v1/media/open", media_open)
         app.router.add_post("/api/v1/media/{sessionid}/audio", media_audio)
+        app.router.add_post("/api/v1/media/{sessionid}/complete", media_complete)
         app.router.add_post("/api/v1/media/{sessionid}/cancel", media_cancel)
         app.router.add_get("/api/v1/media/{sessionid}/metrics", media_metrics)
         app.router.add_post("/api/v1/media/{sessionid}/close", media_close)
@@ -449,6 +464,7 @@ def setup_routes(app):
     app.router.add_post("/is_speaking", is_speaking)
     app.router.add_post("/api/v1/media/open", media_open)
     app.router.add_post("/api/v1/media/{sessionid}/audio", media_audio)
+    app.router.add_post("/api/v1/media/{sessionid}/complete", media_complete)
     app.router.add_post("/api/v1/media/{sessionid}/cancel", media_cancel)
     app.router.add_get("/api/v1/media/{sessionid}/metrics", media_metrics)
     app.router.add_post("/api/v1/media/{sessionid}/close", media_close)

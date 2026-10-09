@@ -96,6 +96,58 @@ async def test_media_pipeline_synthesizes_a_multi_sentence_reply_once():
 
 
 @pytest.mark.asyncio
+async def test_media_pipeline_completes_avatar_only_at_explicit_turn_boundary():
+    class Tts:
+        last_metrics = {"rtf": 0.1}
+
+        def synthesize_stream(self, *_args):
+            yield (np.ones(320, dtype=np.int16) * 100).tobytes()
+
+    class Avatar:
+        completed = 0
+
+        def open(self): return "0"
+        def push_audio(self, _frame, *, clock_ms): assert clock_ms == 0
+        def complete_audio(self): self.completed += 1
+
+    avatar = Avatar()
+    pipeline = MediaPipeline(Tts(), avatar)
+    try:
+        events = [event async for event in pipeline.stream("你好。", "ref.wav", "参考")]
+        assert any(event["type"] == "reply.audio.chunk" for event in events)
+        assert avatar.completed == 0
+        await pipeline.complete_avatar()
+        assert avatar.completed == 1
+    finally:
+        pipeline.close()
+
+
+@pytest.mark.asyncio
+async def test_cached_media_waits_for_explicit_turn_completion():
+    class Tts:
+        pass
+
+    class Avatar:
+        completed = 0
+
+        def open(self): return "0"
+        def push_audio(self, _frame, *, clock_ms): assert clock_ms in {0, 20}
+        def complete_audio(self): self.completed += 1
+
+    avatar = Avatar()
+    pipeline = MediaPipeline(Tts(), avatar)
+    frame = (np.ones(320, dtype=np.int16) * 100).tobytes()
+    try:
+        events = [event async for event in pipeline.stream_cached((frame, frame))]
+        assert len(events) == 2
+        assert avatar.completed == 0
+        await pipeline.complete_avatar()
+        assert avatar.completed == 1
+    finally:
+        pipeline.close()
+
+
+@pytest.mark.asyncio
 async def test_media_pipeline_degrades_after_three_consecutive_avatar_failures():
     class Tts:
         last_metrics = {"rtf": 0.1}

@@ -255,6 +255,47 @@ async def test_turn_pipeline_emits_one_generation_and_records_server_stages():
     assert sample["browser_first_non_silent_ms"] is None
 
 
+@pytest.mark.asyncio
+async def test_turn_pipeline_completes_avatar_once_after_all_audio_segments() -> None:
+    class Tts:
+        last_metrics = {}
+
+        def synthesize_stream(self, text, *_args):
+            yield b"\x01\x00" * 320
+
+    class Avatar:
+        completed = 0
+
+        def begin_generation(self, _generation): pass
+        def open(self): return "0"
+        def push_audio(self, _frame, *, clock_ms): assert clock_ms == 0
+        def complete_audio(self): self.completed += 1
+
+    from cyberwife.application.media_pipeline import MediaPipeline
+
+    avatar = Avatar()
+    media = MediaPipeline(Tts(), avatar)
+    orchestrator = ConversationOrchestrator()
+    session = orchestrator.open_session()
+    orchestrator.transition(session.id, SessionState.LISTENING)
+    pipeline = TurnPipeline(
+        orchestrator,
+        _Speech(),
+        _Llm(),
+        PromptCompiler(),
+        OutputSanitizer(),
+        media_pipeline=media,
+        voice_reference_provider=lambda: ("ref.wav", "参考"),
+    )
+    try:
+        events = [event async for event in pipeline.run(session.id, 1, b"\x01\x00" * 320)]
+        assert sum(event.type == "reply.audio.complete" for event in events) == 1
+        assert avatar.completed == 1
+    finally:
+        pipeline.close()
+        media.close()
+
+
 def test_turn_pipeline_rejects_unsafe_first_playable_threshold():
     orchestrator = ConversationOrchestrator()
     with pytest.raises(ValueError, match="first_playable_min_chars"):

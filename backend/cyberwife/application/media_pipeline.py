@@ -83,6 +83,15 @@ class MediaPipeline:
         if calls:
             await asyncio.gather(*calls, return_exceptions=True)
 
+    async def complete_avatar(self) -> None:
+        """Close the current turn after all TTS segments have been emitted."""
+        complete_audio = getattr(self._avatar, "complete_audio", None)
+        if complete_audio is not None:
+            try:
+                await self._run_control(complete_audio)
+            except Exception:
+                self._metrics["avatar_frame_errors"] += 1
+
     async def stream_cached(
         self,
         frames: tuple[bytes, ...],

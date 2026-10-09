@@ -32,6 +32,9 @@ class AvatarPort(ABC):
     def cancel(self) -> None:
         """Discard queued media for the active generation."""
 
+    def complete_audio(self) -> None:
+        """Finish queued media and return the active generation to Idle."""
+
     def close(self) -> None:
         """Close the active local session."""
 
