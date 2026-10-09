@@ -101,17 +101,30 @@ def build(args: argparse.Namespace) -> dict:
     source_manifest_path = source / "manifest.json"
     source_manifest = json.loads(source_manifest_path.read_text(encoding="utf-8"))
     manifest = {
-        "schema": 1,
+        "schema": 2,
+        "build_revision": "musetalk15-scenev2",
         "avatar_id": args.avatar_id,
         "engine": "musetalk15",
         "source_avatar_id": source_manifest.get("avatar_id", source.name),
         "source_manifest_sha256": sha256(source_manifest_path),
+        "source_sha256": source_manifest.get("source_sha256"),
+        "idle_video_sha256": source_manifest.get("idle_video_sha256"),
         "frame_count": len(source_images),
         "frame_size": source_manifest.get("frame_size"),
+        "presentation": source_manifest.get("presentation", "complete_scene"),
+        "coordinates": source_manifest.get("coordinates"),
+        "source_fps": source_manifest.get("source_fps"),
+        "source_frame_count": source_manifest.get("source_frame_count"),
+        "temporal_resample": source_manifest.get("temporal_resample"),
+        "duration_seconds": source_manifest.get("duration_seconds"),
+        "loop_mode": source_manifest.get("loop_mode"),
+        "loop_seam": source_manifest.get("loop_seam"),
+        "idle_motion": source_manifest.get("idle_motion"),
         "runtime_fps": 25.0,
         "face_size": [256, 256],
         "face_box_source": "approved_wav2lip_dataset",
         "parsing_mode": "jaw",
+        "blend_profile": "jaw",
         "extra_margin": args.extra_margin,
         "model_sha256": {
             "musetalk15_unet": sha256(args.model_root / "musetalkV15" / "unet.pth"),
@@ -120,7 +133,8 @@ def build(args: argparse.Namespace) -> dict:
             "face_parse": sha256(args.model_root / "face-parse-bisent" / "79999_iter.pth"),
         },
         "active": False,
-        "visual_approved": False,
+        "visual_approval_required": True,
+        "visual_approved": bool(args.visual_approved),
     }
     (target / "manifest.json").write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", encoding="utf-8",
@@ -137,6 +151,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--extra-margin", type=int, default=0)
     parser.add_argument("--left-cheek-width", type=int, default=90)
     parser.add_argument("--right-cheek-width", type=int, default=90)
+    parser.add_argument("--visual-approved", action="store_true")
     return parser.parse_args()
 
 

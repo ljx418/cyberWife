@@ -101,11 +101,11 @@ models:
     source_url: "https://github.com/TMElyralab/MuseTalk"
     license_id: "MIT + Apache-2.0 + BSD-3-Clause"
     license_review: approved
-    runtime: "LiveTalking MuseTalk plugin; isolated serial canary only"
-    functional_probe: "docs/stages/V2-X8.0/acceptance.md"
+    runtime: "LiveTalking MuseTalk plugin; active default on approved host; serial Wav2Lip fallback"
+    functional_probe: "docs/stages/V2-X8.0-R1/acceptance.md"
     verified_at: "2026-10-09"
-    status: discovered
-    note: "canary总工件3,986,182,419 bytes；不得与Wav2Lip双常驻或设为默认；人工盲评与ComfyUI保留合同关闭后再晋级。"
+    status: verified
+    note: "四场景正式工件已通过真实音频、资源和回滚门；不得与Wav2Lip双常驻。其他人物仍需逐素材验收。"
 
   # ── VAD ─────────────────────────────────────────────────────────────────
   - logical_id: silero-vad-v5

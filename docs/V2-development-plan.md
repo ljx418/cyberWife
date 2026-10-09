@@ -156,6 +156,7 @@ V2-X 完成不等于多形象、多空间或插件平台完成；界面不得提
 Character(id)
 ├─ Profile
 ├─ VoiceProfile
+├─ AvatarModelPolicy(preferred_engine, fallback_engine, resource_profile)
 ├─ AppearanceSet(id)
 │  ├─ SourcePack(id)
 │  └─ Rendition(id, engine, manifest)
@@ -167,7 +168,7 @@ Space(id)
 └─ LightingPreset(id)
 
 ActiveContext(singleton per local user)
-└─ character_id + appearance_id + space_id + rendition_id
+└─ character_id + appearance_id + space_id + rendition_id + resolved_engine
 
 MemoryPlatform
 ├─ CanonicalMemory + MemoryEdge + MemoryCluster
@@ -177,6 +178,8 @@ MemoryPlatform
 ```
 
 活动上下文仍是单用户单会话唯一选择，但数据库不再把“只有一个 Character/Space”写死。切换必须在一个事务内校验授权、派生就绪状态和资源预算，然后原子更新 `ActiveContext`。
+
+`AvatarModelPolicy`允许用户为角色选择已安装且通过质量门的Wav2Lip或MuseTalk。选择结果不是直接启动命令：系统必须先解析该角色/外观/空间是否存在同引擎rendition，确认模型、venv与资源准入，再以“停旧→启动新→健康探针→提交ActiveContext”的方式切换；失败保持旧引擎。24GiB显存设备禁止两个Avatar引擎双常驻。
 
 ### 5.2 文件系统隔离
 
@@ -212,7 +215,7 @@ V2-A 定义以下端口：
 ### 5.4 开发顺序
 
 1. **A0 数据迁移**：新增 Character/Appearance/Space/ActiveContext schema；旧单例数据可重复、可回滚迁移。
-2. **A1 多形象管理**：按 ID 新增、切换、归档；人物、声音、记忆命名空间严格绑定。
+2. **A1 多形象与模型策略管理**：按 ID 新增、切换、归档；人物、声音、记忆命名空间严格绑定；为每个角色保存首选/回退Avatar引擎并只展示具有兼容rendition的选择。
 3. **A2 多空间管理**：空间 CRUD、背景/灯光预设和活动上下文原子切换。
 4. **A3 导入导出**：版本化包、哈希、授权、配额、路径安全、冲突处理和回滚。
 5. **A4 记忆模型扩展**：实体、关系、聚类、来源和命名空间；旧记忆无损迁移。
@@ -230,6 +233,7 @@ V2-A 定义以下端口：
 | V2A-AC05 | 接入一个本地 RAG 与一个 MCP/CLI 测试连接器 | 可启停、健康可见、超时可熔断；未经确认写核心记忆为 0 |
 | V2A-AC06 | 查看聚类和关系，再删除源记忆/禁用提供方 | 边有来源；删除传播完整；禁用后不再召回该提供方内容 |
 | V2A-AC07 | 运行多角色/多空间/内外部记忆组合一小时 | V1/V2-X体验、隐私和资源门无回退；P0/P1=0 |
+| V2A-AC08 | 用户为同一角色依次选择Wav2Lip和MuseTalk，再模拟候选启动失败 | 每次切换均先验证兼容rendition并串行停旧启新；健康端点、ActiveContext与实际进程engine一致；失败保持旧模型；双常驻次数为0；跨重启恢复用户选择 |
 
 ## 6. 架构方案与取舍
 

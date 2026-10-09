@@ -102,10 +102,14 @@ class ScenePresetService:
         if idle_sha != item.get("idle_sha256") or talking_sha != item.get("talking_sha256"):
             return None
         avatar_payload = json.loads(avatar_manifest.read_text(encoding="utf-8"))
+        engine = str(item.get("engine") or avatar_payload.get("engine") or "wav2lip")
+        if engine == "musetalk15":
+            engine = "musetalk"
         if (
             avatar_payload.get("avatar_id") != item.get("speaking_avatar_id")
             or avatar_payload.get("presentation") != "complete_scene"
             or avatar_payload.get("visual_approved") is not True
+            or engine not in {"wav2lip", "musetalk"}
         ):
             return None
         approved = {
@@ -117,7 +121,12 @@ class ScenePresetService:
             or approved.get("talking", {}).get("sha256") != talking_sha
         ):
             return None
-        return {**item, "idle_path": idle_path, "avatar_manifest": avatar_payload}
+        return {
+            **item,
+            "engine": engine,
+            "idle_path": idle_path,
+            "avatar_manifest": avatar_payload,
+        }
 
     def ensure_registered(self) -> dict:
         catalog: list[dict] = []
@@ -194,7 +203,7 @@ class ScenePresetService:
         avatar = binding["avatar_manifest"]
         return {
             "status": "active",
-            "engine": "wav2lip",
+            "engine": binding["engine"],
             "avatar_id": binding["speaking_avatar_id"],
             "source_sha256": avatar.get("source_sha256"),
             "frame_count": int(avatar.get("frame_count", 0)),

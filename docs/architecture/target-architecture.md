@@ -1,8 +1,8 @@
 # cyberWife V1 基线与 V2 演进目标架构
 
-**版本**：3.4
+**版本**：3.5
 **日期**：2026-10-08
-**状态**：V1目标架构已实现；V2-X的D0/D1/X0、X0.1～X0.3、X9、X1、X2、X3.1、X3.2已PASS；X3.3功能门已实现，R1的25fps动作取样与口周融合候选自动门PASS、等待人工A/B，批准前不进入X3.4
+**状态**：V1目标架构已实现；V2-X的D0/D1/X0、X0.1～X0.3、X9、X1、X2、X3.1～X3.3-R1已PASS；X8.0路线选择与X8.0-R1 MuseTalk四场景迁移PASS/ACTIVE，X3.4和X8.1待后续开发
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -20,7 +20,7 @@ App Gateway :7860
   ├─ HTTP stream/cancel → Windows llama-server :8090
   ├─ IPC/loopback → WSL SpeechRuntime :8091（VAD/ASR/Embedding，受控Core venv）
   ├─ in-process adapter → CosyVoice2默认 / Qwen3-TTS显式回退
-  └─ HTTP PCM → WSL AvatarRuntime :8010（LiveTalking/Wav2Lip）
+  └─ HTTP PCM → WSL AvatarRuntime :8010（LiveTalking；Wav2Lip或MuseTalk单引擎）
                               │ loopback WS / Annex-B H.264
                               └────────────────────► Browser WebCodecs/canvas
 
@@ -40,7 +40,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发；机器与项目所有者人工验收PASS |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
-| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口；X3.3-R1把16fps源动作按25fps运行时钟扩展为250帧，并以manifest选择口周融合profile | 保留Wav2Lip256活动基线；V2-X8.0先用同素材串行比较整脸回贴与MuseTalk 1.5，模型候选不得绕过身份、边界、25fps、资源和人工盲评门 | V1 PASS；R1四场景已批准并以revision 12激活；X8模型审查进行中 |
+| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；X3.3-R1提供四场景250帧完整帧数据；X8.0实测MuseTalk 1.5为25.459fps、约15.95GiB VRAM/12.35GiB RAM并获人工选择 | X8.0-R1把四场景迁移到MuseTalk单引擎默认，保留Wav2Lip原子回退；V2-A再提供角色级模型策略选择，禁止双常驻 | V1 PASS；X8.0 AUTOMATION+HUMAN PASS；X8.0-R1开发中 |
 | 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；四场景`scenev2_mouth`均由完整帧构建，不抠人物、不叠第二人物；旧`scenev1`保留回退 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | 四个`scenev2_mouth`已active-ready；X3.4其他外观待开发 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
@@ -109,7 +109,10 @@ ops/install_scene_sequence.py                [已开发/UX13] 人工批准令牌
 backend/cyberwife/application/avatar_asset_service.py [已开发/UX13] 序列清单验证和私有媒体路径门
 prototype/src/App.tsx                        [已开发/UX13] 宽高比舞台、记忆工作台与intro/idle/live/outro状态机
 ops/build_video_avatar.py                     [已开发/UX14+X3.3-R1] scenev1兼容；可按25fps构建250帧scenev2候选并记录融合profile
-ops/install_scene_renditions.py               [已开发/X3.3-R1] 人工批准后才以四场景原子绑定安装scenev2_mouth；当前尚未执行
+ops/install_scene_renditions.py               [已开发/X3.3-R1] 四场景scenev2_mouth原子绑定已完成，保留为Wav2Lip回滚variant
+ops/build_musetalk_avatar.py                   [已开发/X8.0] 从已批准完整场景复用帧/人脸框生成VAE latent与jaw mask
+ops/install_musetalk_scene_renditions.py       [已开发/X8.0-R1] 四场景MuseTalk派生、引擎绑定与原子激活
+ops/select_avatar_engine.py                    [已开发/X8.0-R1] 单引擎rendition/binding/bootstrap选择与失败关闭；V2-A模型策略的低层执行器
 workers/avatar/utils/image.py                 [已开发/X3.3-R1] manifest驱动lower或mouth_oval_v1融合；旧工件缺字段时兼容lower
 tests/ux5/{analyze_lipsync,compare_render_quality}.py [已开发/X3.3-R1] 动作速率、二阶连续性、编码噪声归一边界、清晰度和嘴部响应门
 prototype/src/styles.css                      [已开发/UX14] live首帧原子替换Idle、单人物全舞台表面

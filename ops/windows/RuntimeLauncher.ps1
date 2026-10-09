@@ -15,6 +15,10 @@ param(
     [string]$LlamaCppPath = 'C:\tools\llama.cpp\llama-server.exe',
     [string]$ModelPath = 'C:\ComfyUI-aki-v2\ComfyUI\models\LLM\Qwen3-14B-Q4_K_M.gguf',
     [string]$AvatarModelWsl = '/mnt/c/ComfyUI-aki-v2/ComfyUI/models/Audio/wav2lip/wav2lip.pth',
+    [ValidateSet('auto', 'wav2lip', 'musetalk')]
+    [string]$AvatarEngine = 'auto',
+    [string]$MuseTalkModelRootWsl = '',
+    [string]$MuseTalkPythonWsl = '',
     [string]$AvatarId = '',
     [string]$WslHome = '',
     [string]$DataRootWsl = '',
@@ -60,8 +64,25 @@ if ([string]::IsNullOrWhiteSpace($WslHome) -or -not $WslHome.StartsWith('/')) {
 }
 if ([string]::IsNullOrWhiteSpace($DataRootWsl)) { $DataRootWsl = "$WslHome/.cyberWife" }
 if ([string]::IsNullOrWhiteSpace($AvatarPythonWsl)) { $AvatarPythonWsl = "$DataRootWsl/venvs/avatar-v1-py312/bin/python" }
+if ([string]::IsNullOrWhiteSpace($MuseTalkPythonWsl)) { $MuseTalkPythonWsl = "$DataRootWsl/venvs/musetalk15-canary-v2/bin/python" }
+if ([string]::IsNullOrWhiteSpace($MuseTalkModelRootWsl)) { $MuseTalkModelRootWsl = "$DataRootWsl/models/musetalk15-canary" }
 if ([string]::IsNullOrWhiteSpace($CosyVoicePythonWsl)) { $CosyVoicePythonWsl = "$DataRootWsl/venvs/cosyvoice/bin/python" }
 if ([string]::IsNullOrWhiteSpace($SpeechPythonWsl)) { $SpeechPythonWsl = $CosyVoicePythonWsl }
+$ResolvedAvatarEngine = $AvatarEngine
+if ($ResolvedAvatarEngine -eq 'auto') {
+    $engineFile = "$DataRootWsl/bootstrap/avatar-engine"
+    $selectedEngine = ''
+    try {
+        $selectedEngine = ((& wsl.exe cat $engineFile 2>$null) | Out-String).Trim().ToLowerInvariant()
+    } catch {
+        $selectedEngine = ''
+    }
+    if ($selectedEngine -in @('wav2lip', 'musetalk')) {
+        $ResolvedAvatarEngine = $selectedEngine
+    } else {
+        $ResolvedAvatarEngine = 'wav2lip'
+    }
+}
 if ([string]::IsNullOrWhiteSpace($AvatarId)) {
     $avatarDatabase = "$DataRootWsl/cyberwife.db"
     $avatarQuery = 'SELECT d.avatar_id FROM active_avatar_derivative a JOIN avatar_derivatives d ON d.id=a.derivative_id WHERE a.singleton=1 AND d.status=''active'' LIMIT 1;'
@@ -71,7 +92,19 @@ if ([string]::IsNullOrWhiteSpace($AvatarId)) {
     } catch {
         $resolvedAvatarId = ''
     }
-    if ($resolvedAvatarId -match '^[A-Za-z0-9_-]{1,80}$') {
+    if ($ResolvedAvatarEngine -eq 'musetalk') {
+        $bootstrapAvatarId = ''
+        try {
+            $bootstrapAvatarId = ((& wsl.exe cat "$DataRootWsl/bootstrap/avatar-id" 2>$null) | Out-String).Trim()
+        } catch {
+            $bootstrapAvatarId = ''
+        }
+        if ($bootstrapAvatarId -match '^[A-Za-z0-9_-]{1,80}$') {
+            $AvatarId = $bootstrapAvatarId
+        } else {
+            throw 'MuseTalk is selected but bootstrap/avatar-id is missing or invalid'
+        }
+    } elseif ($resolvedAvatarId -match '^[A-Za-z0-9_-]{1,80}$') {
         $AvatarId = $resolvedAvatarId
     } else {
         $bootstrapAvatarId = ''
@@ -209,7 +242,11 @@ function Start-ManagedComponent([string]$Name) {
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'avatar' {
-            $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', "CW_AVATAR_DATA_ROOT=$DataRootWsl/avatar/avatars", $AvatarPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'wav2lip', '--batch_size', '4', '--modelfile', $AvatarModelWsl, '--avatar_id', $AvatarId)
+            if ($ResolvedAvatarEngine -eq 'musetalk') {
+                $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', "PYTHONPATH=$WorkspaceWsl/workers/avatar`:$WorkspaceWsl", "CW_AVATAR_DATA_ROOT=$DataRootWsl/avatar/avatars", "CW_MUSETALK_MODEL_ROOT=$MuseTalkModelRootWsl", $MuseTalkPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'musetalk', '--batch_size', '4', '--avatar_id', $AvatarId)
+            } else {
+                $args = @('--cd', "$WorkspaceWsl/workers/avatar", 'env', 'HF_HUB_OFFLINE=1', 'TRANSFORMERS_OFFLINE=1', "CW_AVATAR_DATA_ROOT=$DataRootWsl/avatar/avatars", $AvatarPythonWsl, 'app.py', '--bind', '127.0.0.1', '--listenport', '8010', '--control-port', '8011', '--transport', 'ws_h264', '--tts', 'external', '--max_session', '1', '--model', 'wav2lip', '--batch_size', '4', '--modelfile', $AvatarModelWsl, '--avatar_id', $AvatarId)
+            }
             $process = Start-Process -FilePath 'wsl.exe' -ArgumentList $args -RedirectStandardInput $stdin -RedirectStandardOutput $stdout -RedirectStandardError $stderr -PassThru -WindowStyle Hidden
         }
         'gateway' {
@@ -273,8 +310,13 @@ function Assert-Preflight {
     }
     & wsl.exe --cd $WorkspaceWsl test -f $ConfigWsl
     if ($LASTEXITCODE -ne 0) { throw "WSL runtime config missing: $ConfigWsl" }
-    & wsl.exe test -x $AvatarPythonWsl
-    if ($LASTEXITCODE -ne 0) { throw "Avatar Python runtime missing: $AvatarPythonWsl" }
+    $selectedAvatarPython = if ($ResolvedAvatarEngine -eq 'musetalk') { $MuseTalkPythonWsl } else { $AvatarPythonWsl }
+    & wsl.exe test -x $selectedAvatarPython
+    if ($LASTEXITCODE -ne 0) { throw "Avatar Python runtime missing: $selectedAvatarPython" }
+    if ($ResolvedAvatarEngine -eq 'musetalk') {
+        & wsl.exe test -f "$MuseTalkModelRootWsl/musetalkV15/unet.pth"
+        if ($LASTEXITCODE -ne 0) { throw "MuseTalk model missing: $MuseTalkModelRootWsl/musetalkV15/unet.pth" }
+    }
     & wsl.exe test -x $SpeechPythonWsl
     if ($LASTEXITCODE -ne 0) { throw "Speech Python runtime missing: $SpeechPythonWsl" }
     if ($TtsProfile -ne 'qwen') {
@@ -359,9 +401,9 @@ switch ($Action) {
     'restart' {
         if ($Component -eq 'all') {
             & $PSCommandPath -Action stop -Component all -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -PidDir $PidDir -LogDir $LogDir
-            & $PSCommandPath -Action start -Component all -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -SpeechPythonWsl $SpeechPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
+            & $PSCommandPath -Action start -Component all -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarEngine $AvatarEngine -MuseTalkModelRootWsl $MuseTalkModelRootWsl -MuseTalkPythonWsl $MuseTalkPythonWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -SpeechPythonWsl $SpeechPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
         } else {
-            & $PSCommandPath -Action recover -Component $Component -Force -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -SpeechPythonWsl $SpeechPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
+            & $PSCommandPath -Action recover -Component $Component -Force -WorkspaceWin $WorkspaceWin -WorkspaceWsl $WorkspaceWsl -LlamaCppPath $LlamaCppPath -ModelPath $ModelPath -AvatarModelWsl $AvatarModelWsl -AvatarEngine $AvatarEngine -MuseTalkModelRootWsl $MuseTalkModelRootWsl -MuseTalkPythonWsl $MuseTalkPythonWsl -AvatarId $AvatarId -AvatarPythonWsl $AvatarPythonWsl -SpeechPythonWsl $SpeechPythonWsl -ConfigWsl $ConfigWsl -LlamaSlotProfile $LlamaSlotProfile -LlamaBatchSize $LlamaBatchSize -LlamaUbatchSize $LlamaUbatchSize -LlamaDisableContBatching:$LlamaDisableContBatching -LlamaNoHost:$LlamaNoHost -ReclaimWslCache:$ReclaimWslCache -TtsProfile $TtsProfile -TtsFallbackActive:$TtsFallbackActive -CosyVoicePythonWsl $CosyVoicePythonWsl -FirstPlayableMinChars $FirstPlayableMinChars -PidDir $PidDir -LogDir $LogDir -OfflineStrict:$OfflineStrict
         }
     }
 }

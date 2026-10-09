@@ -62,6 +62,7 @@ def build(tmp_path: Path, *, enabled: bool = True, with_bindings: bool = False):
             idle_id, talking_id = str(uuid4()), str(uuid4())
             bindings.append({
                 "scene_id": scene_id, "slug": definition.slug,
+                "engine": "wav2lip",
                 "idle_relative_path": f"assets/{scene_id}-idle.mp4",
                 "idle_sha256": idle_sha, "speaking_avatar_id": avatar_id,
                 "talking_sha256": talking_sha,
@@ -164,4 +165,30 @@ def test_approved_bindings_activate_with_cas_and_survive_catalog_reload(tmp_path
     active = scenes.active_avatar()
     assert active is not None
     assert active["scene_id"] == target["scene_id"]
+    assert active["engine"] == "wav2lip"
     assert active["single_surface_ready"] is True
+
+
+def test_musetalk_binding_reports_runtime_engine(tmp_path):
+    client, manifests, _, scenes = build(tmp_path, with_bindings=True)
+    binding_path = tmp_path / "private" / "v2x" / "scene-renditions" / "scene-bindings.v1.json"
+    payload = json.loads(binding_path.read_text(encoding="utf-8"))
+    target = payload["bindings"][0]
+    target["engine"] = "musetalk"
+    avatar_manifest_path = tmp_path / "avatars" / target["speaking_avatar_id"] / "manifest.json"
+    avatar_manifest = json.loads(avatar_manifest_path.read_text(encoding="utf-8"))
+    avatar_manifest["engine"] = "musetalk15"
+    avatar_manifest_path.write_text(json.dumps(avatar_manifest), encoding="utf-8")
+    target["talking_sha256"] = hashlib.sha256(avatar_manifest_path.read_bytes()).hexdigest()
+    binding_path.write_text(json.dumps(payload), encoding="utf-8")
+    renditions = manifests.load().to_dict()["renditions"]
+    for item in renditions:
+        if item["scene_id"] == target["scene_id"] and item["kind"] == "talking":
+            item["sha256"] = target["talking_sha256"]
+    source_pack = SourcePackService(manifests)
+    source_pack.register_renditions(renditions)
+    current = manifests.load()
+    source_pack.activate_scene(target["scene_id"], expected_revision=current.revision)
+    active = scenes.active_avatar()
+    assert active is not None
+    assert active["engine"] == "musetalk"
