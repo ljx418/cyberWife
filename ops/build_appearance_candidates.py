@@ -51,9 +51,12 @@ def build(args: argparse.Namespace) -> dict:
             idle = Path(idle_record["output"]).resolve()
             if sha256(keyframe) != key_record["output_sha256"] or sha256(idle) != idle_record["output_sha256"]:
                 raise ValueError(f"appearance.input_hash_mismatch:{slug}")
-            token = str(uuid5(AVATAR_NAMESPACE, f"{args.appearance_id}:{slug}:{sha256(idle)}"))[:12]
+            token = str(uuid5(
+                AVATAR_NAMESPACE,
+                f"{args.appearance_id}:{slug}:{sha256(idle)}:coord-median-v1",
+            ))[:12]
             wav_id = f"wav2lip256_app_{token}_scenev2_mouth"
-            muse_id = f"musetalk15_app_{token}_scenev2"
+            muse_id = f"musetalk15_app_{token}_scenev2_stable"
             wav_target = args.avatar_root / wav_id
             if not wav_target.exists():
                 build_wav2lip(
@@ -71,9 +74,14 @@ def build(args: argparse.Namespace) -> dict:
                     left_cheek_width=90,
                     right_cheek_width=90,
                     visual_approved=False,
+                    coordinate_stabilization="median",
                 ))
             muse_manifest = json.loads((muse_target / "manifest.json").read_text(encoding="utf-8"))
-            if muse_manifest.get("visual_approved") is not False or muse_manifest.get("frame_count") != 250:
+            if (
+                muse_manifest.get("visual_approved") is not False
+                or muse_manifest.get("frame_count") != 250
+                or muse_manifest.get("coordinate_stabilization") != "median"
+            ):
                 raise ValueError(f"appearance.candidate_manifest_invalid:{slug}")
             records[slug] = {
                 "scene_id": ScenePresetService.scene_id(slug),

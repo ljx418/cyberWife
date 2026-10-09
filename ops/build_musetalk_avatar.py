@@ -15,6 +15,7 @@ import pickle
 from pathlib import Path
 
 import cv2
+import numpy as np
 import torch
 
 
@@ -28,6 +29,18 @@ def sha256(path: Path) -> str:
 
 def numbered_images(path: Path) -> list[Path]:
     return sorted(path.glob("*.png"), key=lambda item: int(item.stem))
+
+
+def stabilize_coordinates(coordinates: list, mode: str) -> list[list[int]]:
+    values = np.asarray(coordinates, dtype=np.float32)
+    if values.ndim != 2 or values.shape[1] != 4 or len(values) == 0:
+        raise ValueError("invalid source face coordinates")
+    if mode == "source":
+        return np.rint(values).astype(int).tolist()
+    if mode != "median":
+        raise ValueError(f"unsupported coordinate stabilization: {mode}")
+    median = np.rint(np.median(values, axis=0)).astype(int).tolist()
+    return [list(median) for _ in range(len(values))]
 
 
 def build(args: argparse.Namespace) -> dict:
@@ -47,6 +60,8 @@ def build(args: argparse.Namespace) -> dict:
     from workers.avatar.avatars.musetalk.utils.blending import get_image_prepare_material
     from workers.avatar.avatars.musetalk.utils.face_parsing import FaceParsing
 
+    coordinate_stabilization = str(getattr(args, "coordinate_stabilization", "source"))
+    source_coords = stabilize_coordinates(source_coords, coordinate_stabilization)
     target.mkdir(parents=True)
     full_images = target / "full_imgs"
     masks = target / "mask"
@@ -122,7 +137,12 @@ def build(args: argparse.Namespace) -> dict:
         "idle_motion": source_manifest.get("idle_motion"),
         "runtime_fps": 25.0,
         "face_size": [256, 256],
-        "face_box_source": "approved_wav2lip_dataset",
+        "face_box_source": (
+            "approved_wav2lip_dataset_median"
+            if coordinate_stabilization == "median"
+            else "approved_wav2lip_dataset"
+        ),
+        "coordinate_stabilization": coordinate_stabilization,
         "parsing_mode": "jaw",
         "blend_profile": "jaw",
         "extra_margin": args.extra_margin,
@@ -152,6 +172,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--left-cheek-width", type=int, default=90)
     parser.add_argument("--right-cheek-width", type=int, default=90)
     parser.add_argument("--visual-approved", action="store_true")
+    parser.add_argument(
+        "--coordinate-stabilization", choices=("source", "median"), default="source"
+    )
     return parser.parse_args()
 
 
