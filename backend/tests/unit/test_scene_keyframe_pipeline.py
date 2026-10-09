@@ -4,7 +4,7 @@ import inspect
 import json
 from pathlib import Path
 
-from ops import multi_scene_idle_pipeline, scene_keyframe_pipeline
+from ops import appearance_idle_pipeline, multi_scene_idle_pipeline, scene_keyframe_pipeline
 
 
 ROOT = Path(__file__).resolve().parents[3]
@@ -35,6 +35,20 @@ def test_scene_contract_has_exactly_three_missing_scenes_and_no_matting():
 def test_prompts_freeze_mouth_camera_and_background():
     for prompt in multi_scene_idle_pipeline.PROMPTS.values():
         normalized = prompt.lower()
+        assert "locked tripod camera" in normalized
+        assert "lips remain softly closed" in normalized
+        assert "background" in normalized and "static" in normalized
+
+
+def test_alternate_appearance_changes_only_clothing_and_keeps_direct_scene():
+    prompt = scene_keyframe_pipeline.ALTERNATE_APPEARANCE_PROMPT_BASE.lower()
+    assert "authoritative identity" in prompt
+    assert "change only her clothing" in prompt
+    assert "blue-and-white small floral blouse" in prompt
+    assert "one person only" in prompt
+    assert "not a collage or cutout" in prompt
+    for value in appearance_idle_pipeline.prompts("blue-and-white small floral blouse").values():
+        normalized = value.lower()
         assert "locked tripod camera" in normalized
         assert "lips remain softly closed" in normalized
         assert "background" in normalized and "static" in normalized

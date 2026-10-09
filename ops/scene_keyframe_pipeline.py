@@ -49,9 +49,26 @@ PROMPT_BASE = (
     "Direct complete-scene generation, not a collage or cutout. "
 )
 
+ALTERNATE_APPEARANCE_PROMPT_BASE = (
+    "Create one seamless photorealistic 16:9 complete-scene photograph. Use image 1 as the authoritative "
+    "identity and facial reference for the exact same adult woman. Preserve her face shape, eyes, nose, lips, "
+    "skin tone, black updo hairstyle with loose side strands, long gold sun earrings and necklace. Change only "
+    "her clothing to a modest blue-and-white small floral blouse with natural woven fabric, long sleeves and a "
+    "simple round neckline. Use image 2 as the exact room, architecture, furniture layout and color reference. "
+    "Integrate her physically into the room with coherent perspective, furniture contact, occlusion, ambient "
+    "light, cast shadow and color temperature. One person only. Locked eye-level tripod camera. Match the close "
+    "half-body scale of image 1: crop at the waist, top of hair near 8 percent frame height, face at least 15 "
+    "percent of frame width, shoulders spanning about half the frame. Centered front-facing head-and-torso "
+    "framing. Her face must point exactly straight into the camera: zero yaw, zero pitch, zero roll, both ears "
+    "equally visible, both eyes horizontal and equally sized, nose bridge exactly centered between the eyes, "
+    "facial left and right sides symmetric. Both eyes visible, level head and shoulders, direct eye contact, relaxed neutral expression, lips "
+    "softly closed, face large and sharp enough for a native 256 pixel lip crop, safe margin around hair and "
+    "shoulders. Do not zoom out to show the full body. Direct complete-scene generation, not a collage or cutout. "
+)
+
 NEGATIVE = (
     "different person, identity drift, face change, age change, outfit change, jewelry change, side profile, "
-    "three-quarter face, looking away, head tilt, closed eyes, open mouth, teeth, talking, smile, hand near face, "
+    "three-quarter face, quarter profile, profile, face yaw, looking sideways, looking away, head tilt, closed eyes, open mouth, teeth, talking, smile, hand near face, "
     "extra person, duplicate person, extra limbs, malformed hands, floating body, collage, split screen, cutout, "
     "matte edge, transparent layer, mismatched light, beauty-filter skin, text, watermark, blurred face, low quality"
 )
@@ -125,7 +142,15 @@ def _normalize_composition(source: Path, target: Path, *, desired_face_width: in
     }
 
 
-def run(identity: Path, backgrounds: dict[str, Path], output_dir: Path) -> dict:
+def run(
+    identity: Path,
+    backgrounds: dict[str, Path],
+    output_dir: Path,
+    *,
+    prompt_base: str = PROMPT_BASE,
+    appearance_id: str | None = None,
+    appearance_label: str | None = None,
+) -> dict:
     identity = Path(identity).resolve()
     output_dir = Path(output_dir).resolve()
     if not identity.is_file() or not backgrounds or set(backgrounds) != set(SCENE_DIRECTIONS):
@@ -173,7 +198,7 @@ def run(identity: Path, backgrounds: dict[str, Path], output_dir: Path) -> dict:
             graph = json.loads(WORKFLOW.read_text(encoding="utf-8"))
             graph["1"]["inputs"]["image"] = identity_input.name
             graph["2"]["inputs"]["image"] = background_input.name
-            prompt = PROMPT_BASE + SCENE_DIRECTIONS[slug]
+            prompt = prompt_base + SCENE_DIRECTIONS[slug]
             seed = 271828 + index * 1009
             graph["6"]["inputs"]["prompt"] = prompt
             graph["6"]["inputs"]["negative_prompt"] = NEGATIVE
@@ -206,6 +231,8 @@ def run(identity: Path, backgrounds: dict[str, Path], output_dir: Path) -> dict:
             "workflow_sha256": _sha256(WORKFLOW),
             "matting": False,
             "visual_approval_required": True,
+            "appearance_id": appearance_id,
+            "appearance_label": appearance_label,
             "records": records,
         }
         (output_dir / "manifest.json").write_text(
@@ -233,11 +260,30 @@ def main() -> int:
     parser.add_argument("--identity", required=True, type=Path)
     parser.add_argument("--background-dir", required=True, type=Path)
     parser.add_argument("--output-dir", required=True, type=Path)
+    parser.add_argument(
+        "--appearance",
+        choices=("approved-red", "blue-white-floral"),
+        default="approved-red",
+    )
+    parser.add_argument("--appearance-id")
     args = parser.parse_args()
     backgrounds = {
         slug: args.background_dir / f"{slug}.webp" for slug in SCENE_DIRECTIONS
     }
-    print(json.dumps(run(args.identity, backgrounds, args.output_dir), ensure_ascii=False, indent=2))
+    prompt_base = (
+        ALTERNATE_APPEARANCE_PROMPT_BASE
+        if args.appearance == "blue-white-floral"
+        else PROMPT_BASE
+    )
+    label = "蓝白碎花上衣" if args.appearance == "blue-white-floral" else "已批准红色针织上衣"
+    print(json.dumps(run(
+        args.identity,
+        backgrounds,
+        args.output_dir,
+        prompt_base=prompt_base,
+        appearance_id=args.appearance_id,
+        appearance_label=label,
+    ), ensure_ascii=False, indent=2))
     return 0
 
 
