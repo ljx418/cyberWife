@@ -10,11 +10,11 @@
 | 验收项 | 结果 | 证据摘要 |
 |---|---|---|
 | R1-AC01 坐标稳定单测 | PASS | source 保持、median 固定、非法模式关闭 |
-| R1-AC02 三场景同音频 A/B | PASS | 二阶均值下降 30.4%～39.9%；响应比 1.242～1.287 |
-| R1-AC03 连续性 | PASS | 黑帧 0；最大连续近冻结 0～2；序列无缺口 |
+| R1-AC02 三场景同音频 A/B | REVOKED | 整段指标改善，但末段静音仍被推理为说话，存在局部音画失配 |
+| R1-AC03 连续性 | REVOKED | 流连续，但 generation 尾帧范围与有效音频范围不一致 |
 | R1-AC04 性能 | PASS | 首包 472～545 ms；推理 50.41～52.07 FPS |
 | R1-AC05 隔离与回滚 | PASS | 独立候选 ID；manifest 显式能力；正式形象不迁移 |
-| R1-AC06 人工 A/B | WAITING | 自动指标不能代签主观自然度 |
+| R1-AC06 人工 A/B | BLOCKED | 先修复末段口型与验收漏检，不要求人类批准已知缺陷候选 |
 
 ## 回归测试
 
@@ -24,4 +24,4 @@
 - 前端构建：PASS
 - Playwright 端到端：51 passed
 
-自动化结论：**PASS**。阶段结论：**WAITING HUMAN**。
+原自动化结论已撤销。当前阶段结论：**FAIL / RETURN TO DEVELOPMENT PLAN**。详见 `tail-defect-audit.md`。
