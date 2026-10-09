@@ -40,8 +40,8 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | VAD/ASR | SpeechRuntime真实进程与20轮final合同通过；UX8统一繁简/普通话词形与segment展示 | Chrome 900ms句中停顿端点，保持20ms流式输入与不落盘 | 已开发；机器与项目所有者人工验收PASS |
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
-| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口；X3.3-R1候选把16fps源动作按25fps运行时钟扩展为250帧，并以manifest选择口周融合profile | R1自动连续性/边界/嘴部响应/性能门全绿后再由人工A/B；进一步高清和音素自然度进入V2-X8 | V1 PASS；R1候选WAITING HUMAN，未激活 |
-| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；UX14的`scenev1`仍是活动工件；R1新增不覆盖旧工件的`scenev2`候选，不抠图、不叠第二人物 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | `scenev1`已active；四个`scenev2`候选机器PASS、人工待审 |
+| Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；20ms实时PCM使用50ms调度抖动容忍与260ms活跃批窗口；X3.3-R1把16fps源动作按25fps运行时钟扩展为250帧，并以manifest选择口周融合profile | 保留Wav2Lip256活动基线；V2-X8.0先用同素材串行比较整脸回贴与MuseTalk 1.5，模型候选不得绕过身份、边界、25fps、资源和人工盲评门 | V1 PASS；R1四场景已批准并以revision 12激活；X8模型审查进行中 |
+| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；四场景`scenev2_mouth`均由完整帧构建，不抠人物、不叠第二人物；旧`scenev1`保留回退 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | 四个`scenev2_mouth`已active-ready；X3.4其他外观待开发 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |

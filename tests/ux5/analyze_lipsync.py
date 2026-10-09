@@ -38,6 +38,9 @@ def audio_energy(path: Path, count: int, fps: int = 25) -> np.ndarray:
 
 def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[np.ndarray, dict]:
     coords = pickle.loads((dataset / "coords.pkl").read_bytes())
+    manifest_path = dataset / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8")) if manifest_path.is_file() else {}
+    muse_coordinates = str(manifest.get("engine", "")).startswith("musetalk")
     source_files = sorted(
         (dataset / "full_imgs").glob("*.png"), key=lambda path: int(path.stem)
     )
@@ -52,6 +55,7 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
     previous_previous_face = None
     boundary_delta: list[float] = []
     boundary_excess: list[float] = []
+    upper_face_identity_delta: list[float] = []
     frame_motion: list[float] = []
     second_order_motion: list[float] = []
     sharpness: list[float] = []
@@ -63,7 +67,10 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
             black += 1
         source_index = mirror_index(len(source_files), sequence)
         source = cv2.imread(str(source_files[source_index]))
-        y1, y2, x1, x2 = coords[source_index]
+        if muse_coordinates:
+            x1, y1, x2, y2 = coords[source_index]
+        else:
+            y1, y2, x1, x2 = coords[source_index]
         mouth_top = y1 + (y2 - y1) // 2
         actual_roi = frame[mouth_top:y2, x1:x2]
         source_roi = source[mouth_top:y2, x1:x2]
@@ -75,6 +82,12 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
         source_face = source[y1:y2, x1:x2]
         if actual_face.size and actual_face.shape == source_face.shape:
             face_height, face_width = actual_face.shape[:2]
+            upper_end = max(1, round(face_height * 0.42))
+            upper_actual = actual_face[:upper_end]
+            upper_source = source_face[:upper_end]
+            upper_face_identity_delta.append(
+                float(np.mean(cv2.absdiff(upper_actual, upper_source)))
+            )
             band = max(2, round(face_width * 0.12))
             top = round(face_height * 0.35)
             sides_actual = np.concatenate(
@@ -132,6 +145,7 @@ def generated_delta(video: Path, dataset: Path, sequences: list[int]) -> tuple[n
         "max_consecutive_frozen_pairs": max_frozen_run,
         "cheek_boundary_delta": summary(boundary_delta),
         "cheek_boundary_excess_over_codec_floor": summary(boundary_excess),
+        "upper_face_identity_delta": summary(upper_face_identity_delta),
         "face_frame_motion": summary(frame_motion),
         "face_second_order_motion": summary(second_order_motion),
         "face_sharpness": summary(sharpness),

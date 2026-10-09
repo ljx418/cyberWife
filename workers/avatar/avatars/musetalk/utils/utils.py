@@ -13,13 +13,21 @@ from avatars.musetalk.models.unet import UNet,PositionalEncoding
 
 
 def load_all_model(
-    unet_model_path=os.path.join("models", "musetalkV15", "unet.pth"),
+    unet_model_path=None,
     vae_type="sd-vae",
-    unet_config=os.path.join("models", "musetalkV15", "musetalk.json"),
+    unet_config=None,
     device=None,
+    model_root=None,
 ):
+    model_root = model_root or os.environ.get("CW_MUSETALK_MODEL_ROOT", "models")
+    unet_model_path = unet_model_path or os.path.join(
+        model_root, "musetalkV15", "unet.pth",
+    )
+    unet_config = unet_config or os.path.join(
+        model_root, "musetalkV15", "musetalk.json",
+    )
     vae = VAE(
-        model_path = os.path.join("models", vae_type),
+        model_path = os.path.join(model_root, vae_type),
     )
     print(f"load unet model from {unet_model_path}")
     unet = UNet(

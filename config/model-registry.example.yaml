@@ -93,6 +93,20 @@ models:
     verified_at: null
     status: discovered
 
+  - logical_id: livetalking-musetalk15
+    component: avatar
+    filename_or_revision: "musetalkV15/unet.pth (plus pinned VAE/Whisper/face-parsing dependencies)"
+    size_bytes: 3400074924
+    sha256: "7ebf6c98c181e20838e4c0054e96e944ac60d5d692cc01db42839fe11b787007"
+    source_url: "https://github.com/TMElyralab/MuseTalk"
+    license_id: "MIT + Apache-2.0 + BSD-3-Clause"
+    license_review: approved
+    runtime: "LiveTalking MuseTalk plugin; isolated serial canary only"
+    functional_probe: "docs/stages/V2-X8.0/acceptance.md"
+    verified_at: "2026-10-09"
+    status: discovered
+    note: "canary总工件3,986,182,419 bytes；不得与Wav2Lip双常驻或设为默认；人工盲评与ComfyUI保留合同关闭后再晋级。"
+
   # ── VAD ─────────────────────────────────────────────────────────────────
   - logical_id: silero-vad-v5
     component: vad

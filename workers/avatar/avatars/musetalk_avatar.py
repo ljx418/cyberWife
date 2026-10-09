@@ -56,18 +56,20 @@ logger.info('Using {} for inference.'.format(device))
 
 def load_model():
     # load model weights
-    vae, unet, pe = load_all_model()
+    model_root = os.environ.get("CW_MUSETALK_MODEL_ROOT", "models")
+    vae, unet, pe = load_all_model(model_root=model_root)
     #device = torch.device("cuda" if torch.cuda.is_available() else ("mps" if (hasattr(torch.backends, "mps") and torch.backends.mps.is_available()) else "cpu"))
     timesteps = torch.tensor([0], device=device)
     pe = pe.half().to(device)
     vae.vae = vae.vae.half().to(device)
     unet.model = unet.model.half().to(device)
     # Initialize audio processor and Whisper model
-    audio_processor = Audio2Feature(model_path="./models/whisper")
+    audio_processor = Audio2Feature(model_path=os.path.join(model_root, "whisper"))
     return vae, unet, pe, timesteps, audio_processor
 
 def load_avatar(avatar_id):
-    avatar_path = f"./data/avatars/{avatar_id}"
+    avatar_root = os.environ.get("CW_AVATAR_DATA_ROOT", "./data/avatars")
+    avatar_path = os.path.join(avatar_root, avatar_id)
     full_imgs_path = f"{avatar_path}/full_imgs" 
     coords_path = f"{avatar_path}/coords.pkl"
     latents_out_path= f"{avatar_path}/latents.pt"
@@ -144,7 +146,13 @@ class MuseReal(BaseAvatar):
         audio_feature_batch = audio_feature_batch.to(device=self.unet.device,
                                                         dtype=self.unet.model.dtype)
         audio_feature_batch = self.pe(audio_feature_batch)
-        latent_batch = latent_batch.to(dtype=self.unet.model.dtype)
+        # Precomputed avatar latents are intentionally stored on CPU so the
+        # dataset stays portable. Move only the active batch to the model
+        # device; otherwise MuseTalk fails as soon as the first audio batch is
+        # inferred while its UNet is on CUDA.
+        latent_batch = latent_batch.to(
+            device=self.unet.device, dtype=self.unet.model.dtype,
+        )
 
         pred_latents = self.unet.model(latent_batch, 
                                     self.timesteps, 

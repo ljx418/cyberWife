@@ -190,11 +190,17 @@ def main():
     appasync["rtc_manager"] = rtc_manager
 
     async def health(_request):
+        logical_ids = {
+            "wav2lip": "livetalking-wav2lip256",
+            "musetalk": "livetalking-musetalk15",
+            "ultralight": "livetalking-ultralight",
+        }
         return web.json_response({
             "status": "ready",
-            "logical_id": "livetalking-wav2lip256",
+            "logical_id": logical_ids.get(opt.model, f"livetalking-{opt.model}"),
+            "engine": opt.model,
             "device": "cuda" if torch.cuda.is_available() else "cpu",
-            "dtype": "fp32",
+            "dtype": "fp16" if opt.model == "musetalk" else "fp32",
             "avatar_id": opt.avatar_id,
         })
 

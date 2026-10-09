@@ -105,7 +105,10 @@ def generate_avatar(video_path, avatar_id, save_path='./data/avatars', bbox_shif
     coord_placeholder = (0.0, 0.0, 0.0, 0.0)
 
     device = torch.device(f"cuda" if torch.cuda.is_available() else "cpu")
-    vae_local, unet_local, pe_local = load_all_model(device=device)
+    model_root = os.environ.get("CW_MUSETALK_MODEL_ROOT", "models")
+    vae_local, unet_local, pe_local = load_all_model(
+        device=device, model_root=model_root,
+    )
     vae_local.vae = vae_local.vae.half().to(device)
 
     if version == "v15":

@@ -2,14 +2,14 @@
 
 ## 阶段结论
 
-自动质量门已通过，状态为`WAITING HUMAN`。三个新增场景及当前默认蓝调客厅均完成同人物、同场景、同一真实CosyVoice音频的baseline/candidate采集；候选未写入活动场景绑定，项目所有者批准前不进入X3.4。
+自动质量门与项目所有者人工门均已通过，状态为`PASS / ACTIVATED`。三个新增场景及当前默认蓝调客厅均完成同人物、同场景、同一真实CosyVoice音频的baseline/candidate采集；2026-10-09批准后由原子安装器一次写入四个场景绑定，revision从11递增到12。
 
 ## 实现结果
 
 - 10秒、160帧/16fps的批准Idle在构建期按25fps运行时钟线性重采为250帧，动作实际播放速率由1.5625倍恢复为1.00倍。
 - 数据集manifest显式记录`source_frame_count/source_fps/runtime_fps/temporal_resample/blend_profile`；旧manifest缺字段时维持原lower-face行为。
 - `mouth_oval_v1`只融合口周与下颌内部区域，不再横向羽化整张下半脸；第二个更窄候选在最差场景无额外收益，已弃用且未纳入审查。
-- `install_scene_renditions.py`已固化未来批准后的四场景安装合同：统一生成/校验250帧、25fps、`scenev2_mouth`工件；本轮没有执行安装，因此活动绑定仍是可回退的`scenev1`。
+- `install_scene_renditions.py`固化四场景安装合同：统一生成/校验250帧、25fps、`scenev2_mouth`工件；批准后已执行安装，活动蓝调客厅及其余三个场景均解析到新工件，旧`scenev1`仍保留为可回退资产。
 - 质量门增加脸颊边界净扰动、脸部二阶帧间运动、清晰度、重复帧连续长度、动作播放速率；边界净扰动扣除相邻H.264控制带噪声底，避免把编码噪声冒充融合缺陷。
 
 ## 三场景同音频结果
@@ -23,9 +23,14 @@
 
 所有H.264序列单调、sequence gap=0，服务端finalfps均≥25。近似重复帧完整披露；均无超过80ms的连续重复段，不以加噪声伪造运动。
 
+## 激活后回归
+
+活动蓝调客厅使用同一8秒输入重新实采：217个视频包、400个20ms音频包、序列缺口0、黑帧0、持续冻结0、finalfps 25.692、inferfps 136.759，最佳相对诊断偏移+40ms，口型有声/静音运动比1.159353。该数据证明新绑定可运行且嘴部真实响应，不替代X8对音素形状、清晰度与身份保持的独立盲评。
+
 ## 私有证据
 
 - 根目录：`/home/administrator/.cyberWife/acceptance/V2-X3.3-R1/`
 - 汇总对比：`<scene>-comparison-final.json`
 - 原始采集：`baseline/`、`candidate/`下的H.264、时间线、MP4和分析JSON
 - 人工审查页：`review.html`
+- 激活后回归：`post-activation-blue-v2/`
