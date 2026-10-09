@@ -192,3 +192,88 @@ def test_musetalk_binding_reports_runtime_engine(tmp_path):
     active = scenes.active_avatar()
     assert active is not None
     assert active["engine"] == "musetalk"
+
+
+def test_v2_combination_catalog_atomically_switches_appearance_and_scene(tmp_path):
+    client, manifests, _, scenes = build(tmp_path)
+    client.get("/api/v1/scene-presets")
+    current = manifests.load()
+    assert current is not None
+    source_id = current.payload["sources"][0]["source_id"]
+    appearance_ids = [str(uuid4()), str(uuid4())]
+    binding_root = tmp_path / "private" / "v2x" / "scene-renditions"
+    avatar_root = tmp_path / "avatars"
+    bindings, renditions = [], []
+    for appearance_index, appearance_id in enumerate(appearance_ids):
+        for definition in DEFAULT_SCENES[:3]:
+            scene_id = ScenePresetService.scene_id(definition.slug)
+            idle = binding_root / "assets" / appearance_id / f"{scene_id}.mp4"
+            idle.parent.mkdir(parents=True, exist_ok=True)
+            idle.write_bytes(f"idle-{appearance_id}-{scene_id}".encode())
+            idle_sha = hashlib.sha256(idle.read_bytes()).hexdigest()
+            avatar_id = f"avatar_{appearance_index}_{definition.slug.replace('-', '_')}"
+            avatar_dir = avatar_root / avatar_id
+            avatar_dir.mkdir(parents=True)
+            avatar_manifest = avatar_dir / "manifest.json"
+            avatar_manifest.write_text(json.dumps({
+                "avatar_id": avatar_id, "source_sha256": "a" * 64,
+                "presentation": "complete_scene", "visual_approved": True,
+                "engine": "musetalk15", "frame_count": 250,
+                "frame_size": [768, 432], "coordinates": [80, 320, 100, 300],
+            }), encoding="utf-8")
+            talking_sha = hashlib.sha256(avatar_manifest.read_bytes()).hexdigest()
+            idle_id, talking_id = str(uuid4()), str(uuid4())
+            bindings.append({
+                "appearance_id": appearance_id,
+                "appearance_label": f"外观{appearance_index + 1}",
+                "scene_id": scene_id,
+                "slug": definition.slug,
+                "engine": "musetalk",
+                "idle_relative_path": idle.relative_to(binding_root).as_posix(),
+                "idle_sha256": idle_sha,
+                "speaking_avatar_id": avatar_id,
+                "talking_sha256": talking_sha,
+                "idle_rendition_id": idle_id,
+                "talking_rendition_id": talking_id,
+            })
+            renditions.extend([
+                {"rendition_id": idle_id, "kind": "idle", "source_ids": [source_id], "scene_id": scene_id, "status": "approved", "sha256": idle_sha},
+                {"rendition_id": talking_id, "kind": "talking", "source_ids": [source_id], "scene_id": scene_id, "status": "approved", "sha256": talking_sha},
+            ])
+    binding_root.mkdir(parents=True, exist_ok=True)
+    (binding_root / "scene-bindings.v2.json").write_text(json.dumps({
+        "schema_version": 2,
+        "source_pack_id": current.payload["pack_id"],
+        "bindings": bindings,
+    }), encoding="utf-8")
+    SourcePackService(manifests).register_combinations(
+        appearances=[
+            {"appearance_id": appearance_id, "source_ids": [source_id], "confirmed": True}
+            for appearance_id in appearance_ids
+        ],
+        renditions=renditions,
+        active_appearance_id=appearance_ids[0],
+    )
+
+    catalog = client.get("/api/v1/scene-presets").json()
+    assert catalog["schema_version"] == 2
+    assert catalog["active_appearance_id"] == appearance_ids[0]
+    assert len(catalog["appearances"]) == 2
+    assert len(catalog["combinations"]) == 6
+    target_scene = ScenePresetService.scene_id(DEFAULT_SCENES[1].slug)
+    target_combination = next(
+        item for item in catalog["combinations"]
+        if item["appearance_id"] == appearance_ids[1] and item["scene_id"] == target_scene
+    )
+    changed = client.post(
+        f"/api/v1/scene-presets/{target_scene}/activate",
+        json={"expected_revision": catalog["revision"], "appearance_id": appearance_ids[1]},
+    )
+    assert changed.status_code == 200, changed.text
+    body = changed.json()
+    assert body["active_appearance_id"] == appearance_ids[1]
+    assert body["active_scene_id"] == target_scene
+    assert scenes.active_avatar()["avatar_id"] == target_combination["speaking_avatar_id"]
+    active_renditions = [item for item in manifests.load().payload["renditions"] if item["status"] == "active"]
+    assert {item["kind"] for item in active_renditions} == {"idle", "talking"}
+    assert all(item["scene_id"] == target_scene for item in active_renditions)

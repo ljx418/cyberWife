@@ -156,12 +156,30 @@ export interface ScenePreset {
   can_activate: boolean;
   idle_url: string | null;
   speaking_avatar_id: string | null;
+  appearance_id?: string | null;
+}
+
+export interface AppearancePreset {
+  appearance_id: string;
+  label: string;
+  confirmed: boolean;
+}
+
+export interface SceneCombination {
+  appearance_id: string;
+  scene_id: string;
+  idle_url: string;
+  speaking_avatar_id: string;
+  engine: "wav2lip" | "musetalk";
 }
 
 export interface ScenePresetCatalog {
-  schema_version: 1;
+  schema_version: 1 | 2;
   revision: number;
   active_scene_id: string | null;
+  active_appearance_id?: string | null;
+  appearances?: AppearancePreset[];
+  combinations?: SceneCombination[];
   items: ScenePreset[];
 }
 
@@ -241,8 +259,11 @@ export const ConversationClient = {
   async getAssets(kind: "portrait" | "voice") { return request<{ kind: string; items: Array<Record<string, unknown>> }>("GET", `/api/v1/assets/${kind}`); },
   async getSourcePack() { return request<SourcePack>("GET", "/api/v1/source-pack"); },
   async getScenePresets() { return request<ScenePresetCatalog>("GET", "/api/v1/scene-presets"); },
-  async activateScene(sceneId: string, expectedRevision: number) {
-    return request<ScenePresetCatalog>("POST", `/api/v1/scene-presets/${encodeURIComponent(sceneId)}/activate`, { expected_revision: expectedRevision });
+  async activateScene(sceneId: string, expectedRevision: number, appearanceId?: string | null) {
+    return request<ScenePresetCatalog>("POST", `/api/v1/scene-presets/${encodeURIComponent(sceneId)}/activate`, {
+      expected_revision: expectedRevision,
+      ...(appearanceId ? { appearance_id: appearanceId } : {}),
+    });
   },
   sceneIdleUrl(scene: ScenePreset, revision: number) {
     return scene.idle_url ? `${GATEWAY_BASE}${scene.idle_url}?v=${revision}` : null;

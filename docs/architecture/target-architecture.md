@@ -2,7 +2,7 @@
 
 **版本**：3.5
 **日期**：2026-10-08
-**状态**：V1目标架构已实现；V2-X的D0/D1/X0、X0.1～X0.3、X9、X1、X2、X3.1～X3.3-R1已PASS；X8.0路线选择与X8.0-R1 MuseTalk四场景迁移PASS/ACTIVE，X3.4和X8.1待后续开发
+**状态**：V1目标架构已实现；V2-X的D0/D1/X0、X0.1～X0.3、X9、X1、X2、X3.1～X3.5已PASS；X8.0路线选择与X8.0-R1 MuseTalk迁移PASS/ACTIVE，下一阶段为X4，X8.1仍待后续开发
 **架构风格**：模块化单体 Gateway + 端口/适配器 + 本机 GPU 推理进程
 
 ## 1. 架构结论
@@ -41,7 +41,7 @@ RuntimeLauncher.ps1 负责 start / status / recover / stop 与真实功能探针
 | LLM | Windows llama.cpp真实stream、低风险profile与跨阶段取消已通过 | 不迁移高成本runtime | 已开发/已验收 |
 | TTS | Cosy默认链30/30、普通链P95≤7秒、授权盲听5/5；统一取消已接入 | Qwen保留显式回退 | 已开发/已验收 |
 | Avatar | H.264/WebCodecs传输、打断清队列、降级/恢复与长稳态通过；X3.3-R1提供四场景250帧完整帧数据；X8.0实测MuseTalk 1.5为25.459fps、约15.95GiB VRAM/12.35GiB RAM并获人工选择 | X8.0-R1把四场景迁移到MuseTalk单引擎默认，保留Wav2Lip原子回退；V2-A再提供角色级模型策略选择，禁止双常驻 | V1 PASS；X8.0 AUTOMATION+HUMAN PASS；X8.0-R1开发中 |
-| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；四场景`scenev2_mouth`均由完整帧构建，不抠人物、不叠第二人物；旧`scenev1`保留回退 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | 四个`scenev2_mouth`已active-ready；X3.4其他外观待开发 |
+| 人物生成 | 身份参考+完整场景关键帧→Wan首尾条件→人工确认；2外观×3共同场景及红衣蓝调客厅均由完整帧构建，不抠人物、不叠第二人物；v1绑定保留回退 | intro/idle/live/outro共享批准清单；逐素材人工身份、场景和嘴部自然度签署 | 7个`appearance+scene`组合已active-ready；X4状态反馈待开发 |
 | 数据 | SQLite/FTS/sqlite-vec、Memory/Retention、手工新增、候选确认/拒绝、原子删除与no-record均已实现 | 候选确认前不召回；保持事务与保留策略 | 已开发/真实语音链验收 |
 | 健康 | 六组件真实probe、资源、engine、缓存与首响分段状态已实现 | 保持真实状态，不以文件存在冒充ready | 已开发/已验收 |
 | 启动 | audit/prepare/verify与start/status/recover/stop已实现；AC06R以本地制品清单生成本机模型注册表、私有参考音频/Avatar/Cosy源码，Gateway和Launcher不再依赖开发机硬编码素材；双身份拒绝和五项空状态约束新环境 | 在真实新Windows用户+干净WSL运行已完成的执行器 | 当前机迁移/真实启停PASS；外部环境待验 |

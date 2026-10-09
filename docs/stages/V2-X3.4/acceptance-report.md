@@ -9,7 +9,7 @@
 | AC05 资产链 | PASS | keyframe/idle/candidate/capture manifest 与 SHA 齐全；候选 staged |
 | AC06 故障保护 | PASS | 首轮侧脸候选被人工事实检视拒绝，未继续生成；未批准候选不能激活 |
 | AC07 资源与隐私 | PASS | 重型模型串行；ComfyUI与Avatar均loopback；生成后实时服务恢复 |
-| AC08 人工自然度 | PENDING | 必须观看私有 `review/review.html` 后由项目所有者决定 |
+| AC08 人工自然度 | PASS | 项目所有者已明确确认三段视频通过，并在R2末段修复后批准继续后续开发 |
 | AC09 回归 | PASS | 根目录62、后端412（7 skipped）、Avatar 18、Playwright 51全部通过；前端生产构建通过 |
 
-**阶段门：未通过。** 原因仅为 AC08 尚未由人签署，并非机器测试失败。
+**阶段门：PASS / COMPLETE。** X3.4候选已取得人工批准；运行态组合登记与可逆切换归入X3.5，不在本报告冒充完成。

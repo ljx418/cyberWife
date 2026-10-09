@@ -1313,7 +1313,7 @@ function App() {
           scenePresetFeatureEnabled={scenePresetFeatureEnabled}
           scenePresetCatalog={scenePresetCatalog}
           sceneSwitchAllowed={['idle', 'listening', 'interrupted'].includes(conversationState)}
-          onActivateScene={async (scene) => {
+          onActivateScene={async (scene, appearanceId) => {
             if (!scenePresetCatalog || !scene.can_activate || !scene.speaking_avatar_id || !scene.idle_url) return
             if (!['idle', 'listening', 'interrupted'].includes(conversationStateRef.current)) {
               setSettingsStatus('请等待当前回答结束后再切换场景')
@@ -1321,7 +1321,7 @@ function App() {
             }
             setSettingsStatus(`正在切换到${scene.label}…`)
             try {
-              const catalog = await ConversationClient.activateScene(scene.scene_id, scenePresetCatalog.revision)
+              const catalog = await ConversationClient.activateScene(scene.scene_id, scenePresetCatalog.revision, appearanceId)
               const active = catalog.items.find((item) => item.scene_id === catalog.active_scene_id)
               if (!active?.speaking_avatar_id || !active.idle_url) throw new Error('场景动态素材不完整')
               setIdleVideoReady(false)
@@ -1337,7 +1337,8 @@ function App() {
                 }
                 await AvatarSession.start(avatarCanvasRef.current ?? undefined, active.speaking_avatar_id)
               }
-              setSettingsStatus(`已切换到${active.label}；当前对话保持连接`)
+              const appearance = catalog.appearances?.find((item) => item.appearance_id === catalog.active_appearance_id)
+              setSettingsStatus(`已切换到${appearance ? `${appearance.label} · ` : ''}${active.label}；当前对话保持连接`)
             } catch (error) {
               try { setScenePresetCatalog(await ConversationClient.getScenePresets()) } catch { /* keep last visible state */ }
               setSettingsStatus(`场景未切换：${String(error)}`)
@@ -1775,7 +1776,7 @@ interface SettingsDrawerProps {
   scenePresetFeatureEnabled: boolean
   scenePresetCatalog: ScenePresetCatalog | null
   sceneSwitchAllowed: boolean
-  onActivateScene: (scene: ScenePreset) => Promise<void>
+  onActivateScene: (scene: ScenePreset, appearanceId?: string | null) => Promise<void>
   onUploadSource: (file: File, angle: SourceAngle, appearanceLabel: string) => Promise<void>
   stageCompositionFeatureEnabled: boolean
   compositionMode: CompositionMode
@@ -1879,6 +1880,30 @@ function SourcePackPanel(props: { sourcePack: SourcePack; onUpload: (file: File,
 }
 
 function SettingsDrawer(props: SettingsDrawerProps) {
+  const [selectedAppearanceId, setSelectedAppearanceId] = useState<string | null>(
+    props.scenePresetCatalog?.active_appearance_id || null,
+  )
+  useEffect(() => {
+    if (props.scenePresetCatalog?.active_appearance_id) {
+      setSelectedAppearanceId(props.scenePresetCatalog.active_appearance_id)
+    }
+  }, [props.scenePresetCatalog?.active_appearance_id])
+  const viewedScenes = (props.scenePresetCatalog?.items || []).map((scene) => {
+    if (!selectedAppearanceId || !props.scenePresetCatalog?.combinations) return scene
+    const combination = props.scenePresetCatalog.combinations.find(
+      (item) => item.appearance_id === selectedAppearanceId && item.scene_id === scene.scene_id,
+    )
+    const active = props.scenePresetCatalog.active_appearance_id === selectedAppearanceId
+      && props.scenePresetCatalog.active_scene_id === scene.scene_id
+    return {
+      ...scene,
+      appearance_id: selectedAppearanceId,
+      can_activate: Boolean(combination),
+      idle_url: combination?.idle_url || null,
+      speaking_avatar_id: combination?.speaking_avatar_id || null,
+      quality_status: active ? 'active' as const : combination ? 'approved' as const : 'preview_only' as const,
+    }
+  })
   const tabs: Array<{ id: SettingsTab; label: string }> = [
     { id: 'profile', label: '人物' },
     ...(props.sourcePackFeatureEnabled ? [{ id: 'sources' as SettingsTab, label: '素材' }] : []),
@@ -1910,8 +1935,21 @@ function SettingsDrawer(props: SettingsDrawerProps) {
               <hr />
               <SectionHeader index="02" title="相处空间" description={props.scenePresetFeatureEnabled ? '只显示已通过完整场景质量门的动态空间；切换不会重置当前对话。' : '背景与人物独立保存在本机；当前为V1本地预览选择。'} />
               {props.scenePresetFeatureEnabled ? (
-                <div className="background-grid" aria-label="本机场景目录" data-testid="scene-preset-catalog">
-                  {(props.scenePresetCatalog?.items || []).map((scene) => (
+                <>
+                  {(props.scenePresetCatalog?.appearances?.length || 0) > 0 && <div className="segmented" role="radiogroup" aria-label="已批准外观">
+                    {props.scenePresetCatalog!.appearances!.map((appearance) => (
+                      <button
+                        key={appearance.appearance_id}
+                        type="button"
+                        role="radio"
+                        aria-checked={selectedAppearanceId === appearance.appearance_id}
+                        className={selectedAppearanceId === appearance.appearance_id ? 'is-active' : ''}
+                        onClick={() => setSelectedAppearanceId(appearance.appearance_id)}
+                      >{appearance.label}</button>
+                    ))}
+                  </div>}
+                  <div className="background-grid" aria-label="本机场景目录" data-testid="scene-preset-catalog">
+                  {viewedScenes.map((scene) => (
                     <article className={`background-card scene-preset-card ${scene.quality_status === 'active' ? 'is-active' : ''}`} key={scene.scene_id} data-scene-id={scene.scene_id}>
                       <img src={scene.preview_url} alt="" />
                       <span>
@@ -1921,7 +1959,7 @@ function SettingsDrawer(props: SettingsDrawerProps) {
                           className="scene-activate-button"
                           type="button"
                           disabled={!scene.can_activate || scene.quality_status === 'active' || !props.sceneSwitchAllowed}
-                          onClick={() => void props.onActivateScene(scene)}
+                          onClick={() => void props.onActivateScene(scene, selectedAppearanceId)}
                         >
                           {scene.quality_status === 'active' ? '正在使用' : !scene.can_activate ? '尚不可用' : props.sceneSwitchAllowed ? '切换到这里' : '回答结束后可切换'}
                         </button>
@@ -1929,7 +1967,8 @@ function SettingsDrawer(props: SettingsDrawerProps) {
                     </article>
                   ))}
                   {!props.scenePresetCatalog && <div className="empty-state"><strong>正在读取场景目录</strong><span>不会在素材未批准前开放切换。</span></div>}
-                </div>
+                  </div>
+                </>
               ) : (
                 <div className="background-grid" role="radiogroup" aria-label="本地背景">
                   {sceneBackgrounds.map((background) => (

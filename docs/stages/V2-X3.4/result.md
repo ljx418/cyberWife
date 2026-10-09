@@ -2,7 +2,7 @@
 
 ## 当前结论
 
-**AUTOMATED PASS / WAITING HUMAN X3.4-AC08。** 第二外观的三场景关键帧、Idle、MuseTalk 候选和真实音频口播均完成机器验收；候选保持 `staged` 且 `visual_approved=false`，当前红色外观和活动场景未改变。
+**PASS / COMPLETE。** 第二外观的三场景关键帧、Idle、MuseTalk 候选和真实音频口播均完成机器验收；项目所有者已批准三段视频，并在R2末段修复复验后批准继续。候选的运行态登记、组合切换和回滚由X3.5执行，当前红色外观和活动场景在X3.5提交前保持不变。
 
 ## 真实产物
 

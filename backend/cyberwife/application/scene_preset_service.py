@@ -64,27 +64,44 @@ class ScenePresetService:
     def _sha256(path: Path) -> str:
         return hashlib.sha256(path.read_bytes()).hexdigest()
 
-    def _bindings(self) -> dict[str, dict]:
+    def _bindings(self) -> tuple[dict[tuple[str, str | None], dict], int]:
         if self._binding_root is None:
-            return {}
-        target = self._binding_root / "scene-bindings.v1.json"
+            return {}, 1
+        v2_target = self._binding_root / "scene-bindings.v2.json"
+        target = v2_target if v2_target.is_file() else self._binding_root / "scene-bindings.v1.json"
         if not target.is_file():
-            return {}
+            return {}, 1
         payload = json.loads(target.read_text(encoding="utf-8"))
-        if payload.get("schema_version") != 1 or not isinstance(payload.get("bindings"), list):
+        schema_version = payload.get("schema_version")
+        if schema_version not in {1, 2} or not isinstance(payload.get("bindings"), list):
             raise ValueError("scene.binding_manifest_invalid")
-        result: dict[str, dict] = {}
+        result: dict[tuple[str, str | None], dict] = {}
         for item in payload["bindings"]:
             if not isinstance(item, dict) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", str(item.get("speaking_avatar_id", ""))):
                 raise ValueError("scene.binding_manifest_invalid")
             scene_id = str(item.get("scene_id", ""))
-            if scene_id in result:
+            appearance_id = None
+            if schema_version == 2:
+                try:
+                    appearance_id = str(UUID(str(item.get("appearance_id"))))
+                except (ValueError, TypeError, AttributeError) as exc:
+                    raise ValueError("scene.binding_manifest_invalid") from exc
+            key = (scene_id, appearance_id)
+            if key in result:
                 raise ValueError("scene.binding_duplicate")
-            result[scene_id] = dict(item)
-        return result
+            result[key] = dict(item)
+        return result, int(schema_version)
 
-    def _approved_binding(self, scene_id: str, manifest, bindings: dict[str, dict]) -> dict | None:
-        item = bindings.get(scene_id)
+    def _approved_binding(
+        self,
+        scene_id: str,
+        appearance_id: str | None,
+        manifest,
+        bindings: dict[tuple[str, str | None], dict],
+    ) -> dict | None:
+        item = bindings.get((scene_id, appearance_id))
+        if item is None and appearance_id is None:
+            item = bindings.get((scene_id, None))
         if item is None or self._binding_root is None or self._avatar_root is None:
             return None
         idle_path = (self._binding_root / str(item.get("idle_relative_path", ""))).resolve()
@@ -112,20 +129,40 @@ class ScenePresetService:
             or engine not in {"wav2lip", "musetalk"}
         ):
             return None
-        approved = {
-            record["kind"]: record for record in manifest.payload["renditions"]
-            if record["scene_id"] == scene_id and record["status"] in {"approved", "active"}
-        }
+        approved: dict[str, dict] = {}
+        for record in manifest.payload["renditions"]:
+            if record["scene_id"] != scene_id or record["status"] not in {"approved", "active"}:
+                continue
+            expected_sha = idle_sha if record["kind"] == "idle" else talking_sha
+            if record["sha256"] == expected_sha:
+                approved[record["kind"]] = record
         if (
             approved.get("idle", {}).get("sha256") != idle_sha
             or approved.get("talking", {}).get("sha256") != talking_sha
         ):
             return None
+        if appearance_id is not None:
+            appearance = next(
+                (record for record in manifest.payload["appearances"] if record["appearance_id"] == appearance_id),
+                None,
+            )
+            if (
+                appearance is None
+                or appearance["confirmed"] is not True
+                or any(
+                    not set(record["source_ids"]).issubset(set(appearance["source_ids"]))
+                    for record in approved.values()
+                )
+            ):
+                return None
         return {
             **item,
             "engine": engine,
             "idle_path": idle_path,
             "avatar_manifest": avatar_payload,
+            "rendition_ids": (
+                approved["idle"]["rendition_id"], approved["talking"]["rendition_id"]
+            ),
         }
 
     def ensure_registered(self) -> dict:
@@ -155,39 +192,101 @@ class ScenePresetService:
                 "can_activate": False,
             })
         manifest = self._source_pack.register_scenes(manifest_scenes)
-        bindings = self._bindings()
+        bindings, binding_schema = self._bindings()
         active_scene_id = manifest.payload.get("active_scene_id")
+        active_appearance_id = manifest.payload.get("active_appearance_id")
+        appearance_labels: dict[str, str] = {}
+        if binding_schema == 2:
+            for (_, appearance_id), binding in bindings.items():
+                if appearance_id is not None:
+                    appearance_labels.setdefault(appearance_id, str(binding.get("appearance_label", "已批准外观")))
+        appearances = [
+            {
+                "appearance_id": item["appearance_id"],
+                "label": appearance_labels.get(item["appearance_id"], "已批准外观"),
+                "confirmed": item["confirmed"],
+            }
+            for item in manifest.payload["appearances"]
+            if item["confirmed"] is True and item["appearance_id"] in appearance_labels
+        ]
+        selected_appearance_id = active_appearance_id
+        if selected_appearance_id is None and appearances:
+            selected_appearance_id = appearances[0]["appearance_id"]
+        combinations: list[dict] = []
+        if binding_schema == 2:
+            for (scene_id, appearance_id), _ in sorted(bindings.items()):
+                binding = self._approved_binding(scene_id, appearance_id, manifest, bindings)
+                if binding is not None and appearance_id is not None:
+                    combinations.append({
+                        "appearance_id": appearance_id,
+                        "scene_id": scene_id,
+                        "idle_url": f"/api/v1/scene-presets/{scene_id}/idle",
+                        "speaking_avatar_id": binding["speaking_avatar_id"],
+                        "engine": binding["engine"],
+                    })
         for item in catalog:
-            binding = self._approved_binding(item["scene_id"], manifest, bindings)
-            active = binding is not None and active_scene_id == item["scene_id"]
+            binding = self._approved_binding(item["scene_id"], selected_appearance_id, manifest, bindings)
+            active = (
+                binding is not None
+                and active_scene_id == item["scene_id"]
+                and (binding_schema == 1 or active_appearance_id == selected_appearance_id)
+            )
             item["quality_status"] = "active" if active else "approved" if binding else "preview_only"
             item["can_activate"] = binding is not None
             item["idle_url"] = (
                 f"/api/v1/scene-presets/{item['scene_id']}/idle" if binding else None
             )
             item["speaking_avatar_id"] = binding.get("speaking_avatar_id") if binding else None
+            item["appearance_id"] = selected_appearance_id
         return {
-            "schema_version": 1,
+            "schema_version": 2 if binding_schema == 2 else 1,
             "revision": manifest.revision,
             "active_scene_id": active_scene_id,
+            "active_appearance_id": active_appearance_id,
+            "appearances": appearances,
+            "combinations": combinations,
             "items": catalog,
         }
 
-    def activate(self, scene_id: str, *, expected_revision: int) -> dict:
+    def activate(
+        self,
+        scene_id: str,
+        *,
+        expected_revision: int,
+        appearance_id: str | None = None,
+    ) -> dict:
         catalog = self.ensure_registered()
-        target = next((item for item in catalog["items"] if item["scene_id"] == scene_id), None)
-        if target is None:
+        manifest = self._source_pack.load()
+        if manifest is None:
+            raise ValueError("source_pack.required")
+        bindings, binding_schema = self._bindings()
+        selected_appearance_id = appearance_id or manifest.payload.get("active_appearance_id")
+        binding = self._approved_binding(scene_id, selected_appearance_id, manifest, bindings)
+        if scene_id not in {item["scene_id"] for item in catalog["items"]}:
             raise ValueError("scene.not_found")
-        if not target["can_activate"]:
+        if binding is None:
             raise ValueError("scene.renditions_incomplete")
-        self._source_pack.activate_scene(scene_id, expected_revision=expected_revision)
+        if binding_schema == 2:
+            if selected_appearance_id is None:
+                raise ValueError("appearance.required")
+            self._source_pack.activate_combination(
+                scene_id,
+                selected_appearance_id,
+                rendition_ids=binding["rendition_ids"],
+                expected_revision=expected_revision,
+            )
+        else:
+            self._source_pack.activate_scene(scene_id, expected_revision=expected_revision)
         return self.ensure_registered()
 
     def idle_path(self, scene_id: str) -> Path:
         manifest = self._source_pack.load()
         if manifest is None:
             raise ValueError("source_pack.required")
-        binding = self._approved_binding(scene_id, manifest, self._bindings())
+        bindings, _ = self._bindings()
+        binding = self._approved_binding(
+            scene_id, manifest.payload.get("active_appearance_id"), manifest, bindings
+        )
         if binding is None:
             raise FileNotFoundError("scene.renditions_incomplete")
         return binding["idle_path"]
@@ -197,7 +296,10 @@ class ScenePresetService:
         if manifest is None or manifest.payload.get("active_scene_id") is None:
             return None
         scene_id = manifest.payload["active_scene_id"]
-        binding = self._approved_binding(scene_id, manifest, self._bindings())
+        bindings, _ = self._bindings()
+        binding = self._approved_binding(
+            scene_id, manifest.payload.get("active_appearance_id"), manifest, bindings
+        )
         if binding is None:
             return None
         avatar = binding["avatar_manifest"]

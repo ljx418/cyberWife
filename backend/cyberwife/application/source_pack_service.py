@@ -179,6 +179,114 @@ class SourcePackService:
             staged_sha256=staged_sha256,
         )
 
+    def register_combinations(
+        self,
+        *,
+        appearances: list[dict],
+        renditions: list[dict],
+        active_appearance_id: str,
+    ) -> SourcePackManifest:
+        """Atomically register approved X3.5 appearances and their renditions."""
+        current = self._repository.load()
+        if current is None:
+            raise ValueError("source_pack.required")
+        payload = current.to_dict()
+        payload["revision"] = current.revision + 1
+        payload["appearances"] = sorted(
+            ({
+                "appearance_id": str(item["appearance_id"]),
+                "source_ids": sorted(str(value) for value in item["source_ids"]),
+                "confirmed": bool(item["confirmed"]),
+            } for item in appearances),
+            key=lambda item: item["appearance_id"],
+        )
+        payload["renditions"] = sorted(
+            ({
+                "rendition_id": str(item["rendition_id"]),
+                "kind": str(item["kind"]),
+                "source_ids": sorted(str(value) for value in item["source_ids"]),
+                "scene_id": str(item["scene_id"]),
+                "status": str(item["status"]),
+                "sha256": str(item["sha256"]).lower(),
+            } for item in renditions),
+            key=lambda item: item["rendition_id"],
+        )
+        payload["active_appearance_id"] = str(active_appearance_id)
+        manifest = SourcePackManifest.from_dict(payload)
+        selected = next(
+            (item for item in manifest.payload["appearances"] if item["appearance_id"] == active_appearance_id),
+            None,
+        )
+        if selected is None or selected["confirmed"] is not True:
+            raise ValueError("appearance.not_confirmed")
+        comparable = manifest.to_dict()
+        comparable["revision"] = current.revision
+        if comparable == current.to_dict():
+            return current
+        staged_sha256 = self._repository.stage(manifest)
+        return self._repository.commit(
+            expected_revision=current.revision,
+            staged_sha256=staged_sha256,
+        )
+
+    def activate_combination(
+        self,
+        scene_id: str,
+        appearance_id: str,
+        *,
+        rendition_ids: tuple[str, str],
+        expected_revision: int,
+    ) -> SourcePackManifest:
+        """Atomically select one approved appearance+scene rendition pair."""
+        current = self._repository.load()
+        if current is None:
+            raise ValueError("source_pack.required")
+        if current.revision != expected_revision:
+            from cyberwife.ports.assets import ManifestRevisionConflict
+            raise ManifestRevisionConflict(
+                f"expected revision {expected_revision}, current revision {current.revision}"
+            )
+        appearance = next(
+            (item for item in current.payload["appearances"] if item["appearance_id"] == appearance_id),
+            None,
+        )
+        if appearance is None or appearance["confirmed"] is not True:
+            raise ValueError("appearance.not_confirmed")
+        if scene_id not in {item["scene_id"] for item in current.payload["scenes"]}:
+            raise ValueError("scene.not_found")
+        selected = [
+            item for item in current.payload["renditions"]
+            if item["rendition_id"] in set(rendition_ids)
+        ]
+        if (
+            len(selected) != 2
+            or {item["kind"] for item in selected} != {"idle", "talking"}
+            or any(item["scene_id"] != scene_id for item in selected)
+            or any(item["status"] not in {"approved", "active"} for item in selected)
+            or any(not set(item["source_ids"]).issubset(set(appearance["source_ids"])) for item in selected)
+        ):
+            raise ValueError("scene.renditions_incomplete")
+        if (
+            current.payload.get("active_scene_id") == scene_id
+            and current.payload.get("active_appearance_id") == appearance_id
+            and all(item["status"] == "active" for item in selected)
+        ):
+            return current
+        payload = current.to_dict()
+        payload["revision"] = current.revision + 1
+        payload["active_scene_id"] = scene_id
+        payload["active_appearance_id"] = appearance_id
+        selected_ids = set(rendition_ids)
+        for item in payload["renditions"]:
+            if item["kind"] in {"idle", "talking"} and item["status"] in {"approved", "active"}:
+                item["status"] = "active" if item["rendition_id"] in selected_ids else "approved"
+        manifest = SourcePackManifest.from_dict(payload)
+        staged_sha256 = self._repository.stage(manifest)
+        return self._repository.commit(
+            expected_revision=current.revision,
+            staged_sha256=staged_sha256,
+        )
+
     def activate_scene(self, scene_id: str, *, expected_revision: int) -> SourcePackManifest:
         """Atomically select a scene only when approved idle and talking assets exist."""
         current = self._repository.load()

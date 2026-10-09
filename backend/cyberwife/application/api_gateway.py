@@ -626,11 +626,15 @@ class ApiGateway:
             expected_revision = payload.get("expected_revision")
             if not isinstance(expected_revision, int) or isinstance(expected_revision, bool):
                 raise HTTPException(status_code=422, detail="scene.expected_revision_required")
+            appearance_id = payload.get("appearance_id")
+            if appearance_id is not None and not isinstance(appearance_id, str):
+                raise HTTPException(status_code=422, detail="appearance.invalid")
             try:
                 return await asyncio.to_thread(
                     self._scene_preset_service.activate,
                     scene_id,
                     expected_revision=expected_revision,
+                    appearance_id=appearance_id,
                 )
             except ManifestRevisionConflict:
                 raise HTTPException(status_code=409, detail="asset.version_conflict")
